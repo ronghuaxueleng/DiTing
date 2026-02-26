@@ -114,6 +114,8 @@ export default function Dashboard() {
 
     const queryClient = useQueryClient()
     const prevTasksRef = useRef<Record<string, Task>>()
+    const [recentlyFinished, setRecentlyFinished] = useState(false)
+    const cooldownTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
     useEffect(() => {
         if (tasksData && prevTasksRef.current) {
@@ -123,10 +125,18 @@ export default function Dashboard() {
             })
             if (hasNewlyFinished) {
                 queryClient.invalidateQueries({ queryKey: ['videos'] })
+                // Keep fast polling for a cooldown period after tasks finish
+                setRecentlyFinished(true)
+                clearTimeout(cooldownTimerRef.current)
+                cooldownTimerRef.current = setTimeout(() => setRecentlyFinished(false), 10000)
             }
         }
         prevTasksRef.current = tasksData
     }, [tasksData, queryClient])
+
+    useEffect(() => {
+        return () => clearTimeout(cooldownTimerRef.current)
+    }, [])
 
     const hasActiveTasks = tasksData
         ? Object.values(tasksData).some(t => ['processing', 'pending'].includes(t.status))
@@ -150,7 +160,7 @@ export default function Dashboard() {
             includeArchived: includeArchived || undefined,
             search: searchQuery || undefined
         }),
-        refetchInterval: hasActiveTasks ? 5000 : 30000,
+        refetchInterval: (hasActiveTasks || recentlyFinished) ? 5000 : 30000,
         refetchIntervalInBackground: false,
     })
 
