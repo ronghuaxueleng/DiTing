@@ -95,3 +95,13 @@ def get_first_asr_model_by_engine(engine_type):
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def get_configured_cloud_engines():
+    """Return set of cloud engine types that have at least one model config."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT engine FROM asr_models")
+    engines = {row[0] for row in cursor.fetchall()}
+    conn.close()
+    return engines

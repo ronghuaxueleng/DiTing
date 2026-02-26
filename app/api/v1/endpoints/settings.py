@@ -17,6 +17,7 @@ from app.db import (
     get_all_categories, add_category, update_category, delete_category
 )
 from app.core.logger import logger
+from app.asr.client import asr_client
 from app.schemas import (
     LLMProviderCreate,
     LLMModelCreate,
@@ -121,6 +122,7 @@ async def create_asr_model(model: ASRModelCreate):
         raise HTTPException(status_code=400, detail=f"Invalid JSON config: {e}")
     
     new_id = add_asr_model(model.name, model.engine, model.config)
+    asr_client.refresh_cloud_engines()
     return {"id": new_id, "status": "success"}
 
 
@@ -140,6 +142,7 @@ async def update_asr_model_endpoint(model_id: int, model: ASRModelCreate):
 async def delete_asr_model_endpoint(model_id: int):
     """Delete an ASR model configuration"""
     delete_asr_model(model_id)
+    asr_client.refresh_cloud_engines()
     return {"status": "success"}
 
 

@@ -40,6 +40,9 @@ export default function ASRTab() {
     // Structured form fields for cloud model config
     const [cloudForm, setCloudForm] = useState({ api_key: '', model_name: 'paraformer-realtime-v2' })
 
+    // Structured form fields for OpenAI-compatible ASR config
+    const [openaiForm, setOpenaiForm] = useState({ api_key: '', base_url: 'https://api.openai.com/v1', model_name: 'whisper-1' })
+
     // Supported DashScope models grouped by API type
     const DASHSCOPE_MODELS = [
         {
@@ -110,27 +113,49 @@ export default function ASRTab() {
         // Parse existing config into structured form
         try {
             const cfg = JSON.parse(model.config)
-            setCloudForm({ api_key: cfg.api_key || '', model_name: cfg.model_name || 'paraformer-realtime-v2' })
+            if (model.engine === 'openai_asr') {
+                setOpenaiForm({ api_key: cfg.api_key || '', base_url: cfg.base_url || 'https://api.openai.com/v1', model_name: cfg.model_name || 'whisper-1' })
+            } else {
+                setCloudForm({ api_key: cfg.api_key || '', model_name: cfg.model_name || 'paraformer-realtime-v2' })
+            }
         } catch {
             setCloudForm({ api_key: '', model_name: 'paraformer-realtime-v2' })
+            setOpenaiForm({ api_key: '', base_url: 'https://api.openai.com/v1', model_name: 'whisper-1' })
         }
         setShowModelForm(true)
     }
 
     const handleSaveModel = () => {
-        // Build JSON config from structured form
-        let apiKey = cloudForm.api_key
-        // When editing, preserve existing API key if field is left blank
-        if (editingModel && !apiKey) {
-            try {
-                const existingCfg = JSON.parse(editingModel.config)
-                apiKey = existingCfg.api_key || ''
-            } catch { /* ignore */ }
+        const isOpenAI = modelForm.engine === 'openai_asr'
+
+        let configJson: string
+        if (isOpenAI) {
+            let apiKey = openaiForm.api_key
+            if (editingModel && !apiKey) {
+                try {
+                    const existingCfg = JSON.parse(editingModel.config)
+                    apiKey = existingCfg.api_key || ''
+                } catch { /* ignore */ }
+            }
+            configJson = JSON.stringify({
+                api_key: apiKey,
+                base_url: openaiForm.base_url || 'https://api.openai.com/v1',
+                model_name: openaiForm.model_name,
+            })
+        } else {
+            let apiKey = cloudForm.api_key
+            if (editingModel && !apiKey) {
+                try {
+                    const existingCfg = JSON.parse(editingModel.config)
+                    apiKey = existingCfg.api_key || ''
+                } catch { /* ignore */ }
+            }
+            configJson = JSON.stringify({
+                api_key: apiKey,
+                model_name: cloudForm.model_name,
+            })
         }
-        const configJson = JSON.stringify({
-            api_key: apiKey,
-            model_name: cloudForm.model_name,
-        })
+
         const payload = { ...modelForm, config: configJson }
         if (editingModel) {
             updateModelMutation.mutate({ id: editingModel.id, ...payload })
@@ -373,6 +398,7 @@ export default function ASRTab() {
                             setEditingModel(null)
                             setModelForm({ name: '', engine: 'bailian', config: '' })
                             setCloudForm({ api_key: '', model_name: 'paraformer-realtime-v2' })
+                            setOpenaiForm({ api_key: '', base_url: 'https://api.openai.com/v1', model_name: 'whisper-1' })
                             setShowModelForm(true)
                         }}
                         className="flex items-center gap-1 text-sm text-[var(--color-primary)] hover:underline"
@@ -389,11 +415,14 @@ export default function ASRTab() {
                             {t('settings.asr.noCloudModels')}
                         </div>
                     )}
-                    {models?.filter((m: ASRModel) => m.engine === 'bailian').map((model: ASRModel) => (
+                    {models?.filter((m: ASRModel) => m.engine === 'bailian' || m.engine === 'openai_asr').map((model: ASRModel) => (
                         <div key={model.id} className="bg-[var(--color-bg)] p-3 rounded-lg border border-[var(--color-border)] flex items-center justify-between">
                             <div>
                                 <div className="font-medium flex items-center gap-2">
                                     {model.name}
+                                    <span className="bg-blue-500/10 text-blue-500 text-[10px] px-1.5 py-0.5 rounded">
+                                        {model.engine === 'openai_asr' ? 'OpenAI' : 'Bailian'}
+                                    </span>
                                     {Boolean(model.is_active) && <span className="bg-green-500/10 text-green-500 text-[10px] px-1.5 py-0.5 rounded">Active</span>}
                                 </div>
                                 <div className="text-xs text-[var(--color-text-muted)] mt-1 flex items-center gap-2">
@@ -405,6 +434,7 @@ export default function ASRTab() {
                                                     <span className="font-mono bg-[var(--color-bg-hover)] px-1.5 py-0.5 rounded">{cfg.model_name || t('settings.asr.unknownModel')}</span>
                                                     <span>·</span>
                                                     <span>{cfg.api_key ? `Key: ${cfg.api_key.slice(0, 6)}...` : t('settings.asr.noKey')}</span>
+                                                    {cfg.base_url && <><span>·</span><span className="truncate max-w-[200px]">{cfg.base_url}</span></>}
                                                 </>
                                             )
                                         } catch {
@@ -452,7 +482,7 @@ export default function ASRTab() {
                                     type="text"
                                     value={modelForm.name}
                                     onChange={e => setModelForm({ ...modelForm, name: e.target.value })}
-                                    placeholder={t('settings.asr.configNamePlaceholder')}
+                                    placeholder={modelForm.engine === 'openai_asr' ? t('settings.asr.openaiConfigNamePlaceholder') : t('settings.asr.configNamePlaceholder')}
                                     className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm"
                                 />
                             </div>
@@ -460,12 +490,58 @@ export default function ASRTab() {
                                 <label className="text-sm font-medium block mb-1">{t('settings.asr.engineType')}</label>
                                 <select
                                     value={modelForm.engine}
-                                    disabled
-                                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm opacity-50"
+                                    onChange={e => setModelForm({ ...modelForm, engine: e.target.value })}
+                                    disabled={!!editingModel}
+                                    className={`w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm ${editingModel ? 'opacity-50' : ''}`}
                                 >
                                     <option value="bailian">Aliyun Bailian / DashScope</option>
+                                    <option value="openai_asr">OpenAI Compatible</option>
                                 </select>
                             </div>
+                            {/* OpenAI-Compatible fields */}
+                            {modelForm.engine === 'openai_asr' && (
+                                <>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">{t('settings.asr.openaiBaseUrl')}</label>
+                                        <input
+                                            type="text"
+                                            value={openaiForm.base_url}
+                                            onChange={e => setOpenaiForm({ ...openaiForm, base_url: e.target.value })}
+                                            placeholder="https://api.openai.com/v1"
+                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                        />
+                                        <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                                            {t('settings.asr.openaiBaseUrlHint')}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">API Key</label>
+                                        <input
+                                            type="password"
+                                            value={openaiForm.api_key}
+                                            onChange={e => setOpenaiForm({ ...openaiForm, api_key: e.target.value })}
+                                            placeholder={editingModel ? t('settings.asr.leaveBlank') : 'sk-...'}
+                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">{t('settings.asr.model')}</label>
+                                        <input
+                                            type="text"
+                                            value={openaiForm.model_name}
+                                            onChange={e => setOpenaiForm({ ...openaiForm, model_name: e.target.value })}
+                                            placeholder="whisper-1"
+                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                        />
+                                        <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                                            {t('settings.asr.openaiModelHint')}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                            {/* Bailian/DashScope fields */}
+                            {modelForm.engine === 'bailian' && (
+                                <>
                             <div>
                                 <label className="text-sm font-medium block mb-1">{t('settings.asr.dashscopeKey')}</label>
                                 <input
@@ -542,7 +618,9 @@ export default function ASRTab() {
                                         <span>{t('settings.asr.multimodalHint')}</span>
                                     </div>
                                 </div>
-                            </div>
+                                </div>
+                                </>
+                            )}
                         </div>
                         <div className="flex justify-end gap-2 pt-2">
                             <button

@@ -8,9 +8,11 @@ import time
 from typing import List, Dict, Optional
 from app.core.config import settings
 from app.core.logger import logger
-from app.db.asr_config import get_active_model_for_engine
+from app.db.asr_config import get_active_model_for_engine, get_configured_cloud_engines
 from app.db.system_config import get_system_config, set_system_config
 import json
+
+CLOUD_ENGINES = {"bailian", "openai_asr"}
 
 class ASRClient:
     def __init__(self):
@@ -22,9 +24,13 @@ class ASRClient:
         self._last_health = {}  # Cache full /health response per engine
         
         # Runtime Config - Load from DB or use defaults
+        # Only include cloud engines that have at least one model configured
+        self._configured_clouds = get_configured_cloud_engines() & CLOUD_ENGINES
+
         default_priority = list(self.workers.keys())
-        if "bailian" not in default_priority:
-            default_priority.append("bailian")
+        for ce in sorted(self._configured_clouds):
+            if ce not in default_priority:
+                default_priority.append(ce)
             
         self.config = {
              # Default priority is order in settings or just list of keys
@@ -46,9 +52,36 @@ class ASRClient:
         for engine in self.workers.keys():
             self.availability[engine] = False
             self.latency[engine] = -1.0
-        # Cloud engines assumed available
-        self.availability["bailian"] = True
-        self.latency["bailian"] = 0.0
+        # Cloud engines assumed available (only if configured)
+        for ce in self._configured_clouds:
+            self.availability[ce] = True
+            self.latency[ce] = 0.0
+
+    def refresh_cloud_engines(self):
+        """Re-scan DB for configured cloud engines and update priority/availability."""
+        new_clouds = get_configured_cloud_engines() & CLOUD_ENGINES
+        added = new_clouds - self._configured_clouds
+        removed = self._configured_clouds - new_clouds
+
+        for ce in added:
+            self.availability[ce] = True
+            self.latency[ce] = 0.0
+            if ce not in self.config["priority"]:
+                self.config["priority"].append(ce)
+            logger.info(f"☁️ Cloud engine [{ce}] added to priority list")
+
+        for ce in removed:
+            self.availability.pop(ce, None)
+            self.latency.pop(ce, None)
+            if ce in self.config["priority"]:
+                self.config["priority"].remove(ce)
+            if self.config.get("active_engine") == ce:
+                self.config["active_engine"] = self.config["priority"][0] if self.config["priority"] else None
+            logger.info(f"☁️ Cloud engine [{ce}] removed from priority list")
+
+        self._configured_clouds = new_clouds
+        if added or removed:
+            self._save_config_to_db()
 
     def _load_config_from_db(self):
         """Load ASR config from system_configs table."""
@@ -56,7 +89,14 @@ class ASRClient:
             # Priority
             saved_priority = get_system_config("asr_priority")
             if saved_priority:
-                self.config["priority"] = json.loads(saved_priority)
+                loaded = json.loads(saved_priority)
+                # Filter out cloud engines that are no longer configured
+                valid_engines = set(self.workers.keys()) | self._configured_clouds
+                self.config["priority"] = [e for e in loaded if e in valid_engines]
+                # Add any new engines not in saved list
+                for e in valid_engines:
+                    if e not in self.config["priority"]:
+                        self.config["priority"].append(e)
                 logger.info(f"📂 Loaded ASR priority from DB: {self.config['priority']}")
             
             # Strict Mode
@@ -156,12 +196,13 @@ class ASRClient:
                 "latency": self.latency.get(engine, -1),
                 "url": url
             }
-        # Cloud
-        status["bailian"] = {
-            "type": "cloud",
-            "online": True, 
-            "latency": 0
-        }
+        # Cloud (only configured ones)
+        for ce in self._configured_clouds:
+            status[ce] = {
+                "type": "cloud",
+                "online": True,
+                "latency": 0
+            }
         return {
             "engines": status,
             "config": self.config
@@ -171,11 +212,12 @@ class ASRClient:
         """Update runtime config"""
         if priority is not None:
             # Validate engines exist
-            valid_prio = [e for e in priority if e in self.workers or e == "bailian"]
+            valid_prio = [e for e in priority if e in self.workers or e in self._configured_clouds]
             # Add missing engines to end
             for w in self.workers:
                 if w not in valid_prio: valid_prio.append(w)
-            if "bailian" not in valid_prio: valid_prio.append("bailian")
+            for ce in self._configured_clouds:
+                if ce not in valid_prio: valid_prio.append(ce)
             
             self.config["priority"] = valid_prio
             
@@ -183,7 +225,7 @@ class ASRClient:
             self.config["strict_mode"] = strict_mode
             
         if active_engine is not None:
-            if active_engine in self.workers or active_engine == "bailian":
+            if active_engine in self.workers or active_engine in self._configured_clouds:
                 self.config["active_engine"] = active_engine
 
         if disabled_engines is not None:
@@ -330,6 +372,31 @@ class ASRClient:
 
              cloud_engine = BaiLianASREngine(api_key=api_key, model_name=model_name)
              # DashScope SDK calls are synchronous — run in threadpool to avoid blocking the event loop
+             if output_format == "srt":
+                 return await run_in_threadpool(cloud_engine.generate_srt, audio_path, language, prompt)
+             else:
+                 return await run_in_threadpool(cloud_engine.predict, audio_path, language, prompt)
+
+        # 1b. Cloud Engine: OpenAI-Compatible API
+        if engine_key == "openai_asr":
+             from app.asr.openai_asr import OpenAIASREngine
+
+             db_config = get_active_model_for_engine("openai_asr")
+             api_key = None
+             base_url = "https://api.openai.com/v1"
+             model_name = "whisper-1"
+
+             if db_config:
+                 try:
+                     cfg = json.loads(db_config["config"])
+                     api_key = cfg.get("api_key")
+                     base_url = cfg.get("base_url", base_url)
+                     model_name = cfg.get("model_name", model_name)
+                     logger.info(f"☁️ Using OpenAI ASR Config: {model_name} @ {base_url} (ID: {db_config['id']})")
+                 except Exception as e:
+                     logger.error(f"❌ Failed to parse OpenAI ASR config: {e}")
+
+             cloud_engine = OpenAIASREngine(api_key=api_key, base_url=base_url, model_name=model_name)
              if output_format == "srt":
                  return await run_in_threadpool(cloud_engine.generate_srt, audio_path, language, prompt)
              else:
