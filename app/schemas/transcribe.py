@@ -141,7 +141,6 @@ class TranscribeResponse(BaseModel):
     # For cached responses
     text: Optional[str] = None
     raw_text: Optional[str] = None
-    ai_summary: Optional[str] = None
     cached: bool = False
     is_subtitle: bool = False
 

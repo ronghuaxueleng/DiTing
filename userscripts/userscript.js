@@ -1825,12 +1825,6 @@
 
                             window.sv_renderRootTree(initialRoot, summaries, treeContainer);
 
-                        } else if (data.ai_summary) {
-                            // Legacy Fallback
-                            aiBox.style.display = 'block';
-                            aiBox.className = 'sv-ai-result-box';
-                            aiBox.innerHTML = (typeof marked !== 'undefined') ? marked.parse(data.ai_summary) : data.ai_summary;
-                            document.getElementById('sv-acc-ai').classList.remove('collapsed');
                         } else {
                             aiBox.style.display = 'none';
                         }
@@ -1985,12 +1979,6 @@
                                             clearInterval(pollInterval);
                                             contentBox.innerHTML = (pData.cached ? `<div style="color:#10b981; font-size:11px; margin-bottom:4px; display:flex; align-items:center; gap:4px;">${ICONS.zap} 已命中缓存</div>` : '') + parseTextToHtml(pData.raw_text);
                                             renderLyrics(pData); // Render Lyrics View
-                                            if (pData.ai_summary) {
-                                                const aiBox = document.getElementById('sv-ai-result');
-                                                aiBox.style.display = 'block';
-                                                aiBox.innerHTML = (typeof marked !== 'undefined') ? marked.parse(pData.ai_summary) : pData.ai_summary;
-                                                document.getElementById('sv-acc-ai').classList.remove('collapsed');
-                                            }
                                             fetchAndRenderHistory();
                                         } else if (isFailed) {
                                             clearInterval(pollInterval);
@@ -2015,12 +2003,6 @@
                         // Cached or immediate
                         contentBox.innerHTML = (data.cached ? `<div style="color:#10b981; font-size:11px; margin-bottom:4px; display:flex; align-items:center; gap:4px;">${ICONS.zap} 已命中缓存</div>` : '') + parseTextToHtml(data.raw_text);
                         renderLyrics(data); // Render Lyrics View
-                        if (data.ai_summary) {
-                            const aiBox = document.getElementById('sv-ai-result');
-                            aiBox.style.display = 'block';
-                            aiBox.innerHTML = (typeof marked !== 'undefined') ? marked.parse(data.ai_summary) : data.ai_summary;
-                            document.getElementById('sv-acc-ai').classList.remove('collapsed');
-                        }
                         fetchAndRenderHistory();
                     }
                 } else {

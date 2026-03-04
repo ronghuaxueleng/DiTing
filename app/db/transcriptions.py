@@ -102,20 +102,6 @@ def get_transcription_by_source(source_id):
     return row
 
 
-def update_analysis(item_id, prompt, summary, llm_model=None):
-    """Update AI analysis fields (legacy)."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE transcriptions 
-        SET user_prompt = ?, ai_summary = ?, llm_model = ?
-        WHERE id = ?
-    ''', (prompt, summary, llm_model, item_id))
-    conn.commit()
-    conn.close()
-
-
-
 
 
 def update_task_status(item_id, status):

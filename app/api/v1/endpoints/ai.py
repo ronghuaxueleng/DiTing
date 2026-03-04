@@ -12,7 +12,7 @@ from fastapi import APIRouter, Body, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 from app.db import (
-    get_transcription_by_source, update_analysis, update_ai_status,
+    get_transcription_by_source, update_ai_status,
     add_ai_summary, get_ai_summaries, delete_ai_summary, clear_ai_summaries, update_ai_summary,
 )
 from app.core.config import settings
@@ -84,7 +84,6 @@ async def process_ai_analysis(
             delete_ai_summary(overwrite_id)
         
         add_ai_summary(item_id, prompt, summary, model_name, duration, parent_id=parent_id, input_text=input_text)
-        update_analysis(item_id, prompt, summary, model_name)
         
         update_ai_status(item_id, "completed")
         logger.info(f"✅ AI Analysis completed for Item {item_id}")

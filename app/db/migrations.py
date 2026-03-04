@@ -58,6 +58,16 @@ def init_db():
                     logger.info("  -> Adding api_type column to llm_providers table")
                     cursor.execute("ALTER TABLE llm_providers ADD COLUMN api_type TEXT DEFAULT 'chat_completions'")
                     current = "0.12.2"
+
+                # Migrations from v0.12.2 -> 0.12.3
+                if current == "0.12.2":
+                    logger.info("  -> Dropping legacy columns from transcriptions table (ai_summary, user_prompt, llm_model)")
+                    for col in ("ai_summary", "user_prompt", "llm_model"):
+                        try:
+                            cursor.execute(f"ALTER TABLE transcriptions DROP COLUMN {col}")
+                        except Exception as e:
+                            logger.warning(f"  -> Column {col} may not exist, skipping: {e}")
+                    current = "0.12.3"
                     
                 _set_version(cursor, CURRENT_VERSION)
                 logger.info(f"✅ Upgraded to v{CURRENT_VERSION}.")
