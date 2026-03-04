@@ -191,6 +191,7 @@ async def create_manual_summary(item: dict = Body(...)):
     parent_id = item.get("parent_id")
     summary = item.get("summary")
     prompt = item.get("prompt", "Manual Edit")
+    model = item.get("model", "User Edit")
     
     if not transcription_id or not summary:
         raise HTTPException(status_code=400, detail="Missing required fields")
@@ -199,7 +200,7 @@ async def create_manual_summary(item: dict = Body(...)):
         transcription_id,
         prompt,
         summary,
-        model="User Edit",
+        model=model,
         response_time=0,
         parent_id=parent_id
     )
