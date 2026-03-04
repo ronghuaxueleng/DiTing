@@ -1825,6 +1825,13 @@
 
                             window.sv_renderRootTree(initialRoot, summaries, treeContainer);
 
+
+                        } else if (data.ai_summary) {
+                            // Fallback: show latest summary as plain text
+                            aiBox.style.display = 'block';
+                            aiBox.className = 'sv-ai-result-box';
+                            aiBox.innerHTML = (typeof marked !== 'undefined') ? marked.parse(data.ai_summary) : data.ai_summary;
+                            document.getElementById('sv-acc-ai').classList.remove('collapsed');
                         } else {
                             aiBox.style.display = 'none';
                         }

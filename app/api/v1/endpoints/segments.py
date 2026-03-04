@@ -93,6 +93,7 @@ async def get_segment(segment_id: int):
         "segment_start": row['segment_start'],
         "segment_end": row['segment_end'],
         "has_ai": bool(summaries),
+        "ai_summary": summaries[0]['summary'] if summaries else None,
         "ai_status": row['ai_status'],
         "status": row['status'],
         "is_pinned": row['is_pinned'],

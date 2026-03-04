@@ -386,6 +386,7 @@ def build_video_detail(source_id: str, format_cover) -> dict | None:
         "asr_model": row.get('asr_model'),
         "is_subtitle": row.get('is_subtitle', 0),
         "is_pinned": row.get('is_pinned', 0),
+        "ai_summary": summaries[0]['summary'] if summaries else None,
         "summaries": [dict(s) for s in summaries],
         "segment_start": row['segment_start'],
         "segment_end": row['segment_end'],
