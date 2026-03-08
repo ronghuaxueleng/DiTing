@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { transcribeBilibili, transcribeYoutube, transcribeDouyin, transcribeNetwork, getPrompts } from '../api'
 import type { Prompt } from '../api/types'
 import { useEscapeKey } from '../hooks/useEscapeKey'
+import { useTranscriptionPrefs } from '../hooks/useTranscriptionPrefs'
 import Icons from './ui/Icons'
 
 interface AddVideoModalProps {
@@ -61,19 +62,15 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
     const [mode, setMode] = useState<'transcribe' | 'cache' | 'bookmark'>('transcribe')
     const [url, setUrl] = useState('')
     const [useUvr, setUseUvr] = useState(false)
-    const [subtitleMode, setSubtitleMode] = useState<'auto' | 'only_sub' | 'force_asr'>('auto')
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [showHintDetails, setShowHintDetails] = useState(false)
-    const [language, setLanguage] = useState('zh')
     const [quality, setQuality] = useState('best')
-    const [outputFormat, setOutputFormat] = useState('text') // text | srt | srt_char
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [clipboardHint, setClipboardHint] = useState('')
-    const [autoAnalyze, setAutoAnalyze] = useState(() => localStorage.getItem('diting_auto_analyze') === 'true')
-    const [selectedPromptId, setSelectedPromptId] = useState<number | ''>('')
     const [prompts, setPrompts] = useState<Prompt[]>([])
-    const [stripSubtitle, setStripSubtitle] = useState(true)
+    const prefs = useTranscriptionPrefs()
+    const { language, setLanguage, subtitleMode, setSubtitleMode, outputFormat, setOutputFormat, autoAnalyze, setAutoAnalyze, selectedPromptId, setSelectedPromptId, stripSubtitle, setStripSubtitle, saveAll } = prefs
     const inputRef = useRef<HTMLInputElement>(null)
 
     // Load prompts
@@ -81,11 +78,13 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
         getPrompts().then(data => {
             setPrompts(data)
             if (data && data.length > 0 && data[0]?.id) {
-                // Ensure the most used prompt is selected by default
-                setSelectedPromptId(data[0].id)
+                // If no saved prompt preference, select the most used prompt by default
+                if (selectedPromptId === '') {
+                    setSelectedPromptId(data[0].id)
+                }
             }
         }).catch(err => console.error("Failed to load prompts:", err))
-    }, [])
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Helper: extract a clean URL from clipboard text (handles share text like B站/抖音)
     const extractUrl = (text: string): string => {
@@ -217,6 +216,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                 await transcribeNetwork(request)
             }
 
+            saveAll()
             onSuccess()
         } catch (e) {
             setError((e as Error).message)
@@ -521,11 +521,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                                 <input
                                     type="checkbox"
                                     checked={autoAnalyze}
-                                    onChange={(e) => {
-                                        const checked = e.target.checked
-                                        setAutoAnalyze(checked)
-                                        localStorage.setItem('diting_auto_analyze', checked ? 'true' : 'false')
-                                    }}
+                                    onChange={(e) => setAutoAnalyze(e.target.checked)}
                                     className="w-4 h-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                                 />
                                 <span className="text-sm font-medium">{t('addVideo.autoAnalyze')}</span>

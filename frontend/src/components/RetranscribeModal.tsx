@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { retranscribe, getPrompts } from '../api'
 import { useEscapeKey } from '../hooks/useEscapeKey'
+import { useTranscriptionPrefs } from '../hooks/useTranscriptionPrefs'
 import Icons from './ui/Icons'
 import type { Video, Prompt } from '../api/types'
 
@@ -15,28 +16,25 @@ interface RetranscribeModalProps {
 export default function RetranscribeModal({ video, onClose, onSuccess }: RetranscribeModalProps) {
     useEscapeKey(onClose)
     const { t } = useTranslation()
-    const [language, setLanguage] = useState('zh')
     const [useUvr, setUseUvr] = useState(false)
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [prompt, setPrompt] = useState('')
-    const [outputFormat, setOutputFormat] = useState('text')
-    const [subtitleMode, setSubtitleMode] = useState<'auto' | 'only_sub' | 'force_asr'>('auto')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
-    const [autoAnalyze, setAutoAnalyze] = useState(() => localStorage.getItem('diting_auto_analyze') === 'true')
-    const [selectedPromptId, setSelectedPromptId] = useState<number | ''>('')
     const [prompts, setPrompts] = useState<Prompt[]>([])
-    const [stripSubtitle, setStripSubtitle] = useState(true)
+    const { language, setLanguage, subtitleMode, setSubtitleMode, outputFormat, setOutputFormat, autoAnalyze, setAutoAnalyze, selectedPromptId, setSelectedPromptId, stripSubtitle, setStripSubtitle, saveAll } = useTranscriptionPrefs()
 
     // Load prompts
     useEffect(() => {
         getPrompts().then(data => {
             setPrompts(data)
             if (data && data.length > 0 && data[0]?.id) {
-                setSelectedPromptId(data[0].id)
+                if (selectedPromptId === '') {
+                    setSelectedPromptId(data[0].id)
+                }
             }
         }).catch(err => console.error("Failed to load prompts:", err))
-    }, [])
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSubmit = async () => {
         setLoading(true)
@@ -54,6 +52,7 @@ export default function RetranscribeModal({ video, onClose, onSuccess }: Retrans
                 auto_analyze_prompt_id: autoAnalyze && typeof selectedPromptId === 'number' ? selectedPromptId : undefined,
                 auto_analyze_strip_subtitle: autoAnalyze ? stripSubtitle : undefined,
             })
+            saveAll()
             onSuccess()
         } catch (e) {
             setError((e as Error).message)
@@ -222,11 +221,7 @@ export default function RetranscribeModal({ video, onClose, onSuccess }: Retrans
                             <input
                                 type="checkbox"
                                 checked={autoAnalyze}
-                                onChange={(e) => {
-                                    const checked = e.target.checked
-                                    setAutoAnalyze(checked)
-                                    localStorage.setItem('diting_auto_analyze', checked ? 'true' : 'false')
-                                }}
+                                onChange={(e) => setAutoAnalyze(e.target.checked)}
                                 className="w-4 h-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                             />
                             <span className="text-sm font-medium">{t('addVideo.autoAnalyze')}</span>

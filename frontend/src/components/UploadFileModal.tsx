@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { useChunkedUpload } from '../hooks/useChunkedUpload'
+import { useTranscriptionPrefs } from '../hooks/useTranscriptionPrefs'
 import Icons from './ui/Icons'
 
 interface UploadFileModalProps {
@@ -18,7 +19,7 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
     const [showTypeMenu, setShowTypeMenu] = useState(false)
     const typeMenuRef = useRef<HTMLDivElement>(null)
 
-    const [language, setLanguage] = useState('zh')
+    const { language, setLanguage, saveAll } = useTranscriptionPrefs()
     const [useUvr, setUseUvr] = useState(false)
     const [prompt, setPrompt] = useState('')
 
@@ -82,6 +83,7 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
         if (file.size > 50 * 1024 * 1024) {
             try {
                 await startChunkUpload(file, uploadOptions)
+                saveAll()
                 onSuccess()
             } catch (e: any) {
                 if (e.message !== 'Aborted' && chunkState.phase !== 'cancelled') {
@@ -113,6 +115,7 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
                 throw new Error(err.detail || t('upload.uploadFailed'))
             }
 
+            saveAll()
             onSuccess()
         } catch (e) {
             alert(t('upload.uploadFailed') + ': ' + (e as Error).message)
