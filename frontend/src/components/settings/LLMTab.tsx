@@ -11,6 +11,8 @@ import {
     addLLMModel,
     updateLLMModel,
     testLLMModel,
+    fetchAvailableModels,
+    batchAddModels,
 } from '../../api'
 import { useToast } from '../../contexts/ToastContext'
 import Icons from '../ui/Icons'
@@ -33,6 +35,13 @@ export default function LLMTab() {
     const [editingModelId, setEditingModelId] = useState<number | null>(null)
     const [editModelName, setEditModelName] = useState('')
     const [testResults, setTestResults] = useState<Record<number, { loading: boolean; success?: boolean; message?: string; latency_ms?: number }>>({})
+
+    // Model discovery state
+    const [fetchingModelsProviderId, setFetchingModelsProviderId] = useState<number | null>(null)
+    const [availableModels, setAvailableModels] = useState<{ id: string; owned_by: string; already_added: boolean }[]>([])
+    const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set())
+    const [fetchError, setFetchError] = useState<string | null>(null)
+    const [isImporting, setIsImporting] = useState(false)
 
     const { data: providers, isLoading } = useQuery({
         queryKey: ['llm-providers'],
@@ -173,6 +182,52 @@ export default function LLMTab() {
             setTestResults(prev => ({ ...prev, [modelId]: { loading: false, success: false, message: e.message } }))
             showToast('error', t('settings.llm.testFailed') + ': ' + e.message)
         }
+    }
+
+    const handleFetchModels = async (providerId: number) => {
+        setFetchingModelsProviderId(providerId)
+        setAvailableModels([])
+        setSelectedModels(new Set())
+        setFetchError(null)
+        try {
+            const result = await fetchAvailableModels(providerId)
+            if (result.success) {
+                setAvailableModels(result.models)
+                // Pre-select models not yet added
+                const preSelected = new Set(result.models.filter(m => !m.already_added).map(m => m.id))
+                setSelectedModels(preSelected)
+            } else {
+                setFetchError(result.message)
+                showToast('error', t('settings.llm.fetchModelsFailed') + ': ' + result.message)
+            }
+        } catch (e: any) {
+            setFetchError(e.message)
+            showToast('error', t('settings.llm.fetchModelsFailed') + ': ' + e.message)
+        }
+    }
+
+    const handleImportSelected = async (providerId: number) => {
+        if (selectedModels.size === 0) return
+        setIsImporting(true)
+        try {
+            const result = await batchAddModels(providerId, Array.from(selectedModels))
+            queryClient.invalidateQueries({ queryKey: ['llm-providers'] })
+            showToast('success', t('settings.llm.fetchModelsSuccess', { count: result.added }))
+            setFetchingModelsProviderId(null)
+        } catch (e: any) {
+            showToast('error', e.message)
+        } finally {
+            setIsImporting(false)
+        }
+    }
+
+    const toggleModelSelection = (modelId: string) => {
+        setSelectedModels(prev => {
+            const next = new Set(prev)
+            if (next.has(modelId)) next.delete(modelId)
+            else next.add(modelId)
+            return next
+        })
     }
 
     const isEditing = editingId !== null
@@ -380,19 +435,95 @@ export default function LLMTab() {
                                         className="px-3 py-1 text-xs rounded-full border border-[var(--color-primary)] bg-[var(--color-bg)] outline-none min-w-[150px]"
                                     />
                                 ) : (
-                                    <button
-                                        onClick={() => {
-                                            setAddingModelProviderId(provider.id)
-                                            setNewModelName('')
-                                        }}
-                                        className="px-3 py-1.5 text-xs rounded-full border border-dashed border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:border-[var(--color-primary)] transition-colors flex items-center gap-1"
-                                        title={t('settings.llm.addModel')}
-                                    >
-                                        <Icons.Plus className="w-3 h-3" />
-                                        <span>{t('settings.llm.addModel')}</span>
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                setAddingModelProviderId(provider.id)
+                                                setNewModelName('')
+                                            }}
+                                            className="px-3 py-1.5 text-xs rounded-full border border-dashed border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:border-[var(--color-primary)] transition-colors flex items-center gap-1"
+                                            title={t('settings.llm.addModel')}
+                                        >
+                                            <Icons.Plus className="w-3 h-3" />
+                                            <span>{t('settings.llm.addModel')}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleFetchModels(provider.id)}
+                                            disabled={fetchingModelsProviderId === provider.id && availableModels.length === 0 && !fetchError}
+                                            className="px-3 py-1.5 text-xs rounded-full border border-dashed border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:border-[var(--color-primary)] transition-colors flex items-center gap-1"
+                                            title={t('settings.llm.fetchModels')}
+                                        >
+                                            {fetchingModelsProviderId === provider.id && availableModels.length === 0 && !fetchError
+                                                ? <Icons.Loader className="w-3 h-3 animate-spin" />
+                                                : <Icons.Refresh className="w-3 h-3" />
+                                            }
+                                            <span>{fetchingModelsProviderId === provider.id && availableModels.length === 0 && !fetchError
+                                                ? t('settings.llm.fetchingModels')
+                                                : t('settings.llm.fetchModels')
+                                            }</span>
+                                        </button>
+                                    </>
                                 )}
                             </div>
+
+                            {/* Model Discovery Dropdown */}
+                            {fetchingModelsProviderId === provider.id && (availableModels.length > 0 || fetchError) && (
+                                <div className="mt-3 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-3">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-xs font-medium">{t('settings.llm.fetchModels')}</span>
+                                        <button
+                                            onClick={() => setFetchingModelsProviderId(null)}
+                                            className="p-1 rounded-full text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors"
+                                        >
+                                            <Icons.X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                    {fetchError ? (
+                                        <div className="text-xs text-red-400 py-2">{fetchError}</div>
+                                    ) : availableModels.length === 0 ? (
+                                        <div className="text-xs text-[var(--color-text-muted)] py-2">{t('settings.llm.noModelsFound')}</div>
+                                    ) : (
+                                        <>
+                                            <div className="max-h-48 overflow-y-auto space-y-1">
+                                                {availableModels.map(model => (
+                                                    <label
+                                                        key={model.id}
+                                                        className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors ${model.already_added
+                                                            ? 'opacity-50 cursor-not-allowed'
+                                                            : 'hover:bg-[var(--color-bg-hover)]'
+                                                            }`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={model.already_added || selectedModels.has(model.id)}
+                                                            disabled={model.already_added}
+                                                            onChange={() => toggleModelSelection(model.id)}
+                                                            className="rounded"
+                                                        />
+                                                        <span className="flex-1 font-mono">{model.id}</span>
+                                                        {model.already_added && (
+                                                            <span className="text-[10px] text-[var(--color-text-muted)]">{t('settings.llm.alreadyAdded')}</span>
+                                                        )}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-[var(--color-border)]">
+                                                <span className="text-[10px] text-[var(--color-text-muted)]">
+                                                    {selectedModels.size} / {availableModels.filter(m => !m.already_added).length}
+                                                </span>
+                                                <button
+                                                    onClick={() => handleImportSelected(provider.id)}
+                                                    disabled={selectedModels.size === 0 || isImporting}
+                                                    className="px-3 py-1 text-xs bg-[var(--color-primary)] text-white rounded-lg disabled:opacity-50 flex items-center gap-1"
+                                                >
+                                                    {isImporting && <Icons.Loader className="w-3 h-3 animate-spin" />}
+                                                    {t('settings.llm.addSelected')}
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

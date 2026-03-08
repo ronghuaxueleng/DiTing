@@ -348,6 +348,17 @@ export async function testLLMModel(providerId: number, modelId: number): Promise
     return fetchJson(`${API_BASE}/settings/llm/providers/${providerId}/models/${modelId}/test`, { method: 'POST' })
 }
 
+export async function fetchAvailableModels(providerId: number): Promise<{ success: boolean; models: { id: string; owned_by: string; already_added: boolean }[]; message: string }> {
+    return fetchJson(`${API_BASE}/settings/llm/providers/${providerId}/available-models`)
+}
+
+export async function batchAddModels(providerId: number, modelNames: string[]): Promise<{ status: string; added: number }> {
+    return fetchJson(`${API_BASE}/settings/llm/providers/${providerId}/models/batch`, {
+        method: 'POST',
+        body: JSON.stringify({ model_names: modelNames }),
+    })
+}
+
 // ASR Models
 export async function getASRModels(): Promise<ASRModel[]> {
     return fetchJson(`${API_BASE}/settings/asr/models`)

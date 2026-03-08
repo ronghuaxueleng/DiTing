@@ -51,6 +51,7 @@ from app.db.llm_config import (
     set_active_model,
     get_active_model_full,
     get_llm_model_full_by_id,
+    batch_add_models,
 )
 
 # ASR Configuration
@@ -172,6 +173,7 @@ __all__ = [
     "set_active_model",
     "get_active_model_full",
     "get_llm_model_full_by_id",
+    "batch_add_models",
     
     # ASR Configuration
     "add_asr_model",

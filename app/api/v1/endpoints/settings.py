@@ -4,12 +4,12 @@ Unified settings management: LLM providers, ASR models, Prompts
 RESTful API design under /api/settings/*
 """
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 
 from app.db import (
     # LLM
     get_all_providers, add_provider, update_provider, delete_provider,
-    add_model, update_model, delete_model, set_active_model,
+    add_model, update_model, delete_model, set_active_model, batch_add_models,
     # ASR
     get_asr_models, add_asr_model, update_asr_model, delete_asr_model, set_active_asr_model,
     # Prompts
@@ -103,6 +103,42 @@ async def test_llm_model(provider_id: int, model_id: int):
         api_type=model_info.get('api_type', 'chat_completions')
     )
     return result
+
+
+@router.get("/llm/providers/{provider_id}/available-models")
+async def fetch_provider_models(provider_id: int):
+    """Fetch available models from a provider's remote API (OpenAI-compatible /models endpoint)"""
+    from app.db import get_llm_model_full_by_id
+    from app.services.llm import fetch_available_models
+    
+    providers = get_all_providers(include_models=True)
+    provider = next((p for p in providers if p['id'] == provider_id), None)
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    
+    result = await fetch_available_models(
+        api_key=provider['api_key'],
+        base_url=provider['base_url']
+    )
+    
+    if result['success']:
+        # Mark which models are already added locally
+        existing_names = {m['model_name'] for m in provider.get('models', [])}
+        for model in result['models']:
+            model['already_added'] = model['id'] in existing_names
+    
+    return result
+
+
+@router.post("/llm/providers/{provider_id}/models/batch")
+async def batch_add_provider_models(provider_id: int, body: dict = Body(...)):
+    """Batch add multiple models to a provider, skipping duplicates"""
+    model_names = body.get('model_names', [])
+    if not model_names:
+        raise HTTPException(status_code=400, detail="model_names is required")
+    
+    added = batch_add_models(provider_id, model_names)
+    return {"status": "success", "added": added}
 
 
 # ============ ASR Models ============

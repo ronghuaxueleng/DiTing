@@ -124,3 +124,24 @@ async def test_llm_connection(api_key: str, base_url: str, model: str, api_type:
     except Exception as e:
         latency = round((time.time() - start) * 1000)
         return {"success": False, "message": str(e), "latency_ms": latency}
+
+
+async def fetch_available_models(api_key: str, base_url: str):
+    """
+    Fetch available models from an OpenAI-compatible provider.
+    Uses GET /models endpoint (no token cost).
+    Returns { success: bool, models: list[{id, owned_by}], message: str }
+    """
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+    try:
+        response = await client.models.list()
+        models = [
+            {"id": m.id, "owned_by": getattr(m, "owned_by", "")}
+            for m in response.data
+        ]
+        # Sort alphabetically by model id
+        models.sort(key=lambda x: x["id"])
+        return {"success": True, "models": models, "message": "OK"}
+    except Exception as e:
+        logger.error(f"❌ Failed to fetch models from {base_url}: {e}")
+        return {"success": False, "models": [], "message": str(e)}

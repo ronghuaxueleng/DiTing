@@ -170,7 +170,14 @@
             "apiTypeResponses": "Responses (New)",
             "testConnection": "Test Connection",
             "testSuccess": "Connected ({{ms}}ms)",
-            "testFailed": "Connection failed"
+            "testFailed": "Connection failed",
+            "fetchModels": "Fetch Models",
+            "fetchingModels": "Fetching...",
+            "fetchModelsSuccess": "Successfully added {{count}} models",
+            "fetchModelsFailed": "Failed to fetch models",
+            "noModelsFound": "No available models found",
+            "addSelected": "Add Selected",
+            "alreadyAdded": "Already added"
         },
         "asr": {
             "title": "ASR Model Configuration",
