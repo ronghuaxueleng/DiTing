@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     TEMP_UPLOADS_DIR: str = "data/temp_uploads"
     COVERS_DIR: str = "data/covers"
     MEDIA_CACHE_DIR: str = "data/media_cache"
+    NOTE_SCREENSHOTS_DIR: str = "data/note_screenshots"
     
     # ASR Configuration
     ASR_ENGINE: str = "sensevoice"
@@ -64,3 +65,4 @@ os.makedirs(settings.TEMP_DOWNLOADS_DIR, exist_ok=True)
 os.makedirs(settings.TEMP_UPLOADS_DIR, exist_ok=True)
 os.makedirs(settings.COVERS_DIR, exist_ok=True)
 os.makedirs(settings.MEDIA_CACHE_DIR, exist_ok=True)
+os.makedirs(settings.NOTE_SCREENSHOTS_DIR, exist_ok=True)

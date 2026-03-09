@@ -90,6 +90,7 @@ function NoteTOC({ items, activeId, onItemClick }: {
 function GeneratePanel({
     style, setStyle,
     selectedModelId, setSelectedModelId,
+    enableScreenshots, setEnableScreenshots,
     providers,
     onGenerate,
     onCancel,
@@ -99,6 +100,8 @@ function GeneratePanel({
     setStyle: (s: 'concise' | 'detailed' | 'outline') => void
     selectedModelId: number | ''
     setSelectedModelId: (id: number | '') => void
+    enableScreenshots: boolean
+    setEnableScreenshots: (v: boolean) => void
     providers: LLMProvider[]
     onGenerate: () => void
     onCancel: () => void
@@ -142,6 +145,19 @@ function GeneratePanel({
                         ))}
                     </select>
                 </div>
+
+                {/* Screenshots toggle */}
+                <div className="note-gen-field">
+                    <label className="note-gen-label">{t('detail.aiNotes.screenshots')}</label>
+                    <label className="note-gen-checkbox">
+                        <input
+                            type="checkbox"
+                            checked={enableScreenshots}
+                            onChange={e => setEnableScreenshots(e.target.checked)}
+                        />
+                        <span>{t('detail.aiNotes.screenshotsDesc')}</span>
+                    </label>
+                </div>
             </div>
             <div className="note-gen-panel-footer">
                 <button className="note-btn note-btn-secondary" onClick={onCancel}>
@@ -173,6 +189,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     const [showVersions, setShowVersions] = useState(false)
     const [showGenPanel, setShowGenPanel] = useState(false)
     const [selectedModelId, setSelectedModelId] = useState<number | ''>('')
+    const [enableScreenshots, setEnableScreenshots] = useState(false)
     const [pendingDelete, setPendingDelete] = useState<number | null>(null)
     const [pendingReset, setPendingReset] = useState<boolean>(false)
     const [activeTocId, setActiveTocId] = useState<string | null>(null)
@@ -243,6 +260,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
         mutationFn: () => generateNote(sourceId, {
             style,
             llmModelId: selectedModelId || undefined,
+            enableScreenshots,
         }),
         onSuccess: () => {
             showToast('success', t('detail.aiNotes.generatedSuccess'))
@@ -343,6 +361,18 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
         h3: makeHeading('h3'),
         p: ({ children, ...props }: any) => <p {...props}>{renderTimestamps(children)}</p>,
         li: ({ children, ...props }: any) => <li {...props}>{renderTimestamps(children)}</li>,
+        img: ({ src, alt, ...props }: any) => {
+            const isScreenshot = src && src.includes('/api/note-screenshots/')
+            return (
+                <img
+                    src={src}
+                    alt={alt}
+                    className={isScreenshot ? 'note-screenshot' : undefined}
+                    loading="lazy"
+                    {...props}
+                />
+            )
+        },
     }
 
     // Reset heading counter before each render
@@ -444,6 +474,8 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
                     setStyle={setStyle}
                     selectedModelId={selectedModelId}
                     setSelectedModelId={setSelectedModelId}
+                    enableScreenshots={enableScreenshots}
+                    setEnableScreenshots={setEnableScreenshots}
                     providers={providers}
                     onGenerate={() => generateMut.mutate()}
                     onCancel={() => setShowGenPanel(false)}

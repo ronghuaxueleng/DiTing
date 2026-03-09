@@ -2,6 +2,8 @@
 Video Notes Router
 Handles: AI note generation (background), note CRUD, version management.
 """
+import hashlib
+import os
 import re
 import time
 from typing import Optional
@@ -16,10 +18,13 @@ from app.db import (
     get_all_transcriptions_by_source,
     get_active_model_full, get_llm_model_full_by_id,
 )
+from app.db.media_cache_entries import get_best_cache_path
 from app.services.llm import analyze_text
 from app.core.logger import logger, trace_id_ctx
+from app.core.config import settings
 from app.core.task_manager import task_manager, TaskCancelledException
 from app.utils.source_utils import normalize_source_id
+from app.utils.media_utils import extract_frame_at_time
 import asyncio
 
 router = APIRouter(tags=["Notes"])
@@ -33,6 +38,7 @@ class NoteGenerateRequest(BaseModel):
     prompt: Optional[str] = None       # Custom user prompt; None = use built-in note prompt
     llm_model_id: Optional[int] = None
     style: Optional[str] = None        # 'concise' | 'detailed' | 'outline'
+    enable_screenshots: bool = False    # Extract keyframe screenshots?
 
 
 class NoteUpdateRequest(BaseModel):
@@ -55,15 +61,27 @@ NOTE_SYSTEM_PROMPT = """你是一个专业的视频内容笔记助手，擅长�
 每一段转写文本的格式为：`[hh:mm:ss] 文本内容`
 请根据这些时间信息，在合适的章节标题中使用 `⏱ mm:ss` 格式标注时间。"""
 
+SCREENSHOT_PROMPT_ADDON = """
 
-def _build_note_prompt(style: Optional[str]) -> str:
+**关键帧截图指令：**
+在笔记中关键章节开头或重要视觉内容处，使用 `[[SCREENSHOT:mm:ss]]` 标记来请求关键帧截图。
+- 每篇笔记建议标注 3-6 个截图点。
+- mm:ss 应为视频中该画面出现的时间。
+- 标记独占一行，放在对应章节标题之后。
+- 示例：`[[SCREENSHOT:02:15]]`"""
+
+
+def _build_note_prompt(style: Optional[str], enable_screenshots: bool = False) -> str:
     """Build the final user prompt for note generation based on style."""
+    base = NOTE_SYSTEM_PROMPT
+    if enable_screenshots:
+        base += SCREENSHOT_PROMPT_ADDON
     if style == "concise":
-        return NOTE_SYSTEM_PROMPT + "\n\n**风格要求**：简洁模式，每个章节使用 3-5 条要点列表，避免大段文字。"
+        return base + "\n\n**风格要求**：简洁模式，每个章节使用 3-5 条要点列表，避免大段文字。"
     elif style == "outline":
-        return NOTE_SYSTEM_PROMPT + "\n\n**风格要求**：大纲模式，只输出标题和子标题，不需要详细内容。"
+        return base + "\n\n**风格要求**：大纲模式，只输出标题和子标题，不需要详细内容。"
     else:  # 'detailed' or default
-        return NOTE_SYSTEM_PROMPT + "\n\n**风格要求**：详细模式，充分展开每个章节，保留所有重要细节。"
+        return base + "\n\n**风格要求**：详细模式，充分展开每个章节，保留所有重要细节。"
 
 
 def _build_transcript_text(segments: list) -> str:
@@ -85,6 +103,76 @@ def _build_transcript_text(segments: list) -> str:
     return "\n".join(lines)
 
 
+# --- Screenshot Post-Processor ---
+
+def _parse_ts_to_seconds(ts: str) -> float:
+    """Convert 'mm:ss' or 'hh:mm:ss' to seconds."""
+    parts = ts.split(':')
+    parts = [int(p) for p in parts]
+    if len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    if len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    return 0
+
+
+def _extract_screenshots(content: str, source_id: str) -> str:
+    """Replace [[SCREENSHOT:mm:ss]] markers with actual screenshot images.
+
+    1. Find all markers via regex.
+    2. Find the video file via get_best_cache_path.
+    3. For each timestamp, extract a frame with FFmpeg.
+    4. Replace marker with Markdown image link.
+    If no video is cached, all markers are silently removed.
+    """
+    markers = re.findall(r'\[\[SCREENSHOT:(\d{1,2}:\d{2}(?::\d{2})?)\]\]', content)
+    if not markers:
+        return content
+
+    # Get video file path (prefer video quality, not audio_only)
+    media_path, quality = get_best_cache_path(source_id, 'playback')
+    if not media_path or quality == 'audio_only':
+        logger.info(f"📷 No video cache for {source_id}, removing screenshot markers")
+        return re.sub(r'\[\[SCREENSHOT:\d{1,2}:\d{2}(?::\d{2})?\]\]\n?', '', content)
+
+    full_video_path = os.path.abspath(media_path)
+    if not os.path.exists(full_video_path):
+        logger.warning(f"📷 Video file missing: {full_video_path}")
+        return re.sub(r'\[\[SCREENSHOT:\d{1,2}:\d{2}(?::\d{2})?\]\]\n?', '', content)
+
+    # Create output directory
+    out_dir = os.path.join(settings.NOTE_SCREENSHOTS_DIR, source_id)
+    os.makedirs(out_dir, exist_ok=True)
+
+    processed = set()  # avoid duplicate timestamps
+    for ts in markers:
+        if ts in processed:
+            continue
+        processed.add(ts)
+
+        seconds = _parse_ts_to_seconds(ts)
+        # Deterministic filename based on source + timestamp
+        name_hash = hashlib.md5(f"{source_id}_{ts}".encode()).hexdigest()[:12]
+        filename = f"{name_hash}.jpg"
+        out_path = os.path.join(out_dir, filename)
+
+        if not os.path.exists(out_path):
+            ok = extract_frame_at_time(full_video_path, seconds, out_path)
+            if not ok:
+                logger.warning(f"📷 Failed to extract frame at {ts} for {source_id}")
+                content = content.replace(f"[[SCREENSHOT:{ts}]]", '')
+                continue
+
+        img_url = f"/api/note-screenshots/{source_id}/{filename}"
+        content = content.replace(
+            f"[[SCREENSHOT:{ts}]]",
+            f"![⏱ {ts}]({img_url})"
+        )
+
+    logger.info(f"📷 Extracted {len(processed)} screenshots for {source_id}")
+    return content
+
+
 # --- Background Worker ---
 
 async def _process_note_generation(
@@ -94,6 +182,7 @@ async def _process_note_generation(
     prompt: str,
     llm_model_id: Optional[int],
     style: Optional[str],
+    enable_screenshots: bool = False,
     trace_id_token: str = None,
 ):
     token = None
@@ -115,6 +204,11 @@ async def _process_note_generation(
 
         content, model_name = llm_task.result()
         duration = round(time.time() - start_time, 2)
+
+        # Post-process: extract keyframe screenshots if enabled
+        if enable_screenshots:
+            task_manager.update_progress(task_id, 80, "Extracting keyframe screenshots...")
+            content = _extract_screenshots(content, source_id)
 
         task_manager.update_progress(task_id, 90, "Saving note...")
 
@@ -182,7 +276,7 @@ async def generate_note(request: NoteGenerateRequest, background_tasks: Backgrou
         raise HTTPException(status_code=422, detail="Transcription text is empty.")
 
     # Build final prompt
-    base_prompt = request.prompt or _build_note_prompt(request.style)
+    base_prompt = request.prompt or _build_note_prompt(request.style, request.enable_screenshots)
 
     # Create task
     task_id = -int(time.time() * 1000) % 1000000000
@@ -200,6 +294,7 @@ async def generate_note(request: NoteGenerateRequest, background_tasks: Backgrou
         base_prompt,
         request.llm_model_id,
         request.style,
+        request.enable_screenshots,
         trace_id,
     )
 

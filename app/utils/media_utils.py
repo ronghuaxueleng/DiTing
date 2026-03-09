@@ -28,6 +28,46 @@ def extract_video_frame(video_path: str, output_path: str) -> bool:
         return False
 
 
+def extract_frame_at_time(video_path: str, time_seconds: float, output_path: str) -> bool:
+    """Extract a single frame at a specific timestamp from a video using FFmpeg.
+
+    Args:
+        video_path: Absolute or relative path to the video file.
+        time_seconds: Position in seconds (e.g. 125.0 for 2:05).
+        output_path: Where to save the JPEG screenshot.
+
+    Returns:
+        True if the frame was extracted successfully, False otherwise.
+    """
+    try:
+        startupinfo = None
+        if hasattr(subprocess, 'STARTUPINFO'):
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+
+        cmd = [
+            'ffmpeg', '-y',
+            '-ss', str(time_seconds),
+            '-i', video_path,
+            '-vframes', '1',
+            '-q:v', '3',
+            output_path,
+        ]
+        result = subprocess.run(
+            cmd, capture_output=True, text=True,
+            encoding='utf-8', errors='ignore',
+            startupinfo=startupinfo,
+        )
+        if result.returncode != 0:
+            logger.warning(f"FFmpeg extract_frame failed at {time_seconds}s: {result.stderr[:200]}")
+            return False
+        return True
+    except Exception as e:
+        logger.error(f"FFmpeg Exception at {time_seconds}s: {e}")
+        return False
+
+
 def is_network_media_url(url: str) -> bool:
     """Check if URL is a direct media link."""
     url_lower = url.lower()

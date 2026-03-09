@@ -927,3 +927,38 @@ body {
 .note-toc-item--h1 { padding-left: 10px; }
 .note-toc-item--h2 { padding-left: 18px; font-size: 0.76rem; }
 .note-toc-item--h3 { padding-left: 26px; font-size: 0.73rem; }
+
+/* ---- Screenshot styles ---- */
+.note-screenshot {
+  width: 100%;
+  max-width: 640px;
+  border-radius: 8px;
+  margin: 10px 0;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.note-screenshot:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+/* Generate panel checkbox */
+.note-gen-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  padding: 4px 0;
+}
+
+.note-gen-checkbox input[type= checkbox] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
