@@ -736,3 +736,194 @@ body {
   gap: 8px;
   justify-content: flex-end;
 }
+
+/* ============================================================
+ * NoteView  GeneratePanel & TOC Styles (v2)
+ * ============================================================ */
+
+/* Read layout: content + TOC side-by-side */
+.note-read-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.note-read-layout .note-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- Generate Config Panel ---- */
+.note-gen-panel {
+  border: 1px solid var(--color-primary)/30;
+  background: var(--color-primary)/5;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 4px;
+  animation: note-panel-in 0.15s ease-out;
+}
+
+@keyframes note-panel-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.note-gen-panel-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.note-gen-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.note-gen-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Segmented style picker */
+.note-gen-segmented {
+  display: flex;
+  border-radius: 7px;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  background: var(--color-card);
+}
+
+.note-gen-seg-btn {
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: background 0.12s, color 0.12s;
+  border-right: 1px solid var(--color-border);
+}
+
+.note-gen-seg-btn:last-child {
+  border-right: none;
+}
+
+.note-gen-seg-btn:hover {
+  background: var(--color-hover-bg);
+  color: var(--color-text);
+}
+
+.note-gen-seg-btn.active {
+  background: var(--color-primary);
+  color: white;
+}
+
+/* Model select */
+.note-gen-select {
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  background: var(--color-card);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  outline: none;
+  min-width: 160px;
+}
+
+.note-gen-select:focus {
+  border-color: var(--color-primary);
+}
+
+.note-gen-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-primary)/20;
+}
+
+/* ---- TOC Outline Navigation ---- */
+.note-toc {
+  width: 180px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 8px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card-muted, var(--color-card));
+  font-size: 0.78rem;
+  /* Hide on small screens  handled in media query below */
+}
+
+@media (max-width: 1024px) {
+  .note-toc { display: none; }
+  .note-read-layout { display: block; }
+}
+
+.note-toc--collapsed {
+  width: auto;
+}
+
+.note-toc-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--color-border);
+  letter-spacing: 0.03em;
+}
+
+.note-toc-header:hover {
+  color: var(--color-text);
+}
+
+.note-toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+
+.note-toc-item {
+  display: block;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: color 0.1s, background 0.1s;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-left: 2px solid transparent;
+}
+
+.note-toc-item:hover {
+  color: var(--color-text);
+  background: var(--color-hover-bg);
+}
+
+.note-toc-item.active {
+  color: var(--color-primary);
+  border-left-color: var(--color-primary);
+  background: var(--color-primary)/8;
+  font-weight: 600;
+}
+
+/* Indentation by heading level */
+.note-toc-item--h1 { padding-left: 10px; }
+.note-toc-item--h2 { padding-left: 18px; font-size: 0.76rem; }
+.note-toc-item--h3 { padding-left: 26px; font-size: 0.73rem; }

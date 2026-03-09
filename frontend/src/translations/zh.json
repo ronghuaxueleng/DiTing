@@ -803,7 +803,11 @@
             "saveFailed": "笔记保存失败",
             "deleteFailed": "笔记删除失败",
             "exportMd": "导出 Markdown",
-            "noTranscription": "未找到转写内容 — 请先转写视频。"
+            "noTranscription": "未找到转写内容 — 请先转写视频。",
+            "model": "模型",
+            "defaultModel": "（默认模型）",
+            "startGenerate": "开始生成",
+            "toc": "目录"
         }
     },
     "aiSummaryModal": {

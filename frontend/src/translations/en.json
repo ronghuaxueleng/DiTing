@@ -794,7 +794,11 @@
             "saveFailed": "Failed to save note",
             "deleteFailed": "Failed to delete note",
             "exportMd": "Export Markdown",
-            "noTranscription": "No transcription found — please transcribe the video first."
+            "noTranscription": "No transcription found — please transcribe the video first.",
+            "model": "Model",
+            "defaultModel": "(Default Model)",
+            "startGenerate": "Start Generating",
+            "toc": "Outline"
         }
     },
     "aiSummaryModal": {
