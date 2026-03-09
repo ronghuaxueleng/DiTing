@@ -167,3 +167,23 @@ def create_all(cursor):
             FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
         )
     ''')
+
+    # --- Video Notes (AI-generated whole-video notes, v0.12.4+) ---
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS video_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_id TEXT NOT NULL,
+            content TEXT NOT NULL,
+            original_content TEXT,
+            prompt TEXT,
+            model TEXT,
+            provider_id INTEGER,
+            style TEXT,
+            response_time REAL,
+            is_edited BOOLEAN DEFAULT 0,
+            is_active BOOLEAN DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (source_id) REFERENCES video_meta (source_id) ON DELETE CASCADE
+        )
+    ''')

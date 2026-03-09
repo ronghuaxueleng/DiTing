@@ -34,11 +34,11 @@ def init_db():
 
         elif state == "legacy_integer":
             # Existing database with old integer version (≤18).
-            # Schema is already correct from previous migrations.
-            # Just upgrade the version column to TEXT and stamp new version.
+            # Run create_all (IF NOT EXISTS) to pick up any new tables, then re-stamp version.
             old_ver = _get_legacy_int_version(cursor)
             logger.info(f"⬆️ Database at v{old_ver} (legacy integer), upgrading to v{CURRENT_VERSION}...")
             _upgrade_version_column(cursor)
+            db_schema.create_all(cursor)
             _set_version(cursor, CURRENT_VERSION)
             logger.info(f"✅ Upgraded to v{CURRENT_VERSION}.")
 
@@ -68,7 +68,30 @@ def init_db():
                         except Exception as e:
                             logger.warning(f"  -> Column {col} may not exist, skipping: {e}")
                     current = "0.12.3"
-                    
+
+                # Migrations from v0.12.3 -> 0.12.4
+                if current == "0.12.3":
+                    logger.info("  -> Creating video_notes table for AI-generated whole-video notes")
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS video_notes (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            source_id TEXT NOT NULL,
+                            content TEXT NOT NULL,
+                            original_content TEXT,
+                            prompt TEXT,
+                            model TEXT,
+                            provider_id INTEGER,
+                            style TEXT,
+                            response_time REAL,
+                            is_edited BOOLEAN DEFAULT 0,
+                            is_active BOOLEAN DEFAULT 1,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (source_id) REFERENCES video_meta (source_id) ON DELETE CASCADE
+                        )
+                    ''')
+                    current = "0.12.4"
+
                 _set_version(cursor, CURRENT_VERSION)
                 logger.info(f"✅ Upgraded to v{CURRENT_VERSION}.")
             else:

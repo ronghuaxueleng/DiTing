@@ -747,6 +747,7 @@
             "title": "Transcription",
             "listMode": "List",
             "immersiveMode": "Immersive",
+            "noteMode": "AI Notes",
             "empty": "No transcription segments yet"
         },
         "layout": {
@@ -767,6 +768,33 @@
             "noUrl": "Cannot append cache: Missing original URL",
             "success": "Added to background download queue",
             "failed": "Failed to add"
+        },
+        "aiNotes": {
+            "generate": "Generate AI Notes",
+            "generating": "Generating...",
+            "regenerate": "Regenerate",
+            "edit": "Edit",
+            "save": "Save",
+            "cancel": "Cancel",
+            "resetToOriginal": "Reset to AI Version",
+            "resetConfirm": "Reset note to the original AI-generated content? Your edits will be lost.",
+            "emptyTitle": "No AI Notes Yet",
+            "emptyDesc": "Generate a structured note from this video's transcript using AI.",
+            "style": "Note Style",
+            "styleConcise": "Concise (Key Points)",
+            "styleDetailed": "Detailed (Full Content)",
+            "styleOutline": "Outline (Headings Only)",
+            "version": "Version",
+            "versionLabel": "History",
+            "deleteVersion": "Delete this version",
+            "deleteConfirm": "Delete this note version?",
+            "editedBadge": "Edited",
+            "generatedSuccess": "AI note generation started",
+            "generateFailed": "Failed to start note generation",
+            "saveFailed": "Failed to save note",
+            "deleteFailed": "Failed to delete note",
+            "exportMd": "Export Markdown",
+            "noTranscription": "No transcription found — please transcribe the video first."
         }
     },
     "aiSummaryModal": {

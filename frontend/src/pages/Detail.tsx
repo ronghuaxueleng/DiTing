@@ -17,6 +17,7 @@ import ReactMarkdown from 'react-markdown'
 import AISummaryModal from '../components/AISummaryModal'
 import ConfirmModal from '../components/ConfirmModal'
 import ImmersiveView from '../components/ImmersiveView'
+import NoteView from '../components/NoteView'
 import SegmentCard, { type RefineContext } from '../components/SegmentCard'
 import Icons from '../components/ui/Icons'
 import { useToast } from '../contexts/ToastContext'
@@ -36,7 +37,7 @@ export default function Detail() {
 
     // Player State
     const [activeTab, setActiveTab] = useState<'local' | 'stream' | 'embed'>('local')
-    const [contentTab, setContentTab] = useState<'segments' | 'immersive'>('segments')
+    const [contentTab, setContentTab] = useState<'segments' | 'immersive' | 'notes'>('segments')
     const [currentTime, setCurrentTime] = useState(0)
     const playerRef = useRef<HTMLVideoElement | HTMLAudioElement>(null)
     const lastTimeRef = useRef(0)
@@ -522,77 +523,100 @@ export default function Detail() {
                         className={`flex-1 flex-col flex min-h-0 lg:overflow-hidden lg:pl-3 ${mobileLayout === 'split' ? 'overflow-hidden' : ''}`}
                         style={!isDesktop && mobileLayout === 'split' && stickyHeight > 0 ? { height: `calc(100vh - 4rem - ${stickyHeight}px)`, flexShrink: 0 } : undefined}
                     >
-                    {isLoading ? (
-                        <div className="flex justify-center py-20">
-                            <div className="animate-spin h-8 w-8 border-4 border-[var(--color-primary)] border-t-transparent rounded-full" />
-                        </div>
-                    ) : (
-                        <div className={`flex-1 flex flex-col ${mobileLayout === 'split' ? 'overflow-hidden min-h-0' : 'lg:overflow-hidden'}`}>
-                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4 shrink-0">
-                                <h2 className="text-lg font-semibold flex items-center gap-2">
-                                    <Icons.FileText className="w-5 h-5" />
-                                    {t('detail.transcription.title')}
-                                </h2>
-                                {/* Immersive Trigger */}
-                                <div className="flex bg-[var(--color-card-muted)] p-1 rounded-lg">
-                                    <button
-                                        onClick={() => setContentTab('segments')}
-                                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${contentTab === 'segments'
-                                            ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
-                                            : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-                                            }`}
-                                    >
-                                        {t('detail.transcription.listMode')}
-                                    </button>
-                                    <button
-                                        onClick={() => setContentTab('immersive')}
-                                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${contentTab === 'immersive'
-                                            ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]' // Active
-                                            : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-                                            }`}
-                                    >
-                                        <Icons.Music className="w-3 h-3" />
-                                        {t('detail.transcription.immersiveMode')}
-                                    </button>
-                                </div>
+                        {isLoading ? (
+                            <div className="flex justify-center py-20">
+                                <div className="animate-spin h-8 w-8 border-4 border-[var(--color-primary)] border-t-transparent rounded-full" />
                             </div>
+                        ) : (
+                            <div className={`flex-1 flex flex-col ${mobileLayout === 'split' ? 'overflow-hidden min-h-0' : 'lg:overflow-hidden'}`}>
+                                <div className="flex flex-wrap items-center justify-between gap-3 mb-4 shrink-0">
+                                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                                        <Icons.FileText className="w-5 h-5" />
+                                        {t('detail.transcription.title')}
+                                    </h2>
+                                    {/* Immersive Trigger */}
+                                    <div className="flex bg-[var(--color-card-muted)] p-1 rounded-lg">
+                                        <button
+                                            onClick={() => setContentTab('segments')}
+                                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${contentTab === 'segments'
+                                                ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                                                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                }`}
+                                        >
+                                            {t('detail.transcription.listMode')}
+                                        </button>
+                                        <button
+                                            onClick={() => setContentTab('immersive')}
+                                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${contentTab === 'immersive'
+                                                ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]' // Active
+                                                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                }`}
+                                        >
+                                            <Icons.Music className="w-3 h-3" />
+                                            {t('detail.transcription.immersiveMode')}
+                                        </button>
+                                        <button
+                                            onClick={() => setContentTab('notes')}
+                                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${contentTab === 'notes'
+                                                ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                                                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                }`}
+                                        >
+                                            <Icons.FileText className="w-3 h-3" />
+                                            {t('detail.transcription.noteMode')}
+                                        </button>
+                                    </div>
+                                </div>
 
-                            {contentTab === 'segments' ? (
-                                segments?.length === 0 ? (
-                                    <div className="text-center py-20 text-[var(--color-text-muted)]">
-                                        {t('detail.transcription.empty')}
+                                {contentTab === 'segments' ? (
+                                    segments?.length === 0 ? (
+                                        <div className="text-center py-20 text-[var(--color-text-muted)]">
+                                            {t('detail.transcription.empty')}
+                                        </div>
+                                    ) : (
+                                        <div className={`flex-1 space-y-4 pr-2 ${mobileLayout === 'split' ? 'overflow-y-auto' : 'overflow-y-auto lg:overflow-y-auto'}`}>
+                                            {segments?.map((segment) => (
+                                                <SegmentCard
+                                                    key={segment.id}
+                                                    segment={segment}
+                                                    onRefresh={refetchSegments}
+                                                    highlightText={highlightQuery}
+                                                    onOpenAiModal={(seg, refineCtx) => setAiModalState({ segment: seg, refineContext: refineCtx })}
+                                                />
+                                            ))}
+                                        </div>
+                                    )
+                                ) : contentTab === 'immersive' ? (
+                                    <div className={`flex-1 lg:min-h-0 h-full ${mobileLayout === 'split' ? 'min-h-0 overflow-hidden' : 'min-h-[60vh] lg:overflow-hidden'}`}>
+                                        <ImmersiveView
+                                            segments={segments || []}
+                                            currentTime={currentTime}
+                                            onSeek={(time) => {
+                                                if (playerRef.current) {
+                                                    playerRef.current.currentTime = time
+                                                    playerRef.current.play()
+                                                }
+                                            }}
+                                            height="100%"
+                                        />
                                     </div>
                                 ) : (
-                                    <div className={`flex-1 space-y-4 pr-2 ${mobileLayout === 'split' ? 'overflow-y-auto' : 'overflow-y-auto lg:overflow-y-auto'}`}>
-                                        {segments?.map((segment) => (
-                                            <SegmentCard
-                                                key={segment.id}
-                                                segment={segment}
-                                                onRefresh={refetchSegments}
-                                                highlightText={highlightQuery}
-                                                onOpenAiModal={(seg, refineCtx) => setAiModalState({ segment: seg, refineContext: refineCtx })}
-                                            />
-                                        ))}
+                                    <div className={`flex-1 overflow-y-auto ${mobileLayout === 'split' ? '' : 'lg:overflow-y-auto'}`}>
+                                        <NoteView
+                                            sourceId={sourceId!}
+                                            segments={segments || []}
+                                            onSeek={(time) => {
+                                                if (playerRef.current) {
+                                                    playerRef.current.currentTime = time
+                                                    playerRef.current.play()
+                                                }
+                                            }}
+                                        />
                                     </div>
-                                )
-                            ) : (
-                                <div className={`flex-1 lg:min-h-0 h-full ${mobileLayout === 'split' ? 'min-h-0 overflow-hidden' : 'min-h-[60vh] lg:overflow-hidden'}`}>
-                                    <ImmersiveView
-                                        segments={segments || []}
-                                        currentTime={currentTime}
-                                        onSeek={(time) => {
-                                            if (playerRef.current) {
-                                                playerRef.current.currentTime = time
-                                                playerRef.current.play()
-                                            }
-                                        }}
-                                        height="100%"
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {/* Right panel expand handle (shown when right panel is collapsed on desktop) */}

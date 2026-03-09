@@ -660,3 +660,49 @@ export async function batchSetVideoTags(sourceIds: string[], tagIds: number[]): 
         body: JSON.stringify({ source_ids: sourceIds, tag_ids: tagIds })
     })
 }
+
+// ============ Video Notes API ============
+
+import type { VideoNote } from './types'
+
+export async function generateNote(
+    sourceId: string,
+    options?: { prompt?: string; llmModelId?: number; style?: 'concise' | 'detailed' | 'outline' }
+): Promise<{ status: string; task_id: number }> {
+    return fetchJson(`${API_BASE}/notes/generate`, {
+        method: 'POST',
+        body: JSON.stringify({
+            source_id: sourceId,
+            prompt: options?.prompt,
+            llm_model_id: options?.llmModelId,
+            style: options?.style,
+        }),
+    })
+}
+
+export async function getNotes(sourceId: string): Promise<VideoNote[]> {
+    return fetchJson(`${API_BASE}/notes?source_id=${encodeURIComponent(sourceId)}`)
+}
+
+export async function getActiveNote(sourceId: string): Promise<VideoNote | null> {
+    return fetchJson(`${API_BASE}/notes/active?source_id=${encodeURIComponent(sourceId)}`)
+}
+
+export async function updateNote(noteId: number, content: string): Promise<void> {
+    await fetchJson(`${API_BASE}/notes/${noteId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content }),
+    })
+}
+
+export async function resetNote(noteId: number): Promise<void> {
+    await fetchJson(`${API_BASE}/notes/${noteId}/reset`, { method: 'PATCH' })
+}
+
+export async function activateNote(noteId: number): Promise<void> {
+    await fetchJson(`${API_BASE}/notes/${noteId}/activate`, { method: 'PATCH' })
+}
+
+export async function deleteNote(noteId: number): Promise<void> {
+    await fetchJson(`${API_BASE}/notes/${noteId}`, { method: 'DELETE' })
+}

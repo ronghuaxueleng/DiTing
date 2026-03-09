@@ -127,6 +127,18 @@ from app.db.tags import (
     batch_get_video_tags,
 )
 
+# Video Notes (v0.12.4+)
+from app.db.video_notes import (
+    add_video_note,
+    get_active_note,
+    get_all_notes,
+    update_note_content,
+    reset_note_to_original,
+    delete_video_note,
+    set_note_active,
+    get_note_by_id,
+)
+
 __all__ = [
     # Connection helpers
     "get_connection",
@@ -235,4 +247,14 @@ __all__ = [
     "add_tag_to_video",
     "remove_tag_from_video",
     "batch_get_video_tags",
+
+    # Video Notes (v0.12.4+)
+    "add_video_note",
+    "get_active_note",
+    "get_all_notes",
+    "update_note_content",
+    "reset_note_to_original",
+    "delete_video_note",
+    "set_note_active",
+    "get_note_by_id",
 ]

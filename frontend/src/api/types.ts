@@ -77,6 +77,21 @@ export interface AISummary {
     children?: AISummary[]
 }
 
+export interface VideoNote {
+    id: number
+    source_id: string
+    content: string
+    original_content: string | null
+    prompt: string | null
+    model: string | null
+    style: string | null
+    response_time: number | null
+    is_edited: boolean
+    is_active: boolean
+    created_at: string
+    updated_at: string
+}
+
 // Pagination
 export interface PaginatedVideos {
     total: number

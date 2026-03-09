@@ -756,6 +756,7 @@
             "title": "转写内容",
             "listMode": "列表模式",
             "immersiveMode": "沉浸模式",
+            "noteMode": "AI 笔记",
             "empty": "暂无转写片段"
         },
         "layout": {
@@ -776,6 +777,33 @@
             "noUrl": "无法追加缓存：缺少原始URL",
             "success": "已添加到后台下载队列",
             "failed": "添加失败"
+        },
+        "aiNotes": {
+            "generate": "生成 AI 笔记",
+            "generating": "生成中...",
+            "regenerate": "重新生成",
+            "edit": "编辑",
+            "save": "保存",
+            "cancel": "取消",
+            "resetToOriginal": "重置为 AI 原版",
+            "resetConfirm": "将笔记重置为 AI 生成的原始内容？您的编辑将会丢失。",
+            "emptyTitle": "暂无 AI 笔记",
+            "emptyDesc": "使用 AI 从视频转写中生成结构化笔记。",
+            "style": "笔记风格",
+            "styleConcise": "简洁 (关键要点)",
+            "styleDetailed": "详细 (完整内容)",
+            "styleOutline": "大纲 (仅标题)",
+            "version": "版本",
+            "versionLabel": "历史版本",
+            "deleteVersion": "删除本版本",
+            "deleteConfirm": "确定删除本版笔记？",
+            "editedBadge": "已编辑",
+            "generatedSuccess": "AI 笔记生成任务已启动",
+            "generateFailed": "笔记生成启动失败",
+            "saveFailed": "笔记保存失败",
+            "deleteFailed": "笔记删除失败",
+            "exportMd": "导出 Markdown",
+            "noTranscription": "未找到转写内容 — 请先转写视频。"
         }
     },
     "aiSummaryModal": {

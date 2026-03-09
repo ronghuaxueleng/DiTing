@@ -20,7 +20,8 @@ api_router.include_router(settings.router, prefix="")     # /api/settings/* (new
 api_router.include_router(search.router, prefix="")       # /api/search
 api_router.include_router(cache.router, prefix="")        # /api/cache/*
 api_router.include_router(upload.router, prefix="")       # /api/upload/*
-from app.api.v1.endpoints import asr, tags
+from app.api.v1.endpoints import asr, tags, notes
 api_router.include_router(asr.router, prefix="/asr")      # /api/asr/status, /api/asr/config
 api_router.include_router(tags.router, prefix="")         # /api/tags, /api/videos/{id}/tags
+api_router.include_router(notes.router, prefix="")        # /api/notes/*
 
