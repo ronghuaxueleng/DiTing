@@ -18,6 +18,7 @@ import AISummaryModal from '../components/AISummaryModal'
 import ConfirmModal from '../components/ConfirmModal'
 import ImmersiveView from '../components/ImmersiveView'
 import NoteView from '../components/NoteView'
+import RetranscribeModal from '../components/RetranscribeModal'
 import SegmentCard, { type RefineContext } from '../components/SegmentCard'
 import Icons from '../components/ui/Icons'
 import { useToast } from '../contexts/ToastContext'
@@ -193,35 +194,8 @@ export default function Detail() {
     const [isEditingNotes, setIsEditingNotes] = useState(false)
     const [notesContent, setNotesContent] = useState('')
 
-    // Retranscribe State
-    const [retranscribeConfirm, setRetranscribeConfirm] = useState(false)
-
-    const handleRetranscribe = async () => {
-        if (!video) return
-        if (video.source_type !== 'bilibili' && video.source_type !== 'youtube' && video.source_type !== 'douyin') {
-            showToast('error', t('videoCard.retranscribeUnsupported'))
-            return
-        }
-        setRetranscribeConfirm(false)
-        try {
-            if (video.source_type === 'bilibili') {
-                const url = video.original_source || `https://www.bilibili.com/video/${video.source_id}`
-                const { transcribeBilibili } = await import('../api')
-                await transcribeBilibili({ url })
-            } else if (video.source_type === 'youtube') {
-                const url = video.original_source || `https://www.youtube.com/watch?v=${video.source_id}`
-                const { transcribeYoutube } = await import('../api')
-                await transcribeYoutube({ url })
-            } else if (video.source_type === 'douyin') {
-                const { transcribeDouyin } = await import('../api')
-                await transcribeDouyin({ url: video.source_id })
-            }
-            showToast('success', t('common.success'))
-            queryClient.invalidateQueries({ queryKey: ['video', sourceId] })
-        } catch (e) {
-            showToast('error', t('common.error') + ': ' + (e as Error).message)
-        }
-    }
+    // Retranscribe Modal State
+    const [showRetranscribeModal, setShowRetranscribeModal] = useState(false)
 
     // Mutation for Notes
     const updateNotesMutation = useMutation({
@@ -390,7 +364,7 @@ export default function Detail() {
                         {/* Re-transcribe Button */}
                         {(video?.source_type === 'bilibili' || video?.source_type === 'youtube' || (video?.source_type === 'douyin' && video?.media_available)) && (
                             <button
-                                onClick={() => setRetranscribeConfirm(true)}
+                                onClick={() => setShowRetranscribeModal(true)}
                                 className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-card)] rounded-lg transition-all duration-200"
                                 title={t('detail.retranscribe')}
                             >
@@ -736,17 +710,19 @@ export default function Detail() {
                 }}
             />
 
-            {/* Retranscribe Confirmation Modal */}
-            <ConfirmModal
-                isOpen={retranscribeConfirm}
-                title={t('detail.confirm.retranscribeTitle')}
-                message={t('detail.confirm.retranscribeMessage', { title: title })}
-                variant="warning"
-                confirmText={t('detail.confirm.retranscribeBtn')}
-                cancelText={t('common.cancel')}
-                onConfirm={handleRetranscribe}
-                onCancel={() => setRetranscribeConfirm(false)}
-            />
+            {/* Retranscribe Modal */}
+            {showRetranscribeModal && video && (
+                <RetranscribeModal
+                    video={video}
+                    onClose={() => setShowRetranscribeModal(false)}
+                    onSuccess={() => {
+                        setShowRetranscribeModal(false)
+                        showToast('success', t('common.success'))
+                        queryClient.invalidateQueries({ queryKey: ['video', sourceId] })
+                        queryClient.invalidateQueries({ queryKey: ['segments', sourceId] })
+                    }}
+                />
+            )}
         </div>
     )
 }
