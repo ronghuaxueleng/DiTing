@@ -36,19 +36,6 @@ export default function DashboardNotesPane({ video }: Props) {
 
     return (
         <div className="dash-notes-pane flex flex-col h-full w-full relative">
-            {/* Header */}
-            <div className="dash-notes-header flex items-center gap-4 p-4 lg:p-6 border-b border-[var(--color-border)] shrink-0 bg-black/5 dark:bg-white/5">
-                <div className="dash-notes-header-cover w-24 h-16 lg:w-32 lg:h-20 shrink-0 rounded overflow-hidden bg-black/10 shadow-sm relative">
-                    {video.cover && <img src={video.cover} alt="" className="w-full h-full object-cover" />}
-                </div>
-                <div className="dash-notes-header-info flex flex-col overflow-hidden">
-                    <h2 className="dash-notes-header-title text-base lg:text-xl font-semibold text-[var(--color-text)] line-clamp-2 m-0">{video.title}</h2>
-                    <span className="dash-notes-header-meta text-xs lg:text-sm text-[var(--color-text-muted)] mt-1">
-                        {segments.length} {t('dashboard.notesView.segments')}
-                    </span>
-                </div>
-            </div>
-
             {/* NoteView — fills remaining space, scrolls internally */}
             <div className="dash-notes-content flex-1 min-h-0 overflow-hidden p-4 lg:p-6">
                 <NoteView
