@@ -404,7 +404,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     }
 
     return (
-        <div className="note-view">
+        <div className={`note-view${isEditing ? ' note-view--editing' : ''}`}>
             {/* ---- TOOLBAR ---- */}
             <div className="note-toolbar">
                 <div className="note-toolbar-left">
