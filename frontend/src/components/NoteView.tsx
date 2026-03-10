@@ -90,7 +90,7 @@ function NoteTOC({ items, activeId, onItemClick }: {
 function GeneratePanel({
     style, setStyle,
     selectedModelId, setSelectedModelId,
-    enableScreenshots, setEnableScreenshots,
+    screenshotDensity, setScreenshotDensity,
     transcriptionVersions,
     selectedTransVersion, setSelectedTransVersion,
     providers,
@@ -102,8 +102,8 @@ function GeneratePanel({
     setStyle: (s: 'concise' | 'detailed' | 'outline') => void
     selectedModelId: number | ''
     setSelectedModelId: (id: number | '') => void
-    enableScreenshots: boolean
-    setEnableScreenshots: (v: boolean) => void
+    screenshotDensity: string
+    setScreenshotDensity: (v: string) => void
     transcriptionVersions: string[]
     selectedTransVersion: string
     setSelectedTransVersion: (v: string) => void
@@ -168,17 +168,20 @@ function GeneratePanel({
                     </div>
                 )}
 
-                {/* Screenshots toggle */}
+                {/* Screenshot density */}
                 <div className="note-gen-field">
                     <label className="note-gen-label">{t('detail.aiNotes.screenshots')}</label>
-                    <label className="note-gen-checkbox">
-                        <input
-                            type="checkbox"
-                            checked={enableScreenshots}
-                            onChange={e => setEnableScreenshots(e.target.checked)}
-                        />
-                        <span>{t('detail.aiNotes.screenshotsDesc')}</span>
-                    </label>
+                    <div className="note-gen-segmented">
+                        {(['', 'few', 'moderate', 'dense'] as const).map(d => (
+                            <button
+                                key={d}
+                                className={`note-gen-seg-btn ${screenshotDensity === d ? 'active' : ''}`}
+                                onClick={() => setScreenshotDensity(d)}
+                            >
+                                {t(`detail.aiNotes.density${d ? d.charAt(0).toUpperCase() + d.slice(1) : 'Off'}`)}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
             <div className="note-gen-panel-footer">
@@ -211,7 +214,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     const [showVersions, setShowVersions] = useState(false)
     const [showGenPanel, setShowGenPanel] = useState(false)
     const [selectedModelId, setSelectedModelId] = useState<number | ''>('')
-    const [enableScreenshots, setEnableScreenshots] = useState(false)
+    const [screenshotDensity, setScreenshotDensity] = useState('')
     const [selectedTransVersion, setSelectedTransVersion] = useState('')
     const [pendingDelete, setPendingDelete] = useState<number | null>(null)
     const [pendingReset, setPendingReset] = useState<boolean>(false)
@@ -293,7 +296,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
         mutationFn: () => generateNote(sourceId, {
             style,
             llmModelId: selectedModelId || undefined,
-            enableScreenshots,
+            screenshotDensity: screenshotDensity || undefined,
             transcriptionVersion: selectedTransVersion || undefined,
         }),
         onSuccess: () => {
@@ -518,8 +521,8 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
                     setStyle={setStyle}
                     selectedModelId={selectedModelId}
                     setSelectedModelId={setSelectedModelId}
-                    enableScreenshots={enableScreenshots}
-                    setEnableScreenshots={setEnableScreenshots}
+                    screenshotDensity={screenshotDensity}
+                    setScreenshotDensity={setScreenshotDensity}
                     transcriptionVersions={transcriptionVersions}
                     selectedTransVersion={selectedTransVersion}
                     setSelectedTransVersion={setSelectedTransVersion}

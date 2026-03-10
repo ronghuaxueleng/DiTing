@@ -810,6 +810,10 @@
             "toc": "目录",
             "screenshots": "关键帧截图",
             "screenshotsDesc": "在关键时刻自动截取画面",
+            "densityOff": "关闭",
+            "densityFew": "少量",
+            "densityModerate": "适中",
+            "densityDense": "密集",
             "exportFailed": "导出失败",
             "transVersion": "转录版本",
             "transVersionAuto": "（自动 - 优先使用置顶版本）"

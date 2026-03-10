@@ -801,6 +801,10 @@
             "toc": "Outline",
             "screenshots": "Screenshots",
             "screenshotsDesc": "Auto-capture keyframes at key moments",
+            "densityOff": "Off",
+            "densityFew": "Few",
+            "densityModerate": "Normal",
+            "densityDense": "Dense",
             "exportFailed": "Export failed",
             "transVersion": "Transcription",
             "transVersionAuto": "(Auto - prefer pinned)"
