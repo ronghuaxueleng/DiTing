@@ -37,7 +37,13 @@ export default function Detail() {
 
     // Player State
     const [activeTab, setActiveTab] = useState<'local' | 'stream' | 'embed'>('local')
-    const [contentTab, setContentTab] = useState<'segments' | 'immersive' | 'notes'>('segments')
+    const [contentTab, setContentTabRaw] = useState<'segments' | 'immersive' | 'notes'>(() => {
+        return (localStorage.getItem('detail-content-tab') as 'segments' | 'immersive' | 'notes') || 'segments'
+    })
+    const setContentTab = useCallback((tab: 'segments' | 'immersive' | 'notes') => {
+        setContentTabRaw(tab)
+        localStorage.setItem('detail-content-tab', tab)
+    }, [])
     const [refPanelTab, setRefPanelTab] = useState<'segments' | 'immersive'>('segments')
     const [currentTime, setCurrentTime] = useState(0)
     const playerRef = useRef<HTMLVideoElement | HTMLAudioElement>(null)
