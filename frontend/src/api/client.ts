@@ -667,7 +667,7 @@ import type { VideoNote } from './types'
 
 export async function generateNote(
     sourceId: string,
-    options?: { prompt?: string; llmModelId?: number; style?: 'concise' | 'detailed' | 'outline'; enableScreenshots?: boolean }
+    options?: { prompt?: string; llmModelId?: number; style?: 'concise' | 'detailed' | 'outline'; enableScreenshots?: boolean; transcriptionVersion?: string }
 ): Promise<{ status: string; task_id: number }> {
     return fetchJson(`${API_BASE}/notes/generate`, {
         method: 'POST',
@@ -677,6 +677,7 @@ export async function generateNote(
             llm_model_id: options?.llmModelId,
             style: options?.style,
             enable_screenshots: options?.enableScreenshots ?? false,
+            transcription_version: options?.transcriptionVersion || null,
         }),
     })
 }

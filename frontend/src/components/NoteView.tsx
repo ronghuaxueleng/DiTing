@@ -91,6 +91,8 @@ function GeneratePanel({
     style, setStyle,
     selectedModelId, setSelectedModelId,
     enableScreenshots, setEnableScreenshots,
+    transcriptionVersions,
+    selectedTransVersion, setSelectedTransVersion,
     providers,
     onGenerate,
     onCancel,
@@ -102,6 +104,9 @@ function GeneratePanel({
     setSelectedModelId: (id: number | '') => void
     enableScreenshots: boolean
     setEnableScreenshots: (v: boolean) => void
+    transcriptionVersions: string[]
+    selectedTransVersion: string
+    setSelectedTransVersion: (v: string) => void
     providers: LLMProvider[]
     onGenerate: () => void
     onCancel: () => void
@@ -145,6 +150,23 @@ function GeneratePanel({
                         ))}
                     </select>
                 </div>
+
+                {/* Transcription version selector */}
+                {transcriptionVersions.length > 1 && (
+                    <div className="note-gen-field">
+                        <label className="note-gen-label">{t('detail.aiNotes.transVersion')}</label>
+                        <select
+                            className="note-gen-select"
+                            value={selectedTransVersion}
+                            onChange={e => setSelectedTransVersion(e.target.value)}
+                        >
+                            <option value="">{t('detail.aiNotes.transVersionAuto')}</option>
+                            {transcriptionVersions.map(v => (
+                                <option key={v} value={v}>{v}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {/* Screenshots toggle */}
                 <div className="note-gen-field">
@@ -190,6 +212,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     const [showGenPanel, setShowGenPanel] = useState(false)
     const [selectedModelId, setSelectedModelId] = useState<number | ''>('')
     const [enableScreenshots, setEnableScreenshots] = useState(false)
+    const [selectedTransVersion, setSelectedTransVersion] = useState('')
     const [pendingDelete, setPendingDelete] = useState<number | null>(null)
     const [pendingReset, setPendingReset] = useState<boolean>(false)
     const [activeTocId, setActiveTocId] = useState<string | null>(null)
@@ -197,6 +220,16 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
 
     const qkey = ['notes', sourceId]
     const hasSegments = segments.length > 0
+
+    // Derive unique transcription versions (ASR model names) from segments
+    const transcriptionVersions = useMemo(() => {
+        const models = new Set<string>()
+        for (const seg of segments) {
+            const model = (seg as any).asr_model
+            if (model) models.add(model)
+        }
+        return Array.from(models)
+    }, [segments])
 
     // Queries
     const { data: notes = [], isLoading } = useQuery<VideoNote[]>({
@@ -261,6 +294,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
             style,
             llmModelId: selectedModelId || undefined,
             enableScreenshots,
+            transcriptionVersion: selectedTransVersion || undefined,
         }),
         onSuccess: () => {
             showToast('success', t('detail.aiNotes.generatedSuccess'))
@@ -486,6 +520,9 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
                     setSelectedModelId={setSelectedModelId}
                     enableScreenshots={enableScreenshots}
                     setEnableScreenshots={setEnableScreenshots}
+                    transcriptionVersions={transcriptionVersions}
+                    selectedTransVersion={selectedTransVersion}
+                    setSelectedTransVersion={setSelectedTransVersion}
                     providers={providers}
                     onGenerate={() => generateMut.mutate()}
                     onCancel={() => setShowGenPanel(false)}

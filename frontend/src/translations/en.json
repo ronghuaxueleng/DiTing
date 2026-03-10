@@ -801,7 +801,9 @@
             "toc": "Outline",
             "screenshots": "Screenshots",
             "screenshotsDesc": "Auto-capture keyframes at key moments",
-            "exportFailed": "Export failed"
+            "exportFailed": "Export failed",
+            "transVersion": "Transcription",
+            "transVersionAuto": "(Auto - prefer pinned)"
         }
     },
     "aiSummaryModal": {

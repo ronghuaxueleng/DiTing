@@ -42,6 +42,7 @@ class NoteGenerateRequest(BaseModel):
     llm_model_id: Optional[int] = None
     style: Optional[str] = None        # 'concise' | 'detailed' | 'outline'
     enable_screenshots: bool = False    # Extract keyframe screenshots?
+    transcription_version: Optional[str] = None  # ASR model name to filter segments
 
 
 class NoteUpdateRequest(BaseModel):
@@ -269,10 +270,20 @@ async def generate_note(request: NoteGenerateRequest, background_tasks: Backgrou
     """Generate an AI note for a whole video in the background."""
     source_id = normalize_source_id(request.source_id)
 
-    # Fetch all segments
-    segments = get_all_transcriptions_by_source(source_id)
-    if not segments:
+    # Fetch segments, filtering by transcription version if specified
+    all_segments = get_all_transcriptions_by_source(source_id)
+    if not all_segments:
         raise HTTPException(status_code=404, detail="No transcriptions found for this video. Please transcribe first.")
+
+    if request.transcription_version:
+        # Filter to only segments from the specified ASR model
+        segments = [s for s in all_segments if dict(s).get('asr_model') == request.transcription_version]
+        if not segments:
+            raise HTTPException(status_code=404, detail=f"No segments found for transcription version: {request.transcription_version}")
+    else:
+        # Default: use pinned segments if any, else all segments
+        pinned = [s for s in all_segments if dict(s).get('is_pinned')]
+        segments = pinned if pinned else all_segments
 
     transcript_text = _build_transcript_text(segments)
     if not transcript_text.strip():
