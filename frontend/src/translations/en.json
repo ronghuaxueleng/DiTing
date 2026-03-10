@@ -815,7 +815,9 @@
             "densityDense": "Dense",
             "exportFailed": "Export failed",
             "transVersion": "Transcription",
-            "transVersionAuto": "(Auto - prefer pinned)"
+            "transVersionAuto": "(Auto - prefer pinned)",
+            "customPrompt": "Additional Instructions",
+            "customPromptPlaceholder": "Optional: add custom instructions, e.g. add timestamps to all sections, focus on price comparison, etc."
         }
     },
     "aiSummaryModal": {

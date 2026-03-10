@@ -309,8 +309,10 @@ async def generate_note(request: NoteGenerateRequest, background_tasks: Backgrou
     if not transcript_text.strip():
         raise HTTPException(status_code=422, detail="Transcription text is empty.")
 
-    # Build final prompt
-    base_prompt = request.prompt or _build_note_prompt(request.style, request.screenshot_density)
+    # Build final prompt — always start from built-in, append user instructions if provided
+    base_prompt = _build_note_prompt(request.style, request.screenshot_density)
+    if request.prompt and request.prompt.strip():
+        base_prompt += f"\n\n**用户附加指令：**\n{request.prompt.strip()}"
 
     # Create task
     task_id = -int(time.time() * 1000) % 1000000000

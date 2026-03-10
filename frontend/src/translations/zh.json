@@ -829,7 +829,9 @@
             "densityDense": "密集",
             "exportFailed": "导出失败",
             "transVersion": "转录版本",
-            "transVersionAuto": "（自动 - 优先使用置顶版本）"
+            "transVersionAuto": "（自动 - 优先使用置顶版本）",
+            "customPrompt": "附加指令",
+            "customPromptPlaceholder": "可选：临时补充要求，如所有小节都需要时间跳转、重点分析价格对比等"
         }
     },
     "aiSummaryModal": {

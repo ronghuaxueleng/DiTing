@@ -160,6 +160,8 @@ function GeneratePanel({
     isPending,
     activeTask,
     onCancelTask,
+    customPrompt,
+    setCustomPrompt,
 }: {
     style: string
     setStyle: (s: 'concise' | 'detailed' | 'outline') => void
@@ -176,6 +178,8 @@ function GeneratePanel({
     isPending: boolean
     activeTask: Task | null
     onCancelTask: () => void
+    customPrompt: string
+    setCustomPrompt: (v: string) => void
 }) {
     const { t } = useTranslation()
     return (
@@ -248,6 +252,18 @@ function GeneratePanel({
                         ))}
                     </div>
                 </div>
+
+                {/* Additional instructions */}
+                <div className="note-gen-field" style={{ flexBasis: '100%' }}>
+                    <label className="note-gen-label">{t('detail.aiNotes.customPrompt')}</label>
+                    <textarea
+                        className="note-gen-textarea"
+                        value={customPrompt}
+                        onChange={e => setCustomPrompt(e.target.value)}
+                        placeholder={t('detail.aiNotes.customPromptPlaceholder')}
+                        rows={2}
+                    />
+                </div>
             </div>
             <div className="note-gen-panel-footer">
                 {activeTask ? (
@@ -311,6 +327,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     const [selectedModelId, setSelectedModelId] = useState<number | ''>('')
     const [screenshotDensity, setScreenshotDensity] = useState('')
     const [selectedTransVersion, setSelectedTransVersion] = useState('')
+    const [customPrompt, setCustomPrompt] = useState('')
     const [pendingDelete, setPendingDelete] = useState<number | null>(null)
     const [pendingReset, setPendingReset] = useState<boolean>(false)
     const [activeTocId, setActiveTocId] = useState<string | null>(null)
@@ -450,6 +467,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
             llmModelId: selectedModelId || undefined,
             screenshotDensity: screenshotDensity || undefined,
             transcriptionVersion: selectedTransVersion || undefined,
+            prompt: customPrompt.trim() || undefined,
         }),
         onSuccess: (data) => {
             // data = { status, task_id }
@@ -695,6 +713,8 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
                     isPending={generateMut.isPending}
                     activeTask={activeTask}
                     onCancelTask={() => pendingTaskId !== null && cancelTask(pendingTaskId).then(() => setPendingTaskId(null))}
+                    customPrompt={customPrompt}
+                    setCustomPrompt={setCustomPrompt}
                 />
             )}
 
