@@ -182,6 +182,7 @@ def create_all(cursor):
             response_time REAL,
             is_edited BOOLEAN DEFAULT 0,
             is_active BOOLEAN DEFAULT 1,
+            gen_params TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (source_id) REFERENCES video_meta (source_id) ON DELETE CASCADE

@@ -15,6 +15,7 @@ def add_video_note(
     provider_id: int = None,
     style: str = None,
     response_time: float = None,
+    gen_params: str = None,
 ) -> int:
     """Insert a new video note and make it the active version (deactivating others)."""
     conn = get_connection()
@@ -27,10 +28,10 @@ def add_video_note(
     cursor.execute(
         """
         INSERT INTO video_notes
-            (source_id, content, original_content, prompt, model, provider_id, style, response_time, is_edited, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
+            (source_id, content, original_content, prompt, model, provider_id, style, response_time, gen_params, is_edited, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
         """,
-        (source_id, content, original_content, prompt, model, provider_id, style, response_time),
+        (source_id, content, original_content, prompt, model, provider_id, style, response_time, gen_params),
     )
     conn.commit()
     new_id = cursor.lastrowid

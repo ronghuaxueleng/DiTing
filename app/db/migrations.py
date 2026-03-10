@@ -92,6 +92,13 @@ def init_db():
                     ''')
                     current = "0.12.4"
 
+                # Always ensure gen_params column exists (added post-0.12.4)
+                try:
+                    cursor.execute("ALTER TABLE video_notes ADD COLUMN gen_params TEXT")
+                    logger.info("  -> Added gen_params column to video_notes")
+                except Exception:
+                    pass  # Column already exists
+
                 _set_version(cursor, CURRENT_VERSION)
                 logger.info(f"✅ Upgraded to v{CURRENT_VERSION}.")
             else:

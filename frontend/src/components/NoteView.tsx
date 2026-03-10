@@ -725,11 +725,21 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
                         <div key={note.id}
                             className={`note-version-item ${note.is_active ? 'active' : ''}`}>
                             <button className="note-version-select"
-                                onClick={() => !note.is_active && activateMut.mutate(note.id)}>
+                                onClick={() => !note.is_active && activateMut.mutate(note.id)}
+                                title={note.gen_params?.user_prompt ? `💡 ${note.gen_params.user_prompt}` : undefined}>
                                 <span className="note-version-model">{note.model ?? 'AI'}</span>
                                 <span className="note-version-date">{fmtDate(note.created_at)}</span>
                                 {note.is_edited && <span className="note-version-edited">✏️</span>}
                                 {note.style && <span className="note-version-style">{note.style}</span>}
+                                {note.gen_params?.screenshot_density && (
+                                    <span className="note-version-badge">📷 {note.gen_params.screenshot_density}</span>
+                                )}
+                                {note.gen_params?.transcription_version && (
+                                    <span className="note-version-badge">🎤 {note.gen_params.transcription_version}</span>
+                                )}
+                                {note.gen_params?.user_prompt && (
+                                    <span className="note-version-badge" title={note.gen_params.user_prompt}>💡</span>
+                                )}
                             </button>
                             <button className="note-version-delete"
                                 onClick={() => setPendingDelete(note.id)}

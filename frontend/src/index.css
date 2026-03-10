@@ -1293,3 +1293,15 @@ body {
   color: var(--color-text-muted);
   opacity: 0.7;
 }
+
+/* Note version history gen_params badges */
+.note-version-badge {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+  cursor: default;
+}

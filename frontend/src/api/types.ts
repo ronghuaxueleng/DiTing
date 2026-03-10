@@ -88,6 +88,11 @@ export interface VideoNote {
     response_time: number | null
     is_edited: boolean
     is_active: boolean
+    gen_params?: {
+        user_prompt?: string
+        screenshot_density?: string
+        transcription_version?: string
+    } | null
     created_at: string
     updated_at: string
 }

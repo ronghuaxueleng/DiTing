@@ -4,6 +4,7 @@ Handles: AI note generation (background), note CRUD, version management.
 """
 import hashlib
 import io
+import json
 import os
 import re
 import time
@@ -207,6 +208,8 @@ async def _process_note_generation(
     llm_model_id: Optional[int],
     style: Optional[str],
     screenshot_density: Optional[str] = None,
+    user_prompt: Optional[str] = None,
+    transcription_version: Optional[str] = None,
     trace_id_token: str = None,
 ):
     token = None
@@ -215,7 +218,7 @@ async def _process_note_generation(
 
     try:
         logger.info(f"📝 Starting note generation for {source_id}, Task {task_id}...")
-        task_manager.update_progress(task_id, 10, "Requesting LLM for note generation...")
+        task_manager.update_progress(task_id, 10, f"Requesting LLM... (style={style or 'default'})")
 
         start_time = time.time()
 
@@ -256,6 +259,13 @@ async def _process_note_generation(
             provider_id=provider_id,
             style=style,
             response_time=duration,
+            gen_params=json.dumps({
+                k: v for k, v in {
+                    "user_prompt": user_prompt,
+                    "screenshot_density": screenshot_density,
+                    "transcription_version": transcription_version,
+                }.items() if v
+            }, ensure_ascii=False) or None,
         )
 
         logger.info(f"✅ Note generation completed for {source_id}")
@@ -280,6 +290,13 @@ def _note_to_dict(row) -> dict:
     d = dict(row)
     d["is_edited"] = bool(d.get("is_edited"))
     d["is_active"] = bool(d.get("is_active"))
+    # Parse gen_params JSON if present
+    gp = d.get("gen_params")
+    if gp and isinstance(gp, str):
+        try:
+            d["gen_params"] = json.loads(gp)
+        except (json.JSONDecodeError, TypeError):
+            d["gen_params"] = None
     return d
 
 
@@ -331,6 +348,8 @@ async def generate_note(request: NoteGenerateRequest, background_tasks: Backgrou
         request.llm_model_id,
         request.style,
         request.screenshot_density,
+        request.prompt,              # user_prompt
+        request.transcription_version,
         trace_id,
     )
 
