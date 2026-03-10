@@ -561,7 +561,16 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
                 if (m) {
                     const secs = parseTimestamp(m[1]!)
                     return (
-                        <button key={i} onClick={() => onSeek(secs)}
+                        <button key={i}
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onSeek(secs)
+                            }}
+                            onMouseDown={(e) => {
+                                // Prevent browser auto-focus which causes scroll jumps
+                                e.preventDefault()
+                            }}
                             className="note-ts-btn" title={`Jump to ${m[1]}`}>
                             {part}
                         </button>
