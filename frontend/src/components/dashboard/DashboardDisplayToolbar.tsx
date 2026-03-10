@@ -4,7 +4,7 @@ import Icons from '../ui/Icons'
 export interface DashboardDisplayToolbarProps {
     sortBy: string
     limit: number
-    viewMode: 'grid' | 'list'
+    viewMode: 'grid' | 'list' | 'notes'
     selectionMode: boolean
     onUpdateParams: (updates: Record<string, string | null>) => void
     onUpdateFilter: (updates: Record<string, string | null>) => void
@@ -99,6 +99,16 @@ export default function DashboardDisplayToolbar({
                         title={t('dashboard.view.list')}
                     >
                         <Icons.List className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => onUpdateParams({ view: 'notes' })}
+                        className={`p-1.5 rounded-md transition-all ${viewMode === 'notes'
+                            ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm'
+                            : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                            }`}
+                        title={t('dashboard.view.notes')}
+                    >
+                        <Icons.BookOpen className="w-4 h-4" />
                     </button>
                 </div>
             </div>

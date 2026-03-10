@@ -106,8 +106,9 @@
             "includeLabel": "IS"
         },
         "view": {
-            "grid": "Grid",
-            "list": "List"
+            "grid": "Grid View",
+            "list": "List View",
+            "notes": "Notes View"
         },
         "sourceBadge": {
             "bilibili": "Bilibili",

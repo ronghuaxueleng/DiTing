@@ -701,7 +701,13 @@ const Icons = {
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16" />
         </svg>
-    )
+    ),
+    BookOpen: ({ className, strokeWidth }: IconProps) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </svg>
+    ),
 }
 
 // Database

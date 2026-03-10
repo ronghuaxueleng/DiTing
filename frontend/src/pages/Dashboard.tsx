@@ -9,6 +9,7 @@ import TagManager from '../components/TagManager'
 import ConfirmModal from '../components/ConfirmModal'
 import BatchTagEditor from '../components/BatchTagEditor'
 import DetailPanel from '../components/DetailPanel'
+import DashboardNotesPane from '../components/dashboard/DashboardNotesPane'
 import Pagination from '../components/Pagination'
 import DashboardFilterBar from '../components/dashboard/DashboardFilterBar'
 import DashboardDisplayToolbar from '../components/dashboard/DashboardDisplayToolbar'
@@ -54,7 +55,8 @@ export default function Dashboard() {
     const selectedTagId = searchParams.get('tag') ? Number(searchParams.get('tag')) : undefined
     const tagExclude = searchParams.get('tag_exclude') === '1'
     const sortBy = (searchParams.get('sort') || 'time') as 'time' | 'title' | 'segments'
-    const viewMode = (searchParams.get('view') || 'grid') as 'grid' | 'list'
+    const viewMode = (searchParams.get('view') || 'grid') as 'grid' | 'list' | 'notes'
+    const [selectedNoteVideo, setSelectedNoteVideo] = useState<Video | null>(null)
 
     // Quick Filters
     const parseQuick = (v: string | null) => v === '1' ? true : v === '0' ? false : undefined
@@ -306,45 +308,85 @@ export default function Dashboard() {
                         {t('dashboard.display.empty')}
                     </div>
                 ) : (
-                    viewMode === 'grid' ? (
-                        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6">
-                            {(data?.items || []).map((video) => (
-                                <VideoCard
-                                    key={video.source_id}
-                                    video={video}
-                                    onRefresh={refetch}
-                                    onOpenPanel={() => setSelectedVideo(video)}
-                                    selectionMode={selectionMode}
-                                    selected={selectedIds.has(video.source_id)}
-                                    onToggleSelect={toggleSelect}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="flex flex-col gap-2">
-                            {(data?.items || []).map((video) => (
-                                <VideoListItem
-                                    key={video.source_id}
-                                    video={video}
-                                    onRefresh={refetch}
-                                    onOpenPanel={() => setSelectedVideo(video)}
-                                    selectionMode={selectionMode}
-                                    selected={selectedIds.has(video.source_id)}
-                                    onToggleSelect={toggleSelect}
-                                />
-                            ))}
-                        </div>
-                    )
+                    viewMode !== 'notes' && (
+                        viewMode === 'grid' ? (
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6">
+                                {(data?.items || []).map((video) => (
+                                    <VideoCard
+                                        key={video.source_id}
+                                        video={video}
+                                        onRefresh={refetch}
+                                        onOpenPanel={() => setSelectedVideo(video)}
+                                        selectionMode={selectionMode}
+                                        selected={selectedIds.has(video.source_id)}
+                                        onToggleSelect={toggleSelect}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-2">
+                                {(data?.items || []).map((video) => (
+                                    <VideoListItem
+                                        key={video.source_id}
+                                        video={video}
+                                        onRefresh={refetch}
+                                        onOpenPanel={() => setSelectedVideo(video)}
+                                        selectionMode={selectionMode}
+                                        selected={selectedIds.has(video.source_id)}
+                                        onToggleSelect={toggleSelect}
+                                    />
+                                ))}
+                            </div>
+                        ))
                 )}
 
-                {/* Pagination */}
-                <Pagination
-                    page={page}
-                    totalPages={totalPages}
-                    total={data?.total}
-                    onPageChange={(p) => updateParams({ page: String(p) })}
-                />
+                {/* Pagination (hidden in notes view — right pane handles its own scroll) */}
+                {viewMode !== 'notes' && (
+                    <Pagination
+                        page={page}
+                        totalPages={totalPages}
+                        total={data?.total}
+                        onPageChange={(p) => updateParams({ page: String(p) })}
+                    />
+                )}
             </div>
+
+            {/* Notes View — master-detail layout below the content area */}
+            {viewMode === 'notes' && (
+                <div className="w-full px-4 sm:px-6 lg:px-8 pb-8 flex gap-4" style={{ minHeight: 'calc(100vh - 260px)' }}>
+                    {/* Left: video list (compact) */}
+                    <div className="dash-notes-list">
+                        {(data?.items || []).map(video => (
+                            <button
+                                key={video.source_id}
+                                className={`dash-notes-list-item ${selectedNoteVideo?.source_id === video.source_id ? 'active' : ''}`}
+                                onClick={() => setSelectedNoteVideo(video)}
+                            >
+                                {video.cover && (
+                                    <img src={video.cover} alt="" className="dash-notes-list-cover" />
+                                )}
+                                <div className="dash-notes-list-info">
+                                    <span className="dash-notes-list-title">{video.title}</span>
+                                    {video.ai_count > 0 && (
+                                        <span className="dash-notes-list-badge">✨ {video.ai_count}</span>
+                                    )}
+                                </div>
+                            </button>
+                        ))}
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            total={data?.total}
+                            onPageChange={(p) => updateParams({ page: String(p) })}
+                        />
+                    </div>
+
+                    {/* Right: NoteView pane */}
+                    <div className="dash-notes-pane-wrapper">
+                        <DashboardNotesPane video={selectedNoteVideo} />
+                    </div>
+                </div>
+            )}
 
             {selectedVideo && (
                 <DetailPanel

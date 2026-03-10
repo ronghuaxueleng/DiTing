@@ -64,6 +64,11 @@
             "perPage": "{{count}} / 页",
             "empty": "暂无视频记录"
         },
+        "notesView": {
+            "placeholder": "选择视频查看 AI 笔记",
+            "placeholderDesc": "点击左侧视频列表中的条目，在此查看 AI 生成的笔记",
+            "segments": "条转录"
+        },
         "batch": {
             "select": "选择",
             "selectAll": "全选",
@@ -107,7 +112,8 @@
         },
         "view": {
             "grid": "卡片",
-            "list": "列表"
+            "list": "列表",
+            "notes": "笔记浏览"
         },
         "sourceBadge": {
             "bilibili": "Bilibili",

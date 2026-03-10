@@ -420,7 +420,8 @@ export default function Detail() {
 
                         {renderPlayer()}
 
-                        {/* Notes Section — hidden on mobile in split mode */}<div className={`bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm transition-all duration-200 ${isEditingNotes ? 'ring-2 ring-[var(--color-primary)]/20' : ''} ${mobileLayout === 'split' ? 'hidden lg:block' : ''}`}>
+                        {/* Notes Section — hidden on mobile in split mode, and hidden when AI notes tab is active */}
+                        {contentTab !== 'notes' && <div className={`bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm transition-all duration-200 ${isEditingNotes ? 'ring-2 ring-[var(--color-primary)]/20' : ''} ${mobileLayout === 'split' ? 'hidden lg:block' : ''}`}>
                             <div className="px-4 py-3 border-b border-[var(--color-border)] flex justify-between items-center bg-[var(--color-card-muted)]">
                                 <h3 className="font-medium text-sm flex items-center gap-2">
                                     {t('detail.notes.title')}
@@ -502,7 +503,7 @@ export default function Detail() {
                                     )
                                 )}
                             </div>
-                        </div>
+                        </div>}
                     </div>
                 )}
 
