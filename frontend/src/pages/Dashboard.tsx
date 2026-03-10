@@ -357,22 +357,22 @@ export default function Dashboard() {
 
             {/* Notes View — master-detail layout below the content area */}
             {viewMode === 'notes' && (
-                <div className="w-full px-4 sm:px-6 lg:px-8 pb-8 flex gap-4" style={{ minHeight: 'calc(100vh - 260px)' }}>
+                <div className="w-full px-4 sm:px-6 lg:px-8 pb-8 flex flex-col lg:flex-row gap-4" style={{ minHeight: 'calc(100vh - 260px)' }}>
                     {/* Left: video list (compact) */}
-                    <div className="dash-notes-list">
+                    <div className={`dash-notes-list w-full lg:w-80 flex-shrink-0 flex flex-col gap-2 overflow-y-auto ${selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
                         {(data?.items || []).map(video => (
                             <button
                                 key={video.source_id}
-                                className={`dash-notes-list-item ${selectedNoteVideo?.source_id === video.source_id ? 'active' : ''}`}
+                                className={`dash-notes-list-item flex items-start gap-3 p-3 text-left border rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${selectedNoteVideo?.source_id === video.source_id ? 'active border-[var(--color-primary)] bg-[var(--color-primary)]/10' : 'border-[var(--color-border)] bg-[var(--color-card)]'}`}
                                 onClick={() => setSelectedNoteVideo(video)}
                             >
                                 {video.cover && (
-                                    <img src={video.cover} alt="" className="dash-notes-list-cover" />
+                                    <img src={video.cover} alt="" className="dash-notes-list-cover w-24 h-16 object-cover rounded bg-black/10 shrink-0" />
                                 )}
-                                <div className="dash-notes-list-info">
-                                    <span className="dash-notes-list-title">{video.title}</span>
+                                <div className="dash-notes-list-info flex flex-col flex-1 min-w-0">
+                                    <span className="dash-notes-list-title text-sm font-medium line-clamp-2 text-[var(--color-text)]">{video.title}</span>
                                     {video.ai_count > 0 && (
-                                        <span className="dash-notes-list-badge">✨ {video.ai_count}</span>
+                                        <span className="dash-notes-list-badge mt-1 text-xs px-1.5 py-0.5 rounded bg-[var(--color-primary)]/15 text-[var(--color-primary)] w-max border border-[var(--color-primary)]/20">✨ {video.ai_count}</span>
                                     )}
                                 </div>
                             </button>
@@ -386,7 +386,15 @@ export default function Dashboard() {
                     </div>
 
                     {/* Right: NoteView pane */}
-                    <div className="dash-notes-pane-wrapper">
+                    <div className={`dash-notes-pane-wrapper flex-1 bg-[var(--color-card)] rounded-xl border border-[var(--color-border)] overflow-hidden shadow-sm flex flex-col min-h-[500px] lg:min-h-0 ${!selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
+                        {selectedNoteVideo && (
+                            <button
+                                className="lg:hidden p-3 border-b border-[var(--color-border)] text-[var(--color-text-muted)] flex items-center gap-2 bg-black/5 dark:bg-white/5 font-medium hover:text-[var(--color-text)] transition-colors"
+                                onClick={() => setSelectedNoteVideo(null)}
+                            >
+                                <span>←</span> {t('common.back', 'Back')}
+                            </button>
+                        )}
                         <DashboardNotesPane video={selectedNoteVideo} />
                     </div>
                 </div>
