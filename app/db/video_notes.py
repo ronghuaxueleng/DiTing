@@ -125,6 +125,21 @@ def delete_video_note(note_id: int):
     conn.close()
 
 
+def delete_all_notes_by_source(source_id: str) -> int:
+    """Delete all note versions for a video.
+
+    Called when the entire video record is being removed.
+    Returns the number of rows deleted.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM video_notes WHERE source_id = ?", (source_id,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return deleted
+
+
 def set_note_active(note_id: int, source_id: str):
     """Make a specific note the active version (deactivates all others for the video)."""
     conn = get_connection()

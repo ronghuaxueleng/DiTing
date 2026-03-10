@@ -9,6 +9,7 @@ from app.db import (
     get_transcription_by_source,
     batch_count_ai_summaries, batch_get_cache_counts, batch_get_video_tags,
     delete_video_meta, delete_transcriptions_by_source,
+    delete_all_notes_by_source,
 )
 from app.services.media_cache import MediaCacheService
 from app.utils.source_utils import normalize_source_id
@@ -47,14 +48,18 @@ def resolve_effective_source(source_id: str) -> str:
 
 def delete_single_video(source_id: str) -> tuple[bool, int]:
     """
-    Delete a single video's cache, meta, and transcriptions.
+    Delete a single video's cache, meta, transcriptions, notes, and screenshots.
     Returns (meta_deleted: bool, transcription_count: int).
     """
+    from app.api.v1.endpoints.notes import delete_note_screenshots_dir
+
     effective = resolve_effective_source(source_id)
 
     MediaCacheService.delete_cache_for_video(effective)
     meta_deleted = delete_video_meta(effective)
     count = delete_transcriptions_by_source(effective)
+    delete_all_notes_by_source(effective)
+    delete_note_screenshots_dir(effective)
 
     return meta_deleted, count
 

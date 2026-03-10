@@ -30,6 +30,7 @@ from app.core.task_manager import task_manager, TaskCancelledException
 from app.utils.source_utils import normalize_source_id
 from app.utils.media_utils import extract_frame_at_time
 import asyncio
+import shutil
 
 router = APIRouter(tags=["Notes"])
 
@@ -407,12 +408,61 @@ async def activate_note(note_id: int):
     return {"status": "success"}
 
 
+def _delete_note_screenshots(note_row) -> int:
+    """Delete only the screenshot files referenced by the given note row.
+
+    Parses Markdown image links of the form
+    ``![...]( /api/note-screenshots/{source_id}/{filename} )``
+    and removes the corresponding files from NOTE_SCREENSHOTS_DIR.
+    Returns the number of files deleted.
+    """
+    content: str = note_row["content"] or ""
+    source_id: str = note_row["source_id"]
+    pattern = re.compile(
+        r'!\[[^\]]*\]\(/api/note-screenshots/[^/]+/([^)]+\.jpg)\)'
+    )
+    filenames = pattern.findall(content)
+    if not filenames:
+        return 0
+
+    images_dir = os.path.join(settings.NOTE_SCREENSHOTS_DIR, source_id)
+    deleted = 0
+    for filename in set(filenames):
+        img_path = os.path.join(images_dir, filename)
+        if os.path.isfile(img_path):
+            try:
+                os.remove(img_path)
+                deleted += 1
+                logger.info(f"📷 Deleted screenshot: {img_path}")
+            except OSError as exc:
+                logger.warning(f"📷 Failed to delete screenshot {img_path}: {exc}")
+    return deleted
+
+
+def delete_note_screenshots_dir(source_id: str) -> bool:
+    """Delete the entire screenshots directory for a video.
+
+    Called when a whole video record is being deleted.
+    Returns True if the directory was removed.
+    """
+    images_dir = os.path.join(settings.NOTE_SCREENSHOTS_DIR, source_id)
+    if os.path.isdir(images_dir):
+        try:
+            shutil.rmtree(images_dir)
+            logger.info(f"📷 Deleted screenshots directory: {images_dir}")
+            return True
+        except OSError as exc:
+            logger.warning(f"📷 Failed to delete screenshots directory {images_dir}: {exc}")
+    return False
+
+
 @router.delete("/notes/{note_id}")
 async def delete_note(note_id: int):
-    """Delete a specific note version."""
+    """Delete a specific note version and its referenced screenshots."""
     row = get_note_by_id(note_id)
     if not row:
         raise HTTPException(status_code=404, detail="Note not found")
+    _delete_note_screenshots(row)
     delete_video_note(note_id)
     return {"status": "success"}
 
