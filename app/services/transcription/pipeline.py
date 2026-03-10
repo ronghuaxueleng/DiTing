@@ -74,7 +74,8 @@ async def run_transcription_pipeline(
                 task_manager.update_progress(transcription_id, 30, f"Using cached media ({cached_quality})...")
 
         # 1.5 Pre-ASR Hook (e.g. YouTube Subtitles)
-        if not using_cache and pre_asr_hook:
+        # Run hook if: no cache (normal flow) OR only_get_subtitles mode (always need subtitles)
+        if pre_asr_hook and (not using_cache or only_get_subtitles):
             # Only run hook if we don't have cache (implying we might download)
             # OR if hook is cheap. YouTube hook downloads subs.
             # If we utilize cache, we skip download, so we skip hook?
