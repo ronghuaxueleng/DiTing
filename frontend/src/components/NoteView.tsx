@@ -4,10 +4,10 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useTranslation } from 'react-i18next'
 
-import type { Segment, VideoNote, LLMProvider, Task } from '../api/types'
+import type { Segment, VideoNote, LLMProvider, Task, Video } from '../api/types'
 import {
     getNotes, generateNote, updateNote, resetNote, activateNote, deleteNote,
-    getLLMProviders, getTasks, cancelTask,
+    getLLMProviders, getTasks, cancelTask, retranscribe
 } from '../api/client'
 import { useToast } from '../contexts/ToastContext'
 import Icons from './ui/Icons'
@@ -15,6 +15,7 @@ import Icons from './ui/Icons'
 interface NoteViewProps {
     sourceId: string
     segments: Segment[]
+    video?: Video
     onSeek: (timeSeconds: number) => void
 }
 
@@ -183,7 +184,7 @@ function GeneratePanel({
     style, setStyle,
     selectedModelId, setSelectedModelId,
     screenshotDensity, setScreenshotDensity,
-    transcriptionVersions,
+    segments,
     selectedTransVersion, setSelectedTransVersion,
     providers,
     onGenerate,
@@ -200,7 +201,7 @@ function GeneratePanel({
     setSelectedModelId: (id: number | '') => void
     screenshotDensity: string
     setScreenshotDensity: (v: string) => void
-    transcriptionVersions: string[]
+    segments: Segment[]
     selectedTransVersion: string
     setSelectedTransVersion: (v: string) => void
     providers: LLMProvider[]
@@ -251,22 +252,28 @@ function GeneratePanel({
                     </select>
                 </div>
 
-                {/* Transcription version selector */}
-                {transcriptionVersions.length > 1 && (
-                    <div className="note-gen-field">
-                        <label className="note-gen-label">{t('detail.aiNotes.transVersion')}</label>
-                        <select
-                            className="note-gen-select"
-                            value={selectedTransVersion}
-                            onChange={e => setSelectedTransVersion(e.target.value)}
-                        >
-                            <option value="">{t('detail.aiNotes.transVersionAuto')}</option>
-                            {transcriptionVersions.map(v => (
-                                <option key={v} value={v}>{v}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
+                {/* Transcription source selector (Always visible) */}
+                <div className="note-gen-field">
+                    <label className="note-gen-label">{t('detail.aiNotes.transSource')}</label>
+                    <select
+                        className="note-gen-select"
+                        value={selectedTransVersion}
+                        onChange={e => setSelectedTransVersion(e.target.value)}
+                    >
+                        <option value="__all__">{t('detail.aiNotes.transSourceAllConcat', { count: segments.length })}</option>
+                        <optgroup label={t('detail.aiNotes.transSourceSegments')}>
+                            {segments.map((seg, idx) => {
+                                const timeStr = new Date(seg.timestamp).toLocaleString()
+                                const badge = seg.asr_model ? `[${seg.asr_model}]` : ''
+                                const pinnedStr = seg.is_pinned ? `(${t('detail.aiNotes.transSourcePinned')})` : ''
+                                const label = `Segment ${idx + 1} - ${timeStr} ${badge} ${pinnedStr}`.trim()
+                                return (
+                                    <option key={seg.id} value={seg.asr_model || String(seg.id)}>{label}</option>
+                                )
+                            })}
+                        </optgroup>
+                    </select>
+                </div>
 
                 {/* Screenshot density */}
                 <div className="note-gen-field">
@@ -343,7 +350,7 @@ function GeneratePanel({
 }
 
 // ---- Main Component ----
-export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) {
+export default function NoteView({ sourceId, segments, video, onSeek }: NoteViewProps) {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
@@ -367,17 +374,20 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     const qkey = ['notes', sourceId]
     const hasSegments = segments.length > 0
 
-    // Derive unique transcription versions (ASR model names) from segments
-    const transcriptionVersions = useMemo(() => {
-        const models = new Set<string>()
-        for (const seg of segments) {
-            const model = (seg as any).asr_model
-            if (model) models.add(model)
+    // Auto-select initial transcription version
+    useEffect(() => {
+        if (!selectedTransVersion && segments.length > 0) {
+            const pinned = segments.find(s => s.is_pinned)
+            const latest = segments.reduce((prev, current) => (prev.id > current.id) ? prev : current)
+            const target = pinned || latest
+            if (target) {
+                setSelectedTransVersion(target.asr_model || String(target.id))
+            }
         }
-        return Array.from(models)
-    }, [segments])
+    }, [segments, selectedTransVersion])
 
     // Queries
+
     const { data: notes = [], isLoading } = useQuery<VideoNote[]>({
         queryKey: qkey,
         queryFn: () => getNotes(sourceId),
@@ -655,10 +665,59 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     // ---- Render ----
 
     if (!hasSegments) {
+        // Can only transcribe if video exists and we know its type
+        const canTranscribe = video && (video.source_type === 'bilibili' || video.source_type === 'youtube' || (video.source_type === 'douyin' && video.media_available))
+        const isBiliOrYt = video?.source_type === 'bilibili' || video?.source_type === 'youtube'
+
+        const handleTranscribe = async (onlySub: boolean) => {
+            if (!video || !canTranscribe) return
+            try {
+                await retranscribe({
+                    source_id: video.source_id,
+                    only_get_subtitles: onlySub
+                })
+                showToast('success', t('detail.aiNotes.transcribeStarted'))
+                // Invalidate query to reflect pending status
+                queryClient.invalidateQueries({ queryKey: ['video', sourceId] })
+            } catch (e: any) {
+                showToast('error', e.message || String(e))
+            }
+        }
+
         return (
             <div className="note-view-empty">
                 <span className="note-empty-icon">📝</span>
-                <p className="note-empty-title">{t('detail.aiNotes.noTranscription')}</p>
+                <p className="note-empty-title mb-4">{t('detail.aiNotes.noTranscription')}</p>
+                <p className="text-sm text-[var(--color-text-muted)] mb-6 text-center max-w-sm">
+                    {t('detail.aiNotes.noTranscriptionDesc')}
+                </p>
+
+                {canTranscribe ? (
+                    <div className="flex flex-col gap-3 w-64 max-w-full">
+                        <button
+                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[var(--color-primary)] text-white font-medium rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors shadow-sm"
+                            onClick={() => handleTranscribe(false)}
+                            title={t('detail.aiNotes.autoTranscribeHint')}
+                        >
+                            <Icons.Mic className="w-4 h-4" />
+                            {t('detail.aiNotes.autoTranscribe')}
+                        </button>
+                        {isBiliOrYt && (
+                            <button
+                                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text)] font-medium rounded-lg hover:bg-[var(--color-card)] transition-colors"
+                                onClick={() => handleTranscribe(true)}
+                                title={t('detail.aiNotes.onlyGetSubtitlesHint')}
+                            >
+                                <Icons.FileText className="w-4 h-4" />
+                                {t('detail.aiNotes.onlyGetSubtitles')}
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <p className="text-xs text-amber-500/80 mt-2 bg-amber-500/10 px-3 py-1.5 rounded-md border border-amber-500/20">
+                        {t('detail.aiNotes.transcribeUnsupported')}
+                    </p>
+                )}
             </div>
         )
     }
@@ -750,7 +809,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
                     setSelectedModelId={setSelectedModelId}
                     screenshotDensity={screenshotDensity}
                     setScreenshotDensity={setScreenshotDensity}
-                    transcriptionVersions={transcriptionVersions}
+                    segments={segments}
                     selectedTransVersion={selectedTransVersion}
                     setSelectedTransVersion={setSelectedTransVersion}
                     providers={providers}

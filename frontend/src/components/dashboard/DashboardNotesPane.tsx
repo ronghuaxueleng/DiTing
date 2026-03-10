@@ -54,6 +54,7 @@ export default function DashboardNotesPane({ video }: Props) {
                 <NoteView
                     sourceId={video.source_id}
                     segments={segments}
+                    video={video}
                     onSeek={() => { }} // no player in dashboard
                 />
             </div>

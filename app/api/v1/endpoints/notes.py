@@ -313,10 +313,13 @@ async def generate_note(request: NoteGenerateRequest, background_tasks: Backgrou
         raise HTTPException(status_code=404, detail="No transcriptions found for this video. Please transcribe first.")
 
     if request.transcription_version:
-        # Filter to only segments from the specified ASR model
-        segments = [s for s in all_segments if dict(s).get('asr_model') == request.transcription_version]
-        if not segments:
-            raise HTTPException(status_code=404, detail=f"No segments found for transcription version: {request.transcription_version}")
+        if request.transcription_version == '__all__':
+            segments = all_segments
+        else:
+            # Filter to only segments from the specified ASR model, or match by segment ID directly
+            segments = [s for s in all_segments if dict(s).get('asr_model') == request.transcription_version or str(dict(s).get('id')) == request.transcription_version]
+            if not segments:
+                raise HTTPException(status_code=404, detail=f"No segments found for transcription version: {request.transcription_version}")
     else:
         # Default: use pinned segments if any, else all segments
         pinned = [s for s in all_segments if dict(s).get('is_pinned')]

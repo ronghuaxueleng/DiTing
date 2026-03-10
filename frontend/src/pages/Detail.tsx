@@ -682,6 +682,7 @@ export default function Detail() {
                                         <NoteView
                                             sourceId={sourceId!}
                                             segments={segments || []}
+                                            video={video}
                                             onSeek={(time) => {
                                                 if (playerRef.current) {
                                                     playerRef.current.currentTime = time
