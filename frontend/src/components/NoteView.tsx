@@ -56,6 +56,10 @@ function extractToc(content: string): TocItem[] {
 }
 
 // ---- TOC Sub-component ----
+const TOC_MIN_WIDTH = 120
+const TOC_MAX_WIDTH = 320
+const TOC_DEFAULT_WIDTH = 180
+
 function NoteTOC({ items, activeId, onItemClick }: {
     items: TocItem[]
     activeId: string | null
@@ -63,9 +67,64 @@ function NoteTOC({ items, activeId, onItemClick }: {
 }) {
     const { t } = useTranslation()
     const [collapsed, setCollapsed] = useState(false)
+    const [tocWidth, setTocWidth] = useState(() => {
+        const saved = localStorage.getItem('note-toc-width')
+        return saved ? Math.max(TOC_MIN_WIDTH, Math.min(TOC_MAX_WIDTH, Number(saved))) : TOC_DEFAULT_WIDTH
+    })
+    const isDragging = useRef(false)
+
+    const handleDragStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        isDragging.current = true
+        const startX = e.clientX
+        const startWidth = tocWidth
+
+        document.body.style.cursor = 'col-resize'
+        document.body.style.userSelect = 'none'
+
+        const onMove = (ev: MouseEvent) => {
+            if (!isDragging.current) return
+            // Dragging to the left = wider TOC (handle is on left edge of TOC)
+            const delta = startX - ev.clientX
+            const newWidth = Math.max(TOC_MIN_WIDTH, Math.min(TOC_MAX_WIDTH, startWidth + delta))
+            setTocWidth(newWidth)
+        }
+        const onUp = () => {
+            isDragging.current = false
+            document.body.style.cursor = ''
+            document.body.style.userSelect = ''
+            window.removeEventListener('mousemove', onMove)
+            window.removeEventListener('mouseup', onUp)
+            // Persist after drag ends
+            setTocWidth(w => { localStorage.setItem('note-toc-width', String(w)); return w })
+        }
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+    }, [tocWidth])
+
+    const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setTocWidth(TOC_DEFAULT_WIDTH)
+        localStorage.setItem('note-toc-width', String(TOC_DEFAULT_WIDTH))
+    }, [])
+
     if (items.length < 2) return null
     return (
-        <div className={`note-toc ${collapsed ? 'note-toc--collapsed' : ''}`}>
+        <div
+            className={`note-toc ${collapsed ? 'note-toc--collapsed' : ''}`}
+            style={collapsed ? undefined : { width: tocWidth }}
+        >
+            {/* Drag handle on left edge */}
+            {!collapsed && (
+                <div
+                    className="note-toc-resize-handle"
+                    onMouseDown={handleDragStart}
+                    onDoubleClick={handleDoubleClick}
+                    title={t('detail.aiNotes.tocResizeHint', 'Drag to resize, double-click to reset')}
+                />
+            )}
             <div className="note-toc-header" onClick={() => setCollapsed(v => !v)}>
                 <Icons.List className="w-3 h-3" />
                 <span>{t('detail.aiNotes.toc')}</span>
