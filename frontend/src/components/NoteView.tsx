@@ -578,7 +578,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
         return children
     }
 
-    const makeHeading = (Tag: 'h1' | 'h2' | 'h3') =>
+    const makeHeading = (Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') =>
         ({ children, node, ...props }: any) => {
             // Use the AST node's line number to look up the deterministic TOC id
             const line = node?.position?.start?.line
@@ -590,6 +590,9 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
         h1: makeHeading('h1'),
         h2: makeHeading('h2'),
         h3: makeHeading('h3'),
+        h4: makeHeading('h4'),
+        h5: makeHeading('h5'),
+        h6: makeHeading('h6'),
         p: ({ children, ...props }: any) => <p {...props}>{renderTimestamps(children)}</p>,
         li: ({ children, ...props }: any) => <li {...props}>{renderTimestamps(children)}</li>,
         img: ({ src, alt, ...props }: any) => {
