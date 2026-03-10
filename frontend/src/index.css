@@ -326,6 +326,8 @@ body {
   gap: 12px;
   padding: 8px 0;
   min-height: 200px;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* In edit mode, collapse the gap so the textarea fills the space */
@@ -766,11 +768,20 @@ body {
   display: flex;
   gap: 16px;
   align-items: flex-start;
+  flex: 1;
+  min-height: 0;
+  /* allows flex children to shrink */
+  height: 100%;
 }
 
 .note-read-layout .note-content {
   flex: 1;
   min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 8px;
+  /* avoid scrollbar hiding text */
+  scroll-behavior: smooth;
 }
 
 /* ---- Generate Config Panel ---- */
@@ -882,8 +893,9 @@ body {
   width: 180px;
   flex-shrink: 0;
   position: sticky;
-  top: 8px;
-  max-height: calc(100vh - 200px);
+  top: 0;
+  align-self: flex-start;
+  max-height: 100%;
   overflow-y: auto;
   border-radius: 8px;
   border: 1px solid var(--color-border);
@@ -1004,6 +1016,7 @@ body {
   accent-color: var(--color-primary);
   cursor: pointer;
 }
+
 /* ============================================================
  * Dashboard Notes View Styles
  * ============================================================ */

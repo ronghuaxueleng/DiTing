@@ -672,7 +672,7 @@ export default function Detail() {
                                         />
                                     </div>
                                 ) : (
-                                    <div className={`flex-1 overflow-y-auto ${mobileLayout === 'split' ? '' : 'lg:overflow-y-auto'}`}>
+                                    <div className={`flex-1 overflow-hidden ${mobileLayout === 'split' ? '' : 'lg:overflow-hidden'}`}>
                                         <NoteView
                                             sourceId={sourceId!}
                                             segments={segments || []}

@@ -22,6 +22,7 @@ interface TocItem {
     level: number  // 1=h1, 2=h2, 3=h3
     text: string
     id: string
+    lineNumber: number  // 1-indexed line number in the markdown source
 }
 
 /** Parse "hh:mm:ss" or "mm:ss" → seconds */
@@ -42,12 +43,13 @@ function extractToc(content: string): TocItem[] {
     const lines = content.split('\n')
     const items: TocItem[] = []
     let idx = 0
-    for (const line of lines) {
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+        const line = lines[lineIdx]!
         const m = line.match(/^(#{1,3})\s+(.+)/)
         if (m) {
             // Strip inline markdown (bold, timestamp emoji, etc.)
             const rawText = m[2]!.replace(/\*\*/g, '').replace(/⏱\s*[\d:]+/g, '').trim()
-            items.push({ level: m[1]!.length, text: rawText, id: `note-h-${idx++}` })
+            items.push({ level: m[1]!.length, text: rawText, id: `note-h-${idx++}`, lineNumber: lineIdx + 1 })
         }
     }
     return items
@@ -266,29 +268,43 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
         activeNote ? extractToc(activeNote.content) : []
         , [activeNote?.id, activeNote?.content])
 
-    // IntersectionObserver for TOC active highlight
+    // Build a line-number → TOC id map for deterministic heading ID assignment
+    const tocLineMap = useMemo(() => {
+        const map = new Map<number, string>()
+        for (const item of tocItems) {
+            map.set(item.lineNumber, item.id)
+        }
+        return map
+    }, [tocItems])
+
+    // Scroll-based active heading tracking
     useEffect(() => {
-        if (!contentRef.current || tocItems.length === 0 || isEditing) return
-        const observers: IntersectionObserver[] = []
-        const visible = new Map<string, boolean>()
+        const container = contentRef.current
+        if (!container || tocItems.length === 0 || isEditing) return
 
-        tocItems.forEach(item => {
-            const el = document.getElementById(item.id)
-            if (!el) return
-            const obs = new IntersectionObserver(
-                ([entry]) => {
-                    visible.set(item.id, !!entry?.isIntersecting)
-                    // Pick first visible item
-                    const first = tocItems.find(t => visible.get(t.id))
-                    if (first) setActiveTocId(first.id)
-                },
-                { threshold: 0.1, rootMargin: '-10% 0px -80% 0px' }
-            )
-            obs.observe(el)
-            observers.push(obs)
-        })
+        const handleScroll = () => {
+            const offset = 40 // breathing room below top
 
-        return () => observers.forEach(o => o.disconnect())
+            let activeId: string | null = tocItems[0]?.id ?? null
+            for (const item of tocItems) {
+                const el = document.getElementById(item.id)
+                if (!el) continue
+                // el.offsetTop is relative to the offsetParent; we need position relative to the scroll container
+                const elTop = el.getBoundingClientRect().top - container.getBoundingClientRect().top
+                if (elTop <= offset) {
+                    activeId = item.id
+                } else {
+                    break
+                }
+            }
+            setActiveTocId(activeId)
+        }
+
+        // Run once immediately to set initial active heading
+        handleScroll()
+
+        container.addEventListener('scroll', handleScroll, { passive: true })
+        return () => container.removeEventListener('scroll', handleScroll)
     }, [tocItems, isEditing, activeNote?.id])
 
     // Mutations
@@ -359,7 +375,16 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     }
     const handleTocClick = (id: string) => {
         const el = document.getElementById(id)
-        el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        if (el && contentRef.current) {
+            // Scroll the note-content container directly
+            const containerTop = contentRef.current.getBoundingClientRect().top
+            const elTop = el.getBoundingClientRect().top
+            // Calculate scroll target (add the offset minus some breathing room)
+            contentRef.current.scrollTo({
+                top: contentRef.current.scrollTop + (elTop - containerTop) - 10,
+                behavior: 'smooth'
+            })
+        }
     }
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleSave() }
@@ -367,8 +392,6 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     }, [editContent, activeNote])
 
     // Custom Markdown components — inject IDs on headings and clickable ⏱ timestamps
-    let headingIdx = 0
-    const tocId = () => `note-h-${headingIdx++}`
 
     function renderTimestamps(children: React.ReactNode): React.ReactNode {
         if (typeof children === 'string') {
@@ -397,8 +420,10 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     }
 
     const makeHeading = (Tag: 'h1' | 'h2' | 'h3') =>
-        ({ children, ...props }: any) => {
-            const id = tocId()
+        ({ children, node, ...props }: any) => {
+            // Use the AST node's line number to look up the deterministic TOC id
+            const line = node?.position?.start?.line
+            const id = (line && tocLineMap.get(line)) || `note-h-unknown-${line ?? 'x'}`
             return <Tag id={id} {...props}>{renderTimestamps(children)}</Tag>
         }
 
@@ -421,9 +446,6 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
             )
         },
     }
-
-    // Reset heading counter before each render
-    headingIdx = 0
 
     // ---- Render ----
 
