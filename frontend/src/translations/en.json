@@ -751,6 +751,9 @@
             "noteMode": "AI Notes",
             "empty": "No transcription segments yet"
         },
+        "refPanel": {
+            "title": "Transcript Reference"
+        },
         "layout": {
             "split": "Split Screen",
             "scroll": "Scroll Mode",

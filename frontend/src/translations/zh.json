@@ -765,6 +765,9 @@
             "noteMode": "AI 笔记",
             "empty": "暂无转写片段"
         },
+        "refPanel": {
+            "title": "转录参照"
+        },
         "layout": {
             "split": "分屏模式",
             "scroll": "滚动模式",

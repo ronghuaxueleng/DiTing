@@ -38,6 +38,7 @@ export default function Detail() {
     // Player State
     const [activeTab, setActiveTab] = useState<'local' | 'stream' | 'embed'>('local')
     const [contentTab, setContentTab] = useState<'segments' | 'immersive' | 'notes'>('segments')
+    const [refPanelTab, setRefPanelTab] = useState<'segments' | 'immersive'>('segments')
     const [currentTime, setCurrentTime] = useState(0)
     const playerRef = useRef<HTMLVideoElement | HTMLAudioElement>(null)
     const lastTimeRef = useRef(0)
@@ -504,6 +505,75 @@ export default function Detail() {
                                 )}
                             </div>
                         </div>}
+
+                        {/* Reference Panel — replaces handwritten notes when AI notes tab is active */}
+                        {contentTab === 'notes' && (
+                            <div className={`ref-panel bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm ${mobileLayout === 'split' ? 'hidden lg:flex' : 'flex'} flex-col`} style={{ height: '40vh', minHeight: '260px' }}>
+                                {/* Mini tab header */}
+                                <div className="px-4 py-2.5 border-b border-[var(--color-border)] flex items-center justify-between bg-[var(--color-card-muted)] shrink-0">
+                                    <span className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">
+                                        {t('detail.refPanel.title')}
+                                    </span>
+                                    <div className="flex bg-[var(--color-bg)] p-0.5 rounded-md">
+                                        <button
+                                            onClick={() => setRefPanelTab('segments')}
+                                            className={`px-2.5 py-0.5 text-xs font-medium rounded transition-all ${refPanelTab === 'segments'
+                                                ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                                                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                }`}
+                                        >
+                                            {t('detail.transcription.listMode')}
+                                        </button>
+                                        <button
+                                            onClick={() => setRefPanelTab('immersive')}
+                                            className={`px-2.5 py-0.5 text-xs font-medium rounded transition-all flex items-center gap-1 ${refPanelTab === 'immersive'
+                                                ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                                                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                }`}
+                                        >
+                                            <Icons.Music className="w-3 h-3" />
+                                            {t('detail.transcription.immersiveMode')}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Content — takes remaining height, scrolls internally */}
+                                <div className="flex-1 min-h-0 overflow-y-auto">
+                                    {refPanelTab === 'segments' ? (
+                                        segments?.length === 0 ? (
+                                            <div className="flex items-center justify-center h-full text-sm text-[var(--color-text-muted)]">
+                                                {t('detail.transcription.empty')}
+                                            </div>
+                                        ) : (
+                                            <div className="p-3 space-y-3">
+                                                {segments?.map((segment) => (
+                                                    <SegmentCard
+                                                        key={segment.id}
+                                                        segment={segment}
+                                                        onRefresh={refetchSegments}
+                                                        highlightText={highlightQuery}
+                                                        onOpenAiModal={(seg, refineCtx) => setAiModalState({ segment: seg, refineContext: refineCtx })}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )
+                                    ) : (
+                                        <ImmersiveView
+                                            segments={segments || []}
+                                            currentTime={currentTime}
+                                            onSeek={(time) => {
+                                                if (playerRef.current) {
+                                                    playerRef.current.currentTime = time
+                                                    playerRef.current.play()
+                                                }
+                                            }}
+                                            height="100%"
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                     </div>
                 )}
 
