@@ -73,6 +73,18 @@ function NoteTOC({ items, activeId, onItemClick }: {
         const saved = localStorage.getItem('note-toc-width')
         return saved ? Math.max(TOC_MIN_WIDTH, Math.min(TOC_MAX_WIDTH, Number(saved))) : TOC_DEFAULT_WIDTH
     })
+
+    // Dynamic max level filter
+    const availableMaxLevel = useMemo(() => items.reduce((max, item) => Math.max(max, item.level), 1), [items])
+    const [maxLevel, setMaxLevel] = useState(6)
+
+    // Update max level if we switch to a note with shallower headings
+    useEffect(() => {
+        if (maxLevel > availableMaxLevel) {
+            setMaxLevel(availableMaxLevel)
+        }
+    }, [availableMaxLevel])
+
     const isDragging = useRef(false)
 
     const handleDragStart = useCallback((e: React.MouseEvent) => {
@@ -127,14 +139,31 @@ function NoteTOC({ items, activeId, onItemClick }: {
                     title={t('detail.aiNotes.tocResizeHint', 'Drag to resize, double-click to reset')}
                 />
             )}
-            <div className="note-toc-header" onClick={() => setCollapsed(v => !v)}>
-                <Icons.List className="w-3 h-3" />
-                <span>{t('detail.aiNotes.toc')}</span>
-                <Icons.ChevronRight className={`w-3 h-3 ml-auto transition-transform ${collapsed ? '' : 'rotate-90'}`} />
+            <div className="note-toc-header-container">
+                <div className="note-toc-header" onClick={() => setCollapsed(v => !v)}>
+                    <Icons.List className="w-3 h-3" />
+                    <span>{t('detail.aiNotes.toc')}</span>
+                    <Icons.ChevronRight className={`w-3 h-3 ml-auto transition-transform ${collapsed ? '' : 'rotate-90'}`} />
+                </div>
+                {!collapsed && availableMaxLevel > 1 && (
+                    <div className="note-toc-filter px-[10px] pb-2 flex items-center gap-2">
+                        <span className="text-[10px] text-[var(--color-primary)] font-medium w-4 shrink-0">H{maxLevel}</span>
+                        <input
+                            type="range"
+                            min="1"
+                            max={availableMaxLevel}
+                            step="1"
+                            value={maxLevel}
+                            onChange={(e) => setMaxLevel(Number(e.target.value))}
+                            className="note-toc-slider flex-1"
+                            title={t('detail.aiNotes.tocFilterHint', `Show headings up to level ${maxLevel}`)}
+                        />
+                    </div>
+                )}
             </div>
             {!collapsed && (
                 <ul className="note-toc-list">
-                    {items.map(item => (
+                    {items.filter(item => item.level <= maxLevel).map(item => (
                         <li key={item.id}
                             className={`note-toc-item note-toc-item--h${item.level} ${activeId === item.id ? 'active' : ''}`}
                             onClick={() => onItemClick(item.id)}

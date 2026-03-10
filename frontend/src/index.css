@@ -226,7 +226,7 @@ body {
 
 /* â”€â”€â”€ Scrollbar Styling â”€â”€â”€ */
 
-/* Global scrollbar â€?thin & themed */
+/* Global scrollbar ?thin & themed */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
@@ -275,7 +275,7 @@ body {
   background: transparent;
 }
 
-/* .custom-scrollbar â€?auto-hiding overlay variant */
+/* .custom-scrollbar ?auto-hiding overlay variant */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
@@ -307,7 +307,7 @@ body {
   background: var(--scrollbar-thumb-hover);
 }
 
-/* .no-scrollbar â€?completely hidden scrollbar */
+/* .no-scrollbar ?completely hidden scrollbar */
 .no-scrollbar {
   scrollbar-width: none;
 }
@@ -599,7 +599,7 @@ body {
   }
 }
 
-/** Edit area â€?fills available height */
+/** Edit area ?fills available height */
 .note-edit-area {
   display: flex;
   flex-direction: column;
@@ -903,7 +903,7 @@ body {
   /* width is now set via inline style from React */
 }
 
-/* Resize drag handle â€?thin strip on the left edge */
+/* Resize drag handle ?thin strip on the left edge */
 .note-toc-resize-handle {
   position: absolute;
   left: -3px;
@@ -956,21 +956,23 @@ body {
 
 .note-toc-list {
   list-style: none;
-  margin: 0;
+  margin: 0 0 0 10px;
   padding: 6px 0;
+  border-left: 1px solid var(--color-border);
 }
 
 .note-toc-item {
   display: block;
-  padding: 4px 10px;
+  padding: 5px 10px 5px 0;
   cursor: pointer;
   color: var(--color-text-muted);
-  transition: color 0.1s, background 0.1s;
+  transition: all 0.15s ease;
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   border-left: 2px solid transparent;
+  margin-left: -1px; /* Align active border perfectly over the list track */
 }
 
 .note-toc-item:hover {
@@ -982,341 +984,89 @@ body {
   color: var(--color-primary);
   border-left-color: var(--color-primary);
   background: var(--color-primary)/8;
-  font-weight: 600;
+  font-weight: 500; /* Use medium weight instead of heavy 600 for elegance */
 }
 
-/* Indentation by heading level */
+/* Indentation by strictly adding padding inside the item, keeping the border flush left */
 .note-toc-item--h1 {
-  padding-left: 10px;
+  padding-left: 12px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-top: 4px; /* Slight separation for top-level headers */
 }
 
 .note-toc-item--h2 {
-  padding-left: 18px;
-  font-size: 0.76rem;
+  padding-left: 22px;
+  font-size: 0.8rem;
 }
 
 .note-toc-item--h3 {
-  padding-left: 26px;
-  font-size: 0.73rem;
-}
-
-/* ---- Screenshot styles ---- */
-.note-screenshot {
-  width: 100%;
-  max-width: 640px;
-  border-radius: 8px;
-  margin: 10px 0;
-  border: 1px solid var(--color-border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  cursor: pointer;
-  transition: box-shadow 0.15s ease;
-  display: block;
-}
-
-.note-screenshot:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-}
-
-/* Generate panel checkbox */
-.note-gen-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  color: var(--color-text);
-  padding: 4px 0;
-}
-
-.note-gen-checkbox input[type=checkbox] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--color-primary);
-  cursor: pointer;
-}
-
-/* ============================================================
- * Dashboard Notes View Styles
- * ============================================================ */
-
-/* Full-height wrapper */
-.dash-notes-pane-wrapper {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-/* Left video list sidebar */
-.dash-notes-list {
-  width: 280px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow-y: auto;
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 8px;
-}
-
-.dash-notes-list-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 8px;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-text);
-  transition: background 0.12s;
-}
-
-.dash-notes-list-item:hover {
-  background: var(--color-hover-bg);
-}
-
-.dash-notes-list-item.active {
-  background: var(--color-primary);
-  color: white;
-}
-
-.dash-notes-list-cover {
-  width: 44px;
-  height: 28px;
-  border-radius: 4px;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--color-border);
-}
-
-.dash-notes-list-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.dash-notes-list-title {
-  font-size: 0.8rem;
-  font-weight: 500;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.dash-notes-list-badge {
-  font-size: 0.7rem;
-  opacity: 0.8;
-}
-
-/* Right pane */
-.dash-notes-pane {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.dash-notes-pane--empty {
-  align-items: center;
-  justify-content: center;
-}
-
-.dash-notes-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  color: var(--color-text-muted);
-  text-align: center;
-  padding: 40px;
-}
-
-.dash-notes-placeholder-icon {
-  font-size: 2.5rem;
-}
-
-.dash-notes-placeholder-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.dash-notes-placeholder-desc {
-  font-size: 0.85rem;
-  margin: 0;
-  max-width: 280px;
-}
-
-/* Header strip when a video is selected */
-.dash-notes-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-card-muted);
-  flex-shrink: 0;
-}
-
-.dash-notes-header-cover {
-  width: 60px;
-  height: 38px;
-  border-radius: 6px;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: var(--color-border);
-}
-
-.dash-notes-header-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.dash-notes-header-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.dash-notes-header-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin: 0 0 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dash-notes-header-meta {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
-
-/* Scrollable NoteView wrapper */
-.dash-notes-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px 16px;
-}
-
-/* ============================================================
- * Note Generation Progress Bar
- * ============================================================ */
-
-.note-gen-progress {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.note-gen-progress-bar-wrap {
-  height: 6px;
-  background: var(--color-border);
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.note-gen-progress-bar {
-  height: 100%;
-  background: var(--color-primary);
-  border-radius: 99px;
-  transition: width 0.6s ease;
-  min-width: 4px;
-}
-
-.note-gen-progress-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-}
-
-.note-gen-progress-msg {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.note-gen-progress-pct {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  color: var(--color-primary);
-  flex-shrink: 0;
-  margin-left: 8px;
-}
-
-.note-gen-progress-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-/* Custom prompt textarea in GeneratePanel */
-.note-gen-textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 7px;
-  font-size: 0.82rem;
-  line-height: 1.5;
-  background: var(--color-card);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  outline: none;
-  resize: vertical;
-  min-height: 44px;
-  max-height: 120px;
-  font-family: inherit;
-  transition: border-color 0.15s;
-}
-
-.note-gen-textarea:focus {
-  border-color: var(--color-primary);
-}
-
-.note-gen-textarea::placeholder {
-  color: var(--color-text-muted);
-  opacity: 0.7;
-}
-
-/* Note version history gen_params badges */
-.note-version-badge {
-  font-size: 0.68rem;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--color-bg);
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-  white-space: nowrap;
-  cursor: default;
+  padding-left: 34px;
+  font-size: 0.76rem;
 }
 
 .note-toc-item--h4 {
-  padding-left: 36px;
-  font-size: 0.70rem;
+  padding-left: 46px;
+  font-size: 0.72rem;
 }
 
 .note-toc-item--h5 {
-  padding-left: 48px;
-  font-size: 0.68rem;
+  padding-left: 58px;
+  font-size: 0.70rem;
 }
 
 .note-toc-item--h6 {
-  padding-left: 62px;
-  font-size: 0.65rem;
+  padding-left: 70px;
+  font-size: 0.68rem;
+}
+
+/* TOC Slider */
+.note-toc-header-container {
+  border-bottom: 1px solid var(--color-border);
+}
+.note-toc-header {
+  border-bottom: none; /* Removed from header, moved to container */
+}
+
+.note-toc-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.note-toc-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.1s;
+}
+
+.note-toc-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.note-toc-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.1s;
+}
+
+.note-toc-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
 }
