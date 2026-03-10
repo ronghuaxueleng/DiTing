@@ -69,14 +69,32 @@ def get_video_format_string(quality='best'):
     """
     Map quality label to yt-dlp format string.
     Prefers H.264 (avc1) for iOS compatibility, with fallback to any codec.
+    Multiple fallback chains ensure compatibility with VP9/AV1-only videos (e.g. YouTube).
     """
     if quality == 'worst':
-        return 'worstvideo[vcodec^=avc]+worstaudio/worstvideo+worstaudio/worst'
+        return (
+            'worstvideo[vcodec^=avc]+worstaudio'
+            '/worstvideo+worstaudio'
+            '/worst'
+        )
     elif quality == 'medium':
-        return 'bestvideo[height<=720][vcodec^=avc]+bestaudio/bestvideo[height<=720]+bestaudio/best[height<=720]/best'
+        return (
+            'bestvideo[height<=720][vcodec^=avc]+bestaudio[ext=m4a]'
+            '/bestvideo[height<=720][vcodec^=avc]+bestaudio'
+            '/bestvideo[height<=720]+bestaudio[ext=m4a]'
+            '/bestvideo[height<=720]+bestaudio'
+            '/best[height<=720]'
+            '/best'
+        )
     else:
         # Default: best quality
-        return 'bestvideo[vcodec^=avc]+bestaudio/bestvideo+bestaudio/best'
+        return (
+            'bestvideo[vcodec^=avc]+bestaudio[ext=m4a]'
+            '/bestvideo[vcodec^=avc]+bestaudio'
+            '/bestvideo+bestaudio[ext=m4a]'
+            '/bestvideo+bestaudio'
+            '/best'
+        )
 
 
 def check_and_reraise_cancel(e):
