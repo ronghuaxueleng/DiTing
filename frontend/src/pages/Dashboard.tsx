@@ -290,6 +290,7 @@ export default function Dashboard() {
                     tagExclude={tagExclude}
                     hasSegments={hasSegments}
                     hasAI={hasAI}
+                    hasNotes={hasNotes}
                     hasCached={hasCached}
                     isSubtitle={isSubtitle}
                     includeArchived={includeArchived}
