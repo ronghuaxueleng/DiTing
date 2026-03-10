@@ -370,6 +370,7 @@ export default function NoteView({ sourceId, segments, video, onSeek }: NoteView
     const [pendingDelete, setPendingDelete] = useState<number | null>(null)
     const [pendingReset, setPendingReset] = useState<boolean>(false)
     const [activeTocId, setActiveTocId] = useState<string | null>(null)
+    const [hideScreenshots, setHideScreenshots] = useState<boolean>(() => localStorage.getItem('note-hide-screenshots') === 'true')
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     const qkey = ['notes', sourceId]
@@ -650,6 +651,7 @@ export default function NoteView({ sourceId, segments, video, onSeek }: NoteView
             li: ({ children, ...props }: any) => <li {...props}>{renderTimestamps(children)}</li>,
             img: ({ src, alt, ...props }: any) => {
                 const isScreenshot = src && src.includes('/api/note-screenshots/')
+                if (isScreenshot && hideScreenshots) return null
                 return (
                     <img
                         src={src}
@@ -661,7 +663,7 @@ export default function NoteView({ sourceId, segments, video, onSeek }: NoteView
                 )
             },
         }
-    }, [onSeek, tocLineMap])
+    }, [onSeek, tocLineMap, hideScreenshots])
 
     // ---- Render ----
 
@@ -765,6 +767,18 @@ export default function NoteView({ sourceId, segments, video, onSeek }: NoteView
                             <button className="note-btn note-btn-icon" onClick={handleExport}
                                 title={t('detail.aiNotes.exportMd')}>
                                 <Icons.Download />
+                            </button>
+                            {/* Toggle screenshots visibility */}
+                            <button
+                                className={`note-btn note-btn-icon ${hideScreenshots ? 'active' : ''}`}
+                                onClick={() => setHideScreenshots(v => {
+                                    const next = !v
+                                    localStorage.setItem('note-hide-screenshots', String(next))
+                                    return next
+                                })}
+                                title={hideScreenshots ? t('detail.aiNotes.showScreenshots', '显示截图') : t('detail.aiNotes.hideScreenshots', '隐藏截图')}
+                            >
+                                <Icons.Image />
                             </button>
                             {/* Regenerate → opens config panel */}
                             <button
