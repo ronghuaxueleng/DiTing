@@ -18,6 +18,8 @@ interface NoteViewProps {
     onSeek: (timeSeconds: number) => void
 }
 
+const REMARK_PLUGINS = [remarkGfm]
+
 interface TocItem {
     level: number  // 1=h1, 2=h2, 3=h3
     text: string
@@ -552,71 +554,74 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
 
     // Custom Markdown components — inject IDs on headings and clickable ⏱ timestamps
 
-    function renderTimestamps(children: React.ReactNode): React.ReactNode {
-        if (typeof children === 'string') {
-            const parts = children.split(/(⏱\s*\d{1,2}:\d{2}(?::\d{2})?)/g)
-            if (parts.length === 1) return children
-            return parts.map((part, i) => {
-                const m = part.match(/⏱\s*(\d{1,2}:\d{2}(?::\d{2})?)/)
-                if (m) {
-                    const secs = parseTimestamp(m[1]!)
-                    return (
-                        <button key={i}
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                onSeek(secs)
-                            }}
-                            onMouseDown={(e) => {
-                                // Prevent browser auto-focus which causes scroll jumps
-                                e.preventDefault()
-                            }}
-                            className="note-ts-btn" title={`Jump to ${m[1]}`}>
-                            {part}
-                        </button>
-                    )
-                }
-                return part
-            })
-        }
-        if (Array.isArray(children)) {
-            return children.map((child, i) =>
-                typeof child === 'string' ? <span key={i}>{renderTimestamps(child)}</span> : child
-            )
-        }
-        return children
-    }
-
-    const makeHeading = (Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') =>
-        ({ children, node, ...props }: any) => {
-            // Use the AST node's line number to look up the deterministic TOC id
-            const line = node?.position?.start?.line
-            const id = (line && tocLineMap.get(line)) || `note-h-unknown-${line ?? 'x'}`
-            return <Tag id={id} {...props}>{renderTimestamps(children)}</Tag>
+    // Custom Markdown components — inject IDs on headings and clickable ⏱ timestamps
+    const markdownComponents = useMemo(() => {
+        function renderTimestamps(children: React.ReactNode): React.ReactNode {
+            if (typeof children === 'string') {
+                const parts = children.split(/(⏱\s*\d{1,2}:\d{2}(?::\d{2})?)/g)
+                if (parts.length === 1) return children
+                return parts.map((part, i) => {
+                    const m = part.match(/⏱\s*(\d{1,2}:\d{2}(?::\d{2})?)/)
+                    if (m) {
+                        const secs = parseTimestamp(m[1]!)
+                        return (
+                            <button key={i}
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    onSeek(secs)
+                                }}
+                                onMouseDown={(e) => {
+                                    // Prevent browser auto-focus which causes scroll jumps
+                                    e.preventDefault()
+                                }}
+                                className="note-ts-btn" title={`Jump to ${m[1]}`}>
+                                {part}
+                            </button>
+                        )
+                    }
+                    return part
+                })
+            }
+            if (Array.isArray(children)) {
+                return children.map((child, i) =>
+                    typeof child === 'string' ? <span key={i}>{renderTimestamps(child)}</span> : child
+                )
+            }
+            return children
         }
 
-    const markdownComponents = {
-        h1: makeHeading('h1'),
-        h2: makeHeading('h2'),
-        h3: makeHeading('h3'),
-        h4: makeHeading('h4'),
-        h5: makeHeading('h5'),
-        h6: makeHeading('h6'),
-        p: ({ children, ...props }: any) => <p {...props}>{renderTimestamps(children)}</p>,
-        li: ({ children, ...props }: any) => <li {...props}>{renderTimestamps(children)}</li>,
-        img: ({ src, alt, ...props }: any) => {
-            const isScreenshot = src && src.includes('/api/note-screenshots/')
-            return (
-                <img
-                    src={src}
-                    alt={alt}
-                    className={isScreenshot ? 'note-screenshot' : undefined}
-                    loading="lazy"
-                    {...props}
-                />
-            )
-        },
-    }
+        const makeHeading = (Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') =>
+            ({ children, node, ...props }: any) => {
+                // Use the AST node's line number to look up the deterministic TOC id
+                const line = node?.position?.start?.line
+                const id = (line && tocLineMap.get(line)) || `note-h-unknown-${line ?? 'x'}`
+                return <Tag id={id} {...props}>{renderTimestamps(children)}</Tag>
+            }
+
+        return {
+            h1: makeHeading('h1'),
+            h2: makeHeading('h2'),
+            h3: makeHeading('h3'),
+            h4: makeHeading('h4'),
+            h5: makeHeading('h5'),
+            h6: makeHeading('h6'),
+            p: ({ children, ...props }: any) => <p {...props}>{renderTimestamps(children)}</p>,
+            li: ({ children, ...props }: any) => <li {...props}>{renderTimestamps(children)}</li>,
+            img: ({ src, alt, ...props }: any) => {
+                const isScreenshot = src && src.includes('/api/note-screenshots/')
+                return (
+                    <img
+                        src={src}
+                        alt={alt}
+                        className={isScreenshot ? 'note-screenshot' : undefined}
+                        loading="lazy"
+                        {...props}
+                    />
+                )
+            },
+        }
+    }, [onSeek, tocLineMap])
 
     // ---- Render ----
 
@@ -803,7 +808,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
             {activeNote && !isEditing && (
                 <div className="note-read-layout">
                     <div className="note-content" ref={contentRef}>
-                        <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                        <Markdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
                             {activeNote.content}
                         </Markdown>
                     </div>

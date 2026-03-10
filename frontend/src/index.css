@@ -1009,11 +1009,11 @@ body {
   border: 1px solid var(--color-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: box-shadow 0.15s ease;
+  display: block;
 }
 
 .note-screenshot:hover {
-  transform: scale(1.02);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
