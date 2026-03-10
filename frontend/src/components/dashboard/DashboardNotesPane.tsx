@@ -49,8 +49,8 @@ export default function DashboardNotesPane({ video }: Props) {
                 </div>
             </div>
 
-            {/* NoteView */}
-            <div className="dash-notes-content flex-1 overflow-y-auto p-4 lg:p-6 min-h-[400px]">
+            {/* NoteView — fills remaining space, scrolls internally */}
+            <div className="dash-notes-content flex-1 min-h-0 overflow-hidden p-4 lg:p-6">
                 <NoteView
                     sourceId={video.source_id}
                     segments={segments}

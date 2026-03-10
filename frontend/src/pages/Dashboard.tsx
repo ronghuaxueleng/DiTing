@@ -355,41 +355,56 @@ export default function Dashboard() {
                 )}
             </div>
 
-            {/* Notes View — master-detail layout below the content area */}
+            {/* Notes View — master-detail layout, viewport-constrained so each panel scrolls independently */}
             {viewMode === 'notes' && (
-                <div className="w-full px-4 sm:px-6 lg:px-8 pb-8 flex flex-col lg:flex-row gap-4" style={{ minHeight: 'calc(100vh - 260px)' }}>
-                    {/* Left: video list (compact) */}
-                    <div className={`dash-notes-list w-full lg:w-80 flex-shrink-0 flex flex-col gap-2 overflow-y-auto ${selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
-                        {(data?.items || []).map(video => (
-                            <button
-                                key={video.source_id}
-                                className={`dash-notes-list-item flex items-start gap-3 p-3 text-left border rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${selectedNoteVideo?.source_id === video.source_id ? 'active border-[var(--color-primary)] bg-[var(--color-primary)]/10' : 'border-[var(--color-border)] bg-[var(--color-card)]'}`}
-                                onClick={() => setSelectedNoteVideo(video)}
-                            >
-                                {video.cover && (
-                                    <img src={video.cover} alt="" className="dash-notes-list-cover w-24 h-16 object-cover rounded bg-black/10 shrink-0" />
-                                )}
-                                <div className="dash-notes-list-info flex flex-col flex-1 min-w-0">
-                                    <span className="dash-notes-list-title text-sm font-medium line-clamp-2 text-[var(--color-text)]">{video.title}</span>
-                                    {video.ai_count > 0 && (
-                                        <span className="dash-notes-list-badge mt-1 text-xs px-1.5 py-0.5 rounded bg-[var(--color-primary)]/15 text-[var(--color-primary)] w-max border border-[var(--color-primary)]/20">✨ {video.ai_count}</span>
+                <div className="w-full px-4 sm:px-6 lg:px-8 pb-4 flex flex-col lg:flex-row gap-4 overflow-hidden" style={{ height: 'calc(100vh - 260px)' }}>
+                    {/* Left: video list (compact, scrolls independently) */}
+                    <div className={`lg:w-80 flex-shrink-0 flex flex-col border border-[var(--color-border)] rounded-xl bg-[var(--color-card)] overflow-hidden ${selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
+                        {/* Scrollable list area */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 p-2">
+                            {(data?.items || []).map(video => (
+                                <button
+                                    key={video.source_id}
+                                    className={`dash-notes-list-item flex items-start gap-3 p-2.5 text-left rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0 ${selectedNoteVideo?.source_id === video.source_id ? 'active bg-[var(--color-primary)]/10 ring-1 ring-[var(--color-primary)]/40' : ''}`}
+                                    onClick={() => setSelectedNoteVideo(video)}
+                                >
+                                    {video.cover && (
+                                        <img src={video.cover} alt="" className="dash-notes-list-cover w-20 h-14 object-cover rounded bg-black/10 shrink-0" />
                                     )}
+                                    <div className="dash-notes-list-info flex flex-col flex-1 min-w-0">
+                                        <span className="dash-notes-list-title text-sm font-medium line-clamp-2 text-[var(--color-text)]">{video.title}</span>
+                                        {video.ai_count > 0 && (
+                                            <span className="dash-notes-list-badge mt-1 text-xs px-1.5 py-0.5 rounded bg-[var(--color-primary)]/15 text-[var(--color-primary)] w-max border border-[var(--color-primary)]/20">✨ {video.ai_count}</span>
+                                        )}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                        {/* Pagination pinned at bottom */}
+                        {(data?.total ?? 0) > limit && (
+                            <div className="shrink-0 border-t border-[var(--color-border)] p-2 bg-[var(--color-card)]">
+                                <div className="flex items-center justify-center gap-1">
+                                    <button
+                                        onClick={() => updateParams({ page: String(Math.max(1, page - 1)) })}
+                                        disabled={page === 1}
+                                        className="px-2 py-1 text-xs bg-[var(--color-border)] hover:bg-[var(--color-border)]/80 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                    >‹</button>
+                                    <span className="text-xs text-[var(--color-text-muted)] px-2">{page} / {totalPages}</span>
+                                    <button
+                                        onClick={() => updateParams({ page: String(Math.min(totalPages, page + 1)) })}
+                                        disabled={page === totalPages}
+                                        className="px-2 py-1 text-xs bg-[var(--color-border)] hover:bg-[var(--color-border)]/80 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                    >›</button>
                                 </div>
-                            </button>
-                        ))}
-                        <Pagination
-                            page={page}
-                            totalPages={totalPages}
-                            total={data?.total}
-                            onPageChange={(p) => updateParams({ page: String(p) })}
-                        />
+                            </div>
+                        )}
                     </div>
 
-                    {/* Right: NoteView pane */}
-                    <div className={`dash-notes-pane-wrapper flex-1 bg-[var(--color-card)] rounded-xl border border-[var(--color-border)] overflow-hidden shadow-sm flex flex-col min-h-[500px] lg:min-h-0 ${!selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
+                    {/* Right: NoteView pane (scrolls independently) */}
+                    <div className={`dash-notes-pane-wrapper flex-1 min-w-0 bg-[var(--color-card)] rounded-xl border border-[var(--color-border)] overflow-hidden shadow-sm flex flex-col ${!selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
                         {selectedNoteVideo && (
                             <button
-                                className="lg:hidden p-3 border-b border-[var(--color-border)] text-[var(--color-text-muted)] flex items-center gap-2 bg-black/5 dark:bg-white/5 font-medium hover:text-[var(--color-text)] transition-colors"
+                                className="lg:hidden p-3 border-b border-[var(--color-border)] text-[var(--color-text-muted)] flex items-center gap-2 bg-black/5 dark:bg-white/5 font-medium hover:text-[var(--color-text)] transition-colors shrink-0"
                                 onClick={() => setSelectedNoteVideo(null)}
                             >
                                 <span>←</span> {t('common.back', 'Back')}
