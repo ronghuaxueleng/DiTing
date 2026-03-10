@@ -9,6 +9,7 @@ export interface DashboardActiveFiltersProps {
     tagExclude: boolean
     hasSegments?: boolean
     hasAI?: boolean
+    hasNotes?: boolean
     hasCached?: boolean
     isSubtitle?: boolean
     includeArchived: string | null
@@ -25,6 +26,7 @@ export default function DashboardActiveFilters({
     tagExclude,
     hasSegments,
     hasAI,
+    hasNotes,
     hasCached,
     isSubtitle,
     includeArchived,
@@ -35,7 +37,7 @@ export default function DashboardActiveFilters({
 }: DashboardActiveFiltersProps) {
     const { t } = useTranslation()
 
-    if (!(sourceType || status || selectedTagId || hasSegments !== undefined || hasAI !== undefined || hasCached !== undefined || isSubtitle !== undefined || includeArchived !== null || searchQuery)) {
+    if (!(sourceType || status || selectedTagId || hasSegments !== undefined || hasAI !== undefined || hasNotes !== undefined || hasCached !== undefined || isSubtitle !== undefined || includeArchived !== null || searchQuery)) {
         return null
     }
 
@@ -92,6 +94,17 @@ export default function DashboardActiveFilters({
                 </div>
             )}
 
+            {hasNotes !== undefined && (
+                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs border ${hasNotes
+                    ? 'bg-teal-500/10 border-teal-500/20 text-teal-600 dark:text-teal-400'
+                    : 'bg-red-500/10 border-red-500/20 text-red-600'
+                    }`}>
+                    <Icons.BookOpen className="w-3 h-3" />
+                    <span>{hasNotes === false ? t('dashboard.filters.noNotes') : t('dashboard.filters.hasNotes')}</span>
+                    <button onClick={() => onUpdateFilter({ notes: null })} className="p-0.5 hover:text-red-500 rounded"><Icons.X className="w-3 h-3" /></button>
+                </div>
+            )}
+
             {hasCached !== undefined && (
                 <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs border ${hasCached
                     ? 'bg-blue-500/10 border-blue-500/20 text-blue-600'
@@ -134,7 +147,7 @@ export default function DashboardActiveFilters({
             )}
 
             <button
-                onClick={() => onUpdateFilter({ source: null, status: null, tag: null, tag_exclude: null, segments: null, ai: null, cached: null, subtitle: null, archived: null, q: null })}
+                onClick={() => onUpdateFilter({ source: null, status: null, tag: null, tag_exclude: null, segments: null, ai: null, notes: null, cached: null, subtitle: null, archived: null, q: null })}
                 className="text-xs text-[var(--color-text-muted)] hover:text-red-500 transition-colors ml-2"
             >
                 {t('dashboard.filters.clearAll')}

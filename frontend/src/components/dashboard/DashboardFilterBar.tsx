@@ -9,6 +9,7 @@ export interface DashboardFilterBarProps {
     tagExclude: boolean
     hasSegments?: boolean
     hasAI?: boolean
+    hasNotes?: boolean
     hasCached?: boolean
     isSubtitle?: boolean
     includeArchived: string | null
@@ -23,6 +24,7 @@ export default function DashboardFilterBar({
     tagExclude,
     hasSegments,
     hasAI,
+    hasNotes,
     hasCached,
     isSubtitle,
     includeArchived,
@@ -31,14 +33,14 @@ export default function DashboardFilterBar({
 }: DashboardFilterBarProps) {
     const { t } = useTranslation()
 
-    const toggleFilter = (key: 'segments' | 'ai' | 'cached' | 'subtitle' | 'archived') => {
+    const toggleFilter = (key: 'segments' | 'ai' | 'notes' | 'cached' | 'subtitle' | 'archived') => {
         if (key === 'archived') {
             const nextVal = includeArchived === null ? '1' : includeArchived === '1' ? 'all' : null
             onUpdateFilter({ archived: nextVal })
             return
         }
 
-        const currentVal = key === 'segments' ? hasSegments : key === 'ai' ? hasAI : key === 'cached' ? hasCached : isSubtitle
+        const currentVal = key === 'segments' ? hasSegments : key === 'ai' ? hasAI : key === 'notes' ? hasNotes : key === 'cached' ? hasCached : isSubtitle
         const nextVal = currentVal === undefined ? '1' : currentVal === true ? '0' : null
         onUpdateFilter({ [key]: nextVal })
     }
@@ -122,6 +124,18 @@ export default function DashboardFilterBar({
                     >
                         <Icons.Sparkles className="w-3 h-3" />
                         {hasAI === false ? t('dashboard.filters.noAI') : t('dashboard.filters.hasAI')}
+                    </button>
+                    <button
+                        onClick={() => toggleFilter('notes')}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-all flex items-center gap-1.5 ${hasNotes === true
+                            ? 'bg-teal-500/15 border-teal-500/30 text-teal-600 dark:text-teal-400'
+                            : hasNotes === false
+                                ? 'bg-red-500/10 border-red-500/20 text-red-500'
+                                : 'bg-[var(--color-card)] border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]'
+                            }`}
+                    >
+                        <Icons.BookOpen className="w-3 h-3" />
+                        {hasNotes === false ? t('dashboard.filters.noNotes') : t('dashboard.filters.hasNotes')}
                     </button>
                     <button
                         onClick={() => toggleFilter('cached')}

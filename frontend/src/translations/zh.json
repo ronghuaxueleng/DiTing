@@ -93,6 +93,8 @@
             "noSegments": "无转录",
             "hasAI": "有AI摘要",
             "noAI": "无AI摘要",
+            "hasNotes": "有笔记",
+            "noNotes": "无笔记",
             "hasCached": "已缓存",
             "noCached": "未缓存",
             "isSubtitle": "有字幕",

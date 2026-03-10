@@ -56,6 +56,7 @@ async def get_videos(
     is_subtitle: bool = None,
     include_archived: str = None,
     search: str = None,
+    has_notes: bool = None,
 ):
     """Get aggregated video list (paginated), optionally filtered."""
     return await run_in_threadpool(
@@ -74,6 +75,7 @@ async def get_videos(
         is_subtitle=is_subtitle,
         include_archived=include_archived,
         search=search,
+        has_notes=has_notes,
     )
 
 

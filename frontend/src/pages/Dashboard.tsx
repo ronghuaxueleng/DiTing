@@ -62,6 +62,7 @@ export default function Dashboard() {
     const parseQuick = (v: string | null) => v === '1' ? true : v === '0' ? false : undefined
     const hasSegments = parseQuick(searchParams.get('segments'))
     const hasAI = parseQuick(searchParams.get('ai'))
+    const hasNotes = parseQuick(searchParams.get('notes'))
     const hasCached = parseQuick(searchParams.get('cached'))
     const isSubtitle = parseQuick(searchParams.get('subtitle'))
 
@@ -146,7 +147,7 @@ export default function Dashboard() {
 
     const { data, isLoading, refetch } = useQuery({
         // Include sort/filters in query key to trigger refetch
-        queryKey: ['videos', page, limit, sourceType, status, selectedTagId, tagExclude, sortBy, hasSegments, hasAI, hasCached, isSubtitle, includeArchived, searchQuery],
+        queryKey: ['videos', page, limit, sourceType, status, selectedTagId, tagExclude, sortBy, hasSegments, hasAI, hasNotes, hasCached, isSubtitle, includeArchived, searchQuery],
         queryFn: () => getVideos({
             page,
             limit,
@@ -157,6 +158,7 @@ export default function Dashboard() {
             sortBy,
             hasSegments,
             hasAI,
+            hasNotes,
             hasCached,
             isSubtitle,
             includeArchived: includeArchived || undefined,
@@ -254,6 +256,7 @@ export default function Dashboard() {
                     tagExclude={tagExclude}
                     hasSegments={hasSegments}
                     hasAI={hasAI}
+                    hasNotes={hasNotes}
                     hasCached={hasCached}
                     isSubtitle={isSubtitle}
                     includeArchived={includeArchived}

@@ -41,6 +41,7 @@ export interface GetVideosParams {
     sortBy?: string
     hasSegments?: boolean
     hasAI?: boolean
+    hasNotes?: boolean
     hasCached?: boolean
     isSubtitle?: boolean
     includeArchived?: string
@@ -57,6 +58,7 @@ export async function getVideos({
     sortBy,
     hasSegments,
     hasAI,
+    hasNotes,
     hasCached,
     isSubtitle,
     includeArchived,
@@ -71,6 +73,7 @@ export async function getVideos({
     if (sortBy) params.set('sort_by', sortBy)
     if (hasSegments !== undefined) params.set('has_segments', String(hasSegments))
     if (hasAI !== undefined) params.set('has_ai', String(hasAI))
+    if (hasNotes !== undefined) params.set('has_notes', String(hasNotes))
     if (hasCached !== undefined) params.set('has_cached', String(hasCached))
     if (isSubtitle !== undefined) params.set('is_subtitle', String(isSubtitle))
     if (includeArchived) params.set('include_archived', includeArchived)

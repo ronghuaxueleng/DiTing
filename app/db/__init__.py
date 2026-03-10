@@ -127,7 +127,6 @@ from app.db.tags import (
     batch_get_video_tags,
 )
 
-# Video Notes (v0.12.4+)
 from app.db.video_notes import (
     add_video_note,
     get_active_note,
@@ -137,6 +136,7 @@ from app.db.video_notes import (
     delete_video_note,
     set_note_active,
     get_note_by_id,
+    batch_count_notes,
 )
 
 __all__ = [
@@ -257,4 +257,5 @@ __all__ = [
     "delete_video_note",
     "set_note_active",
     "get_note_by_id",
+    "batch_count_notes",
 ]

@@ -64,6 +64,25 @@ def get_all_notes(source_id: str) -> list:
     return rows
 
 
+def batch_count_notes(source_ids: list[str]) -> dict:
+    """Count AI notes for multiple source IDs in one query.
+    Returns a dict mapping source_id -> count.
+    """
+    if not source_ids:
+        return {}
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholders = ','.join('?' * len(source_ids))
+    cursor.execute(
+        f'SELECT source_id, COUNT(*) as cnt FROM video_notes WHERE source_id IN ({placeholders}) GROUP BY source_id',
+        list(source_ids)
+    )
+    result = {row[0]: row[1] for row in cursor.fetchall()}
+    conn.close()
+    return result
+
+
 def update_note_content(note_id: int, content: str):
     """Update note content (user edit). Also flags is_edited and refreshes updated_at."""
     conn = get_connection()

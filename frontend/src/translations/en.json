@@ -88,6 +88,8 @@
             "noSegments": "No Transcript",
             "hasAI": "Has AI",
             "noAI": "No AI",
+            "hasNotes": "Has Notes",
+            "noNotes": "No Notes",
             "hasCached": "Cached",
             "noCached": "Not Cached",
             "isSubtitle": "Has Subtitle",

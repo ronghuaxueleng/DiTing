@@ -165,10 +165,16 @@ def build_video_list_row(r, format_cover) -> dict:
 def enrich_video_list(videos: list[dict], all_source_ids: list[str], all_row_ids: list[int]):
     """Batch-enrich video list with AI counts, cache counts, and tags (in-place)."""
     # AI summary counts
+    from app.db import batch_count_ai_summaries, batch_count_notes
     ai_counts = batch_count_ai_summaries(all_row_ids) if all_row_ids else {}
     for v in videos:
         v['ai_count'] = sum(ai_counts.get(rid, 0) for rid in v['_row_ids'])
         v.pop('_row_ids', None)
+
+    # Note counts
+    note_counts = batch_count_notes(all_source_ids) if all_source_ids else {}
+    for v in videos:
+        v['note_count'] = note_counts.get(v['source_id'], 0)
 
     # Cache entry counts
     cache_counts = batch_get_cache_counts(all_source_ids) if all_source_ids else {}
@@ -193,6 +199,7 @@ def apply_filters(
     is_subtitle: bool = None,
     include_archived: str = None,
     search: str = None,
+    has_notes: bool = None,
 ) -> list[dict]:
     """Apply all filter criteria to the video list."""
     result = video_list
@@ -213,6 +220,8 @@ def apply_filters(
         result = [v for v in result if (v['count'] > 0) == has_segments]
     if has_ai is not None:
         result = [v for v in result if (v['ai_count'] > 0) == has_ai]
+    if has_notes is not None:
+        result = [v for v in result if (v.get('note_count', 0) > 0) == has_notes]
     if has_cached is not None:
         result = [v for v in result if bool(v['media_available']) == has_cached]
     if is_subtitle is not None:
@@ -234,7 +243,7 @@ def apply_filters(
     return result
 
 
-def apply_sorting(video_list: list[dict], sort_by: str = 'time'):
+def apply_sorting(video_list: list[dict], sort_by: str):
     """Sort the video list in-place."""
     if sort_by == 'title':
         video_list.sort(key=lambda x: (x.get('title') or x.get('source_id') or '').lower())
@@ -260,6 +269,7 @@ def build_paginated_video_list(
     is_subtitle: bool = None,
     include_archived: str = None,
     search: str = None,
+    has_notes: bool = None,
 ) -> dict:
     """
     Build a paginated, filtered, sorted video list.
@@ -292,6 +302,7 @@ def build_paginated_video_list(
         is_subtitle=is_subtitle,
         include_archived=include_archived,
         search=search,
+        has_notes=has_notes,
     )
 
     apply_sorting(video_list, sort_by)
