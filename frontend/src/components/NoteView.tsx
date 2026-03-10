@@ -550,7 +550,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
             <div className="note-toolbar">
                 <div className="note-toolbar-left">
                     {/* Version history toggle */}
-                    {notes.length > 1 && (
+                    {notes.length > 0 && (
                         <button
                             className={`note-btn note-btn-icon ${showVersions ? 'active' : ''}`}
                             onClick={() => setShowVersions(v => !v)}
@@ -640,7 +640,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
             )}
 
             {/* ---- VERSION HISTORY PANEL ---- */}
-            {showVersions && notes.length > 1 && (
+            {showVersions && notes.length > 0 && (
                 <div className="note-version-panel">
                     {notes.map(note => (
                         <div key={note.id}
