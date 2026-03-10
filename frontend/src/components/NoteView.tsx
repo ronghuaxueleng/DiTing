@@ -314,7 +314,8 @@ function GeneratePanel({
                             />
                         </div>
                         <div className="note-gen-progress-meta">
-                            <span className="note-gen-progress-msg">
+                            <span className="note-gen-progress-msg flex items-center gap-2">
+                                <Icons.Loader className="w-3.5 h-3.5 animate-spin text-[var(--color-primary)] opacity-80" />
                                 {activeTask.message || t('detail.aiNotes.genStageProcessing')}
                             </span>
                             <span className="note-gen-progress-pct">{activeTask.progress ?? 0}%</span>

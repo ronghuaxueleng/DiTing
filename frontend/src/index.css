@@ -885,7 +885,75 @@ body {
   gap: 8px;
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid var(--color-primary)/20;
+  border-top: 1px solid rgba(var(--color-primary-rgb, 99, 102, 241), 0.2);
+}
+
+/* ---- Generate Progress View ---- */
+.note-gen-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding-top: 12px;
+}
+
+.note-gen-progress-bar-wrap {
+  width: 100%;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.note-gen-progress-bar {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  background-image: linear-gradient(45deg,
+      rgba(255, 255, 255, 0.15) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.15) 50%,
+      rgba(255, 255, 255, 0.15) 75%,
+      transparent 75%,
+      transparent);
+  background-size: 1rem 1rem;
+  animation: progress-stripes 1s linear infinite;
+}
+
+@keyframes progress-stripes {
+  from {
+    background-position: 1rem 0;
+  }
+
+  to {
+    background-position: 0 0;
+  }
+}
+
+.note-gen-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.note-gen-progress-msg {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.note-gen-progress-pct {
+  color: var(--color-text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+}
+
+.note-gen-progress-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
 
 /* ---- TOC Outline Navigation ---- */
@@ -972,7 +1040,8 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   border-left: 2px solid transparent;
-  margin-left: -1px; /* Align active border perfectly over the list track */
+  margin-left: -1px;
+  /* Align active border perfectly over the list track */
 }
 
 .note-toc-item:hover {
@@ -984,7 +1053,8 @@ body {
   color: var(--color-primary);
   border-left-color: var(--color-primary);
   background: var(--color-primary)/8;
-  font-weight: 500; /* Use medium weight instead of heavy 600 for elegance */
+  font-weight: 500;
+  /* Use medium weight instead of heavy 600 for elegance */
 }
 
 /* Indentation by strictly adding padding inside the item, keeping the border flush left */
@@ -992,7 +1062,8 @@ body {
   padding-left: 12px;
   font-weight: 500;
   color: var(--color-text);
-  margin-top: 4px; /* Slight separation for top-level headers */
+  margin-top: 4px;
+  /* Slight separation for top-level headers */
 }
 
 .note-toc-item--h2 {
@@ -1024,8 +1095,10 @@ body {
 .note-toc-header-container {
   border-bottom: 1px solid var(--color-border);
 }
+
 .note-toc-header {
-  border-bottom: none; /* Removed from header, moved to container */
+  border-bottom: none;
+  /* Removed from header, moved to container */
 }
 
 .note-toc-slider {
@@ -1048,7 +1121,7 @@ body {
   background: var(--color-primary);
   cursor: pointer;
   border: 2px solid white;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   transition: transform 0.1s;
 }
 
@@ -1063,7 +1136,7 @@ body {
   background: var(--color-primary);
   cursor: pointer;
   border: 2px solid white;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   transition: transform 0.1s;
 }
 
