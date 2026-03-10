@@ -126,7 +126,7 @@ export default function Dashboard() {
                 return prev && ['processing', 'pending'].includes(prev.status) && ['completed', 'failed', 'cancelled'].includes(task.status)
             })
             if (hasNewlyFinished) {
-                queryClient.invalidateQueries({ queryKey: ['videos'] })
+                queryClient.refetchQueries({ queryKey: ['videos'] })
                 // Keep fast polling for a cooldown period after tasks finish
                 setRecentlyFinished(true)
                 clearTimeout(cooldownTimerRef.current)
