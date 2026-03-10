@@ -226,7 +226,7 @@ body {
 
 /* ─── Scrollbar Styling ─── */
 
-/* Global scrollbar — thin & themed */
+/* Global scrollbar �?thin & themed */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
@@ -275,7 +275,7 @@ body {
   background: transparent;
 }
 
-/* .custom-scrollbar — auto-hiding overlay variant */
+/* .custom-scrollbar �?auto-hiding overlay variant */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
@@ -307,7 +307,7 @@ body {
   background: var(--scrollbar-thumb-hover);
 }
 
-/* .no-scrollbar — completely hidden scrollbar */
+/* .no-scrollbar �?completely hidden scrollbar */
 .no-scrollbar {
   scrollbar-width: none;
 }
@@ -599,7 +599,7 @@ body {
   }
 }
 
-/** Edit area — fills available height */
+/** Edit area �?fills available height */
 .note-edit-area {
   display: flex;
   flex-direction: column;
@@ -903,7 +903,7 @@ body {
   /* width is now set via inline style from React */
 }
 
-/* Resize drag handle — thin strip on the left edge */
+/* Resize drag handle �?thin strip on the left edge */
 .note-toc-resize-handle {
   position: absolute;
   left: -3px;
@@ -1304,4 +1304,19 @@ body {
   border: 1px solid var(--color-border);
   white-space: nowrap;
   cursor: default;
+}
+
+.note-toc-item--h4 {
+  padding-left: 36px;
+  font-size: 0.70rem;
+}
+
+.note-toc-item--h5 {
+  padding-left: 48px;
+  font-size: 0.68rem;
+}
+
+.note-toc-item--h6 {
+  padding-left: 62px;
+  font-size: 0.65rem;
 }

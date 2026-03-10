@@ -45,7 +45,7 @@ function extractToc(content: string): TocItem[] {
     let idx = 0
     for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
         const line = lines[lineIdx]!
-        const m = line.match(/^(#{1,3})\s+(.+)/)
+        const m = line.match(/^(#{1,6})\s+(.+)/)
         if (m) {
             // Strip inline markdown (bold, timestamp emoji, etc.)
             const rawText = m[2]!.replace(/\*\*/g, '').replace(/⏱\s*[\d:]+/g, '').trim()
@@ -57,7 +57,7 @@ function extractToc(content: string): TocItem[] {
 
 // ---- TOC Sub-component ----
 const TOC_MIN_WIDTH = 120
-const TOC_MAX_WIDTH = 320
+const TOC_MAX_WIDTH = 480
 const TOC_DEFAULT_WIDTH = 180
 
 function NoteTOC({ items, activeId, onItemClick }: {
