@@ -809,7 +809,8 @@
             "startGenerate": "开始生成",
             "toc": "目录",
             "screenshots": "关键帧截图",
-            "screenshotsDesc": "在关键时刻自动截取画面"
+            "screenshotsDesc": "在关键时刻自动截取画面",
+            "exportFailed": "导出失败"
         }
     },
     "aiSummaryModal": {

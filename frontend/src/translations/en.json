@@ -800,7 +800,8 @@
             "startGenerate": "Start Generating",
             "toc": "Outline",
             "screenshots": "Screenshots",
-            "screenshotsDesc": "Auto-capture keyframes at key moments"
+            "screenshotsDesc": "Auto-capture keyframes at key moments",
+            "exportFailed": "Export failed"
         }
     },
     "aiSummaryModal": {

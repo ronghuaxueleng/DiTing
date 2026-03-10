@@ -302,13 +302,23 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
     }
     const handleSave = () => { if (activeNote) saveMut.mutate(editContent) }
     const handleCancelEdit = () => { setIsEditing(false); setEditContent(activeNote?.content ?? '') }
-    const handleExport = () => {
+    const handleExport = async () => {
         if (!activeNote) return
-        const blob = new Blob([activeNote.content], { type: 'text/markdown;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url; a.download = `note-${sourceId}.md`; a.click()
-        URL.revokeObjectURL(url)
+        try {
+            const res = await fetch(`/api/notes/${activeNote.id}/export`)
+            if (!res.ok) throw new Error('Export failed')
+            const disposition = res.headers.get('Content-Disposition') || ''
+            const nameMatch = disposition.match(/filename="([^"]+)"/) ||
+                disposition.match(/filename=([^;]+)/)
+            const filename = (nameMatch?.[1] ?? `note-${sourceId}.md`).trim()
+            const blob = await res.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url; a.download = filename; a.click()
+            URL.revokeObjectURL(url)
+        } catch {
+            showToast('error', t('detail.aiNotes.exportFailed'))
+        }
     }
     const handleTocClick = (id: string) => {
         const el = document.getElementById(id)

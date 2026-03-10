@@ -3,12 +3,15 @@ Video Notes Router
 Handles: AI note generation (background), note CRUD, version management.
 """
 import hashlib
+import io
 import os
 import re
 import time
+import zipfile
 from typing import Optional
 
 from fastapi import APIRouter, Body, BackgroundTasks, HTTPException
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from app.db import (
@@ -357,3 +360,57 @@ async def delete_note(note_id: int):
         raise HTTPException(status_code=404, detail="Note not found")
     delete_video_note(note_id)
     return {"status": "success"}
+
+
+@router.get("/notes/{note_id}/export")
+async def export_note(note_id: int):
+    """Export a note as a ZIP (with screenshots) or plain Markdown if no images."""
+    row = get_note_by_id(note_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    content: str = row["content"]
+    source_id: str = row["source_id"]
+
+    # Detect screenshot references: /api/note-screenshots/{source_id}/{filename}
+    screenshot_pattern = re.compile(
+        r'!\[([^\]]*)\]\(/api/note-screenshots/[^/]+/([^)]+\.jpg)\)'
+    )
+    matches = screenshot_pattern.findall(content)  # list of (alt, filename)
+
+    if not matches:
+        # No images — plain Markdown download
+        return Response(
+            content=content.encode('utf-8'),
+            media_type='text/markdown; charset=utf-8',
+            headers={"Content-Disposition": f'attachment; filename="note-{source_id}.md"'},
+        )
+
+    # Rewrite image URLs to relative paths before packing
+    md_for_zip = screenshot_pattern.sub(
+        lambda m: f"![{m.group(1)}](./images/{m.group(2)})",
+        content,
+    )
+
+    # Build ZIP in memory
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('note.md', md_for_zip.encode('utf-8'))
+        images_dir = os.path.join(settings.NOTE_SCREENSHOTS_DIR, source_id)
+        seen = set()
+        for _, filename in matches:
+            if filename in seen:
+                continue
+            seen.add(filename)
+            img_path = os.path.join(images_dir, filename)
+            if os.path.isfile(img_path):
+                zf.write(img_path, arcname=f'images/{filename}')
+            else:
+                logger.warning(f"📷 Export: screenshot file missing {img_path}")
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type='application/zip',
+        headers={"Content-Disposition": f'attachment; filename="note-{source_id}.zip"'},
+    )
