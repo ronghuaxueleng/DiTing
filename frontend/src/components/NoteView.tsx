@@ -4,10 +4,10 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useTranslation } from 'react-i18next'
 
-import type { Segment, VideoNote, LLMProvider } from '../api/types'
+import type { Segment, VideoNote, LLMProvider, Task } from '../api/types'
 import {
     getNotes, generateNote, updateNote, resetNote, activateNote, deleteNote,
-    getLLMProviders,
+    getLLMProviders, getTasks, cancelTask,
 } from '../api/client'
 import { useToast } from '../contexts/ToastContext'
 import Icons from './ui/Icons'
@@ -99,6 +99,8 @@ function GeneratePanel({
     onGenerate,
     onCancel,
     isPending,
+    activeTask,
+    onCancelTask,
 }: {
     style: string
     setStyle: (s: 'concise' | 'detailed' | 'outline') => void
@@ -113,6 +115,8 @@ function GeneratePanel({
     onGenerate: () => void
     onCancel: () => void
     isPending: boolean
+    activeTask: Task | null
+    onCancelTask: () => void
 }) {
     const { t } = useTranslation()
     return (
@@ -187,16 +191,46 @@ function GeneratePanel({
                 </div>
             </div>
             <div className="note-gen-panel-footer">
-                <button className="note-btn note-btn-secondary" onClick={onCancel}>
-                    {t('detail.aiNotes.cancel')}
-                </button>
-                <button
-                    className="note-btn note-btn-primary"
-                    onClick={onGenerate}
-                    disabled={isPending}
-                >
-                    ✨ {isPending ? t('detail.aiNotes.generating') : t('detail.aiNotes.startGenerate')}
-                </button>
+                {activeTask ? (
+                    /* ---- Progress view ---- */
+                    <div className="note-gen-progress">
+                        <div className="note-gen-progress-bar-wrap">
+                            <div
+                                className="note-gen-progress-bar"
+                                style={{ width: `${activeTask.progress ?? 0}%` }}
+                            />
+                        </div>
+                        <div className="note-gen-progress-meta">
+                            <span className="note-gen-progress-msg">
+                                {activeTask.message || t('detail.aiNotes.genStageProcessing')}
+                            </span>
+                            <span className="note-gen-progress-pct">{activeTask.progress ?? 0}%</span>
+                        </div>
+                        <div className="note-gen-progress-actions">
+                            <button
+                                className="note-btn note-btn-secondary"
+                                onClick={onCancelTask}
+                                style={{ fontSize: '0.78rem', padding: '4px 12px' }}
+                            >
+                                {t('detail.aiNotes.cancelGenerate')}
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    /* ---- Normal config footer ---- */
+                    <>
+                        <button className="note-btn note-btn-secondary" onClick={onCancel}>
+                            {t('detail.aiNotes.cancel')}
+                        </button>
+                        <button
+                            className="note-btn note-btn-primary"
+                            onClick={onGenerate}
+                            disabled={isPending}
+                        >
+                            ✨ {isPending ? t('detail.aiNotes.generating') : t('detail.aiNotes.startGenerate')}
+                        </button>
+                    </>
+                )}
             </div>
         </div>
     )
@@ -307,6 +341,49 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
         return () => container.removeEventListener('scroll', handleScroll)
     }, [tocItems, isEditing, activeNote?.id])
 
+    // Active task progress tracking — survives page refresh via sessionStorage
+    const taskStorageKey = `note_task_${sourceId}`
+    const [pendingTaskId, _setPendingTaskId] = useState<number | null>(() => {
+        const saved = sessionStorage.getItem(taskStorageKey)
+        return saved ? Number(saved) : null
+    })
+    const setPendingTaskId = (id: number | null) => {
+        _setPendingTaskId(id)
+        if (id === null) sessionStorage.removeItem(taskStorageKey)
+        else sessionStorage.setItem(taskStorageKey, String(id))
+    }
+    // Also open the panel on mount if a task was already in flight
+    useEffect(() => {
+        if (pendingTaskId !== null) setShowGenPanel(true)
+    }, [])
+
+    const { data: tasksMap } = useQuery<Record<string, Task>>({
+        queryKey: ['tasks'],
+        queryFn: getTasks,
+        refetchInterval: 1200,
+        enabled: pendingTaskId !== null,
+    })
+
+    const activeTask: Task | null = pendingTaskId !== null
+        ? (tasksMap?.[String(pendingTaskId)] ?? null)
+        : null
+
+    // Watch task completion
+    useEffect(() => {
+        if (!activeTask || pendingTaskId === null) return
+        if (activeTask.status === 'completed') {
+            setPendingTaskId(null)
+            setShowGenPanel(false)
+            showToast('success', t('detail.aiNotes.generatedSuccess'))
+            // Refresh note list a couple times to catch the new note
+            queryClient.invalidateQueries({ queryKey: qkey })
+            setTimeout(() => queryClient.invalidateQueries({ queryKey: qkey }), 2500)
+        } else if (activeTask.status === 'failed' || activeTask.status === 'cancelled') {
+            setPendingTaskId(null)
+            showToast('error', t('detail.aiNotes.generateFailed'))
+        }
+    }, [activeTask?.status, pendingTaskId])
+
     // Mutations
     const generateMut = useMutation({
         mutationFn: () => generateNote(sourceId, {
@@ -315,11 +392,16 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
             screenshotDensity: screenshotDensity || undefined,
             transcriptionVersion: selectedTransVersion || undefined,
         }),
-        onSuccess: () => {
-            showToast('success', t('detail.aiNotes.generatedSuccess'))
-            setShowGenPanel(false)
-            const poll = setInterval(() => queryClient.invalidateQueries({ queryKey: qkey }), 2000)
-            setTimeout(() => clearInterval(poll), 30000)
+        onSuccess: (data) => {
+            // data = { status, task_id }
+            if ((data as any)?.task_id) {
+                setPendingTaskId((data as any).task_id)
+            } else {
+                // fallback: no task id returned, close immediately
+                setShowGenPanel(false)
+                showToast('success', t('detail.aiNotes.generatedSuccess'))
+                queryClient.invalidateQueries({ queryKey: qkey })
+            }
         },
         onError: () => showToast('error', t('detail.aiNotes.generateFailed')),
     })
@@ -537,7 +619,7 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
             </div>
 
             {/* ---- GENERATE CONFIG PANEL ---- */}
-            {showGenPanel && (
+            {(showGenPanel || pendingTaskId !== null) && (
                 <GeneratePanel
                     style={style}
                     setStyle={setStyle}
@@ -552,6 +634,8 @@ export default function NoteView({ sourceId, segments, onSeek }: NoteViewProps) 
                     onGenerate={() => generateMut.mutate()}
                     onCancel={() => setShowGenPanel(false)}
                     isPending={generateMut.isPending}
+                    activeTask={activeTask}
+                    onCancelTask={() => pendingTaskId !== null && cancelTask(pendingTaskId).then(() => setPendingTaskId(null))}
                 />
             )}
 

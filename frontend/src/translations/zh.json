@@ -816,6 +816,8 @@
             "model": "模型",
             "defaultModel": "（默认模型）",
             "startGenerate": "开始生成",
+            "cancelGenerate": "取消生成",
+            "genStageProcessing": "正在处理...",
             "toc": "目录",
             "screenshots": "关键帧截图",
             "screenshotsDesc": "在关键时刻自动截取画面",

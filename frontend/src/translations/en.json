@@ -802,6 +802,8 @@
             "model": "Model",
             "defaultModel": "(Default Model)",
             "startGenerate": "Start Generating",
+            "cancelGenerate": "Cancel",
+            "genStageProcessing": "Processing...",
             "toc": "Outline",
             "screenshots": "Screenshots",
             "screenshotsDesc": "Auto-capture keyframes at key moments",
