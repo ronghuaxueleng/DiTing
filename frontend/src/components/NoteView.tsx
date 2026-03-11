@@ -22,6 +22,8 @@ interface NoteViewProps {
     onOpenDetail?: () => void
     /** Imperative handle: set to a fn to scroll the note to a heading by text */
     scrollToHeadingRef?: React.MutableRefObject<((headingText: string) => void) | null>
+    /** Fired when the user scrolls to a different heading */
+    onActiveHeadingChange?: (headingText: string | null) => void
 }
 
 const REMARK_PLUGINS = [remarkGfm]
@@ -356,7 +358,7 @@ function GeneratePanel({
 }
 
 // ---- Main Component ----
-export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap, onOpenDetail, scrollToHeadingRef }: NoteViewProps) {
+export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap, onOpenDetail, scrollToHeadingRef, onActiveHeadingChange }: NoteViewProps) {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
@@ -491,6 +493,14 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
         container.addEventListener('scroll', handleScroll, { passive: true })
         return () => container.removeEventListener('scroll', handleScroll)
     }, [tocItems, isEditing, activeNote?.id])
+
+    // Fire callback when active heading changes
+    useEffect(() => {
+        if (!onActiveHeadingChange) return
+        if (!activeTocId) { onActiveHeadingChange(null); return }
+        const item = tocItems.find(t => t.id === activeTocId)
+        onActiveHeadingChange(item?.text ?? null)
+    }, [activeTocId, tocItems, onActiveHeadingChange])
 
     // Active task progress tracking — survives page refresh via sessionStorage
     const taskStorageKey = `note_task_${sourceId}`

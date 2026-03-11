@@ -1338,6 +1338,19 @@ body {
   }
 }
 
+.mindmap-tool-btn--active {
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.mindmap-node-active>foreignObject div {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  transition: outline-color 0.2s, background 0.2s;
+}
+
 .mindmap-svg-wrap {
   flex: 1;
   position: relative;

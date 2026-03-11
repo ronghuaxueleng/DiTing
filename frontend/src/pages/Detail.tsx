@@ -95,6 +95,7 @@ export default function Detail() {
     })
     const vertDraggingRef = useRef(false)
     const scrollToNoteHeadingRef = useRef<((headingText: string) => void) | null>(null)
+    const [activeNoteHeading, setActiveNoteHeading] = useState<string | null>(null)
 
     const applyDragWidth = useCallback((rawWidth: number) => {
         if (rawWidth < SNAP_THRESHOLD) {
@@ -619,6 +620,7 @@ export default function Detail() {
                                                         }
                                                     }}
                                                     onNodeClick={(text) => scrollToNoteHeadingRef.current?.(text)}
+                                                    activeHeadingText={activeNoteHeading}
                                                 />
                                             ) : refPanelTab === 'segments' ? (
                                                 segments?.length === 0 ? (
@@ -881,6 +883,7 @@ export default function Detail() {
                                             playerRef={playerRef}
                                             onOpenMindmap={() => setContentTab('mindmap')}
                                             scrollToHeadingRef={scrollToNoteHeadingRef}
+                                            onActiveHeadingChange={setActiveNoteHeading}
                                         />
                                     </div>
                                 )}

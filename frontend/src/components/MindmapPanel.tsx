@@ -9,6 +9,7 @@ interface MindmapPanelProps {
     noteContent: string
     onSeek?: (seconds: number) => void
     onNodeClick?: (headingText: string) => void
+    activeHeadingText?: string | null
 }
 
 const transformer = new Transformer()
@@ -41,12 +42,13 @@ function applyFoldDepth(node: IPureNode, foldDepth: number, current = 0): IPureN
     } as IPureNode
 }
 
-export default function MindmapPanel({ noteContent, onSeek, onNodeClick }: MindmapPanelProps) {
+export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeHeadingText }: MindmapPanelProps) {
     const { t } = useTranslation()
     const svgRef = useRef<SVGSVGElement>(null)
     const mmRef = useRef<Markmap | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const [isEmpty, setIsEmpty] = useState(false)
+    const [syncEnabled, setSyncEnabled] = useState(false)
 
     // Depth control
     const [maxDepth, setMaxDepth] = useState(6)     // currently selected max depth to show
@@ -190,6 +192,72 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick }: Mindm
 
     const handleFit = () => mmRef.current?.fit()
 
+    // Reverse sync: highlight + zoom to active heading node
+    const prevSyncHeadingRef = useRef<string | null>(null)
+    useEffect(() => {
+        const svg = svgRef.current
+        if (!svg) return
+        // Clear previous highlights
+        svg.querySelectorAll('.mindmap-node-active').forEach(el => el.classList.remove('mindmap-node-active'))
+        if (!syncEnabled || !activeHeadingText) { prevSyncHeadingRef.current = null; return }
+
+        const normalize = (s: string) =>
+            s.replace(/\*\*/g, '').replace(/\u23f1\s*[\d:]+/g, '').replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '').trim().toLowerCase()
+        const needle = normalize(activeHeadingText)
+        if (!needle) return
+
+        // Find matching foreignObject
+        let targetFo: Element | null = null
+        const fos = svg.querySelectorAll('foreignObject')
+        for (const fo of fos) {
+            const div = fo.querySelector('div')
+            if (!div) continue
+            const text = normalize(div.innerText || div.textContent || '')
+            if (text === needle || text.includes(needle) || needle.includes(text)) {
+                targetFo = fo
+                break
+            }
+        }
+        if (!targetFo) return
+
+        // Add highlight class to the g.markmap-node ancestor
+        const gNode = targetFo.closest('g.markmap-node') || targetFo.parentElement
+        if (gNode) gNode.classList.add('mindmap-node-active')
+
+        // Only pan when the heading actually changes (avoid re-pan on same heading)
+        if (activeHeadingText === prevSyncHeadingRef.current) return
+        prevSyncHeadingRef.current = activeHeadingText
+
+        // Pan the viewport to center the active node
+        const foRect = targetFo.getBoundingClientRect()
+        const svgRect = svg.getBoundingClientRect()
+        const cx = foRect.left + foRect.width / 2 - svgRect.left
+        const cy = foRect.top + foRect.height / 2 - svgRect.top
+        const dx = svgRect.width / 2 - cx
+        const dy = svgRect.height / 2 - cy
+        const g = svg.querySelector('g') as SVGGElement | null
+        if (g) {
+            const currentTransform = g.getAttribute('transform') || ''
+            const m = currentTransform.match(/translate\(([^,]+),\s*([^)]+)\)\s*scale\(([^)]+)\)/)
+            if (m) {
+                const tx = parseFloat(m[1]!) + dx
+                const ty = parseFloat(m[2]!) + dy
+                const scale = parseFloat(m[3]!)
+                // Smooth transition
+                g.style.transition = 'transform 0.3s ease'
+                g.setAttribute('transform', `translate(${tx}, ${ty}) scale(${scale})`)
+                setTimeout(() => { g.style.transition = '' }, 350)
+                // Sync d3-zoom internal state so user pan/drag starts from new position
+                const zoomState = (svg as any).__zoom
+                if (zoomState) {
+                    zoomState.x = tx
+                    zoomState.y = ty
+                    zoomState.k = scale
+                }
+            }
+        }
+    }, [syncEnabled, activeHeadingText])
+
     const handleExportSvg = () => {
         if (!svgRef.current) return
         const svgEl = svgRef.current
@@ -250,6 +318,21 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick }: Mindm
                     <Icons.Sparkles className="w-3.5 h-3.5" />
                     <span className="mindmap-tool-label">{t('detail.aiNotes.mindmapAiOptimize', 'AI 优化')}</span>
                 </button>
+
+                {/* Sync toggle */}
+                {activeHeadingText !== undefined && (
+                    <button
+                        className={`mindmap-tool-btn ${syncEnabled ? 'mindmap-tool-btn--active' : ''}`}
+                        onClick={() => setSyncEnabled(v => !v)}
+                        title={syncEnabled
+                            ? t('detail.aiNotes.mindmapSyncOff', '关闭笔记同步定位')
+                            : t('detail.aiNotes.mindmapSyncOn', '开启笔记同步定位')
+                        }
+                    >
+                        <Icons.Eye className="w-3.5 h-3.5" />
+                    </button>
+                )}
+
                 {onSeek && (
                     <span className="mindmap-ts-hint">
                         {t('detail.aiNotes.mindmapTsHint', '点击时间戳跳转')}
