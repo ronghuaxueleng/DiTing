@@ -238,7 +238,29 @@
             "confirmDelete": "Are you sure you want to delete this config?",
             "configUpdated": "ASR config updated",
             "configUpdateFailed": "Failed to update config",
-            "statusRefreshed": "Status refreshed"
+            "statusRefreshed": "Status refreshed",
+            "workerEndpoints": "Local Worker Endpoints",
+            "workerEndpointsHint": "Addresses of the locally-running ASR worker processes. Changes take effect immediately.",
+            "addWorker": "Add Worker",
+            "editWorker": "Edit Worker URL",
+            "deleteWorker": "Remove",
+            "confirmDeleteWorker": "Remove worker \"{{engine}}\"?",
+            "workerEngine": "Engine Name",
+            "workerEnginePlaceholder": "e.g. sensevoice, whisper, qwen3asr",
+            "workerUrl": "Worker URL",
+            "workerUrlPlaceholder": "http://localhost:8001",
+            "workerUrlHint": "HTTP address the server uses to reach this worker. Use localhost for local workers, or IP/hostname for remote GPU servers.",
+            "workerSaved": "Worker endpoint updated",
+            "workerSaveFailed": "Failed to save worker",
+            "workerRemoved": "Worker removed",
+            "workerRemoveFailed": "Failed to remove worker",
+            "noWorkers": "No local workers configured",
+            "enginePresets": "SenseVoice (8001)",
+            "enginePresetsList": [
+                "sensevoice",
+                "whisper",
+                "qwen3asr"
+            ]
         },
         "prompt": {
             "title": "Prompt Management",

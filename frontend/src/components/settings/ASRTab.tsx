@@ -9,6 +9,8 @@ import {
     updateASRModel,
     deleteASRModel,
     setActiveASRModel,
+    updateASRWorkers,
+    deleteASRWorker,
 } from '../../api'
 import { ASRModel } from '../../api/types'
 import { useToast } from '../../contexts/ToastContext'
@@ -100,7 +102,46 @@ export default function ASRTab() {
         }
     })
 
+    // ── Worker URL management ──
+    const PRESET_ENGINES = ['sensevoice', 'whisper', 'qwen3asr']
+    const [showWorkerForm, setShowWorkerForm] = useState(false)
+    const [editingWorkerEngine, setEditingWorkerEngine] = useState<string | null>(null)
+    const [workerForm, setWorkerForm] = useState({ engine: 'sensevoice', customEngine: '', url: 'http://localhost:8001' })
+
+
+    const saveWorkerMutation = useMutation({
+        mutationFn: async ({ engine, url }: { engine: string; url: string }) => {
+            // Get current workers and merge
+            const current = statusData?.engines
+                ? Object.fromEntries(
+                    Object.entries(statusData.engines)
+                        .filter(([, info]: [string, any]) => info.type === 'worker')
+                        .map(([e, info]: [string, any]) => [e, info.url])
+                )
+                : {}
+            return updateASRWorkers({ ...current, [engine]: url })
+        },
+        onSuccess: (data) => {
+            queryClient.setQueryData(['asr-status'], data)
+            setShowWorkerForm(false)
+            setEditingWorkerEngine(null)
+            showToast('success', t('settings.asr.workerSaved'))
+        },
+        onError: (e) => showToast('error', t('settings.asr.workerSaveFailed') + ': ' + e.message)
+    })
+
+    const removeWorkerMutation = useMutation({
+        mutationFn: (engine: string) => deleteASRWorker(engine),
+        onSuccess: (data) => {
+            queryClient.setQueryData(['asr-status'], data)
+            setDeleteConfirmWorkerEngineForModal(null)
+            showToast('success', t('settings.asr.workerRemoved'))
+        },
+        onError: (e) => showToast('error', t('settings.asr.workerRemoveFailed') + ': ' + e.message)
+    })
+
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
+    const [deleteConfirmWorkerEngineForModal, setDeleteConfirmWorkerEngineForModal] = useState<string | null>(null)
 
     const handleDeleteModel = (id: number) => {
         setDeleteConfirmId(null)
@@ -251,6 +292,7 @@ export default function ASRTab() {
                 </button>
             </div>
 
+
             {/* Strict Mode Toggle */}
             <div className="bg-[var(--color-bg)] p-4 rounded-lg flex items-center justify-between border border-[var(--color-border)]">
                 <div>
@@ -392,6 +434,156 @@ export default function ASRTab() {
                         </div>
                     )
                 })}
+            </div>
+
+            {/* ── Local Worker Endpoints ── */}
+            <div className="pt-4 border-t border-[var(--color-border)]">
+                <div className="flex items-center justify-between mb-3">
+                    <div>
+                        <h4 className="font-medium flex items-center gap-2">
+                            <Icons.Cpu className="w-4 h-4 text-purple-500" />
+                            {t('settings.asr.workerEndpoints')}
+                        </h4>
+                        <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{t('settings.asr.workerEndpointsHint')}</p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setEditingWorkerEngine(null)
+                            setWorkerForm({ engine: 'sensevoice', customEngine: '', url: 'http://localhost:8001' })
+                            setShowWorkerForm(true)
+                        }}
+                        className="flex items-center gap-1 text-sm text-[var(--color-primary)] hover:underline shrink-0"
+                    >
+                        <Icons.Plus className="w-4 h-4" />
+                        {t('settings.asr.addWorker')}
+                    </button>
+                </div>
+
+                {/* Worker List */}
+                <div className="space-y-2">
+                    {Object.entries(engines).filter(([, info]: [string, any]) => info.type === 'worker').length === 0 && (
+                        <div className="text-sm text-[var(--color-text-muted)] text-center py-4 bg-[var(--color-bg)] rounded-lg border border-[var(--color-border)] border-dashed">
+                            {t('settings.asr.noWorkers')}
+                        </div>
+                    )}
+                    {Object.entries(engines)
+                        .filter(([, info]: [string, any]) => info.type === 'worker')
+                        .map(([engineName, info]: [string, any]) => (
+                            <div key={engineName} className="bg-[var(--color-bg)] p-3 rounded-lg border border-[var(--color-border)] flex items-center gap-3">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-medium font-mono text-sm">{engineName}</span>
+                                        <span className="bg-purple-500/10 text-purple-500 text-[10px] px-1.5 py-0.5 rounded">Local</span>
+                                        <span className={`flex items-center gap-1 text-[10px] font-medium ${info.online ? 'text-green-500' : 'text-red-500'}`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${info.online ? 'bg-green-500' : 'bg-red-500'}`} />
+                                            {info.online ? 'Online' : 'Offline'}
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-[var(--color-text-muted)] mt-0.5 font-mono truncate">{info.url}</div>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={() => {
+                                            const isPreset = PRESET_ENGINES.includes(engineName)
+                                            setEditingWorkerEngine(engineName)
+                                            setWorkerForm({
+                                                engine: isPreset ? engineName : 'custom',
+                                                customEngine: isPreset ? '' : engineName,
+                                                url: info.url
+                                            })
+                                            setShowWorkerForm(true)
+                                        }}
+                                        className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] rounded"
+                                        title={t('settings.asr.editWorker')}
+                                    >
+                                        <Icons.Edit className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setDeleteConfirmWorkerEngineForModal(engineName)}
+                                        className="p-1.5 text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-500/10 rounded"
+                                        title={t('settings.asr.deleteWorker')}
+                                    >
+                                        <Icons.Trash className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                </div>
+
+                {/* Add/Edit Worker Form Modal */}
+                {showWorkerForm && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" onClick={() => setShowWorkerForm(false)}>
+                        <div className="bg-[var(--color-card)] p-6 rounded-lg w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+                            <h3 className="font-medium text-lg">
+                                {editingWorkerEngine ? t('settings.asr.editWorker') : t('settings.asr.addWorker')}
+                            </h3>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-sm font-medium block mb-1">{t('settings.asr.workerEngine')}</label>
+                                    <select
+                                        value={workerForm.engine}
+                                        onChange={e => setWorkerForm({ ...workerForm, engine: e.target.value })}
+                                        disabled={!!editingWorkerEngine}
+                                        className={`w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm ${editingWorkerEngine ? 'opacity-50' : ''}`}
+                                    >
+                                        {PRESET_ENGINES.map(e => <option key={e} value={e}>{e}</option>)}
+                                        <option value="custom">✨ Custom…</option>
+                                    </select>
+                                    {workerForm.engine === 'custom' && (
+                                        <input
+                                            type="text"
+                                            value={workerForm.customEngine}
+                                            onChange={e => setWorkerForm({ ...workerForm, customEngine: e.target.value })}
+                                            placeholder={t('settings.asr.workerEnginePlaceholder')}
+                                            className="mt-2 w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                            autoFocus
+                                        />
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium block mb-1">{t('settings.asr.workerUrl')}</label>
+                                    <input
+                                        type="text"
+                                        value={workerForm.url}
+                                        onChange={e => setWorkerForm({ ...workerForm, url: e.target.value })}
+                                        placeholder={t('settings.asr.workerUrlPlaceholder')}
+                                        className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                    />
+                                    <div className="text-xs text-[var(--color-text-muted)] mt-1">{t('settings.asr.workerUrlHint')}</div>
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    onClick={() => setShowWorkerForm(false)}
+                                    className="px-4 py-2 text-sm bg-[var(--color-border)] rounded-lg hover:opacity-80"
+                                >
+                                    {t('common.cancel')}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const engineName = workerForm.engine === 'custom' ? workerForm.customEngine.trim() : workerForm.engine
+                                        if (!engineName || !workerForm.url) return
+                                        saveWorkerMutation.mutate({ engine: engineName, url: workerForm.url.trim() })
+                                    }}
+                                    disabled={saveWorkerMutation.isPending}
+                                    className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                                >
+                                    {t('common.save')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete Worker Confirm */}
+                <ConfirmModal
+                    isOpen={deleteConfirmWorkerEngineForModal !== null}
+                    title={t('settings.asr.deleteWorker')}
+                    message={t('settings.asr.confirmDeleteWorker', { engine: deleteConfirmWorkerEngineForModal ?? '' })}
+                    variant="danger"
+                    onConfirm={() => deleteConfirmWorkerEngineForModal && removeWorkerMutation.mutate(deleteConfirmWorkerEngineForModal)}
+                    onCancel={() => setDeleteConfirmWorkerEngineForModal(null)}
+                />
             </div>
 
             {/* Cloud Models Configuration */}
@@ -564,83 +756,83 @@ export default function ASRTab() {
                             {/* Bailian/DashScope fields */}
                             {modelForm.engine === 'bailian' && (
                                 <>
-                            <div>
-                                <label className="text-sm font-medium block mb-1">{t('settings.asr.dashscopeKey')}</label>
-                                <input
-                                    type="password"
-                                    value={cloudForm.api_key}
-                                    onChange={e => setCloudForm({ ...cloudForm, api_key: e.target.value })}
-                                    placeholder={editingModel ? t('settings.asr.leaveBlank') : 'sk-...'}
-                                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium block mb-1">{t('settings.asr.model')}</label>
-                                {(() => {
-                                    const allModels = DASHSCOPE_MODELS.flatMap(g => g.models.map(m => m.value))
-                                    const isCustom = !allModels.includes(cloudForm.model_name)
-                                    const selectValue = isCustom ? 'custom' : cloudForm.model_name
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">{t('settings.asr.dashscopeKey')}</label>
+                                        <input
+                                            type="password"
+                                            value={cloudForm.api_key}
+                                            onChange={e => setCloudForm({ ...cloudForm, api_key: e.target.value })}
+                                            placeholder={editingModel ? t('settings.asr.leaveBlank') : 'sk-...'}
+                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">{t('settings.asr.model')}</label>
+                                        {(() => {
+                                            const allModels = DASHSCOPE_MODELS.flatMap(g => g.models.map(m => m.value))
+                                            const isCustom = !allModels.includes(cloudForm.model_name)
+                                            const selectValue = isCustom ? 'custom' : cloudForm.model_name
 
-                                    return (
-                                        <select
-                                            value={selectValue}
-                                            onChange={e => {
-                                                const val = e.target.value
-                                                setCloudForm({
-                                                    ...cloudForm,
-                                                    model_name: val === 'custom' ? '' : val
-                                                })
-                                            }}
-                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm"
-                                        >
-                                            {DASHSCOPE_MODELS.map(group => (
-                                                <optgroup key={group.group} label={group.group}>
-                                                    {group.models.map(m => (
-                                                        <option key={m.value} value={m.value}>{m.label}</option>
+                                            return (
+                                                <select
+                                                    value={selectValue}
+                                                    onChange={e => {
+                                                        const val = e.target.value
+                                                        setCloudForm({
+                                                            ...cloudForm,
+                                                            model_name: val === 'custom' ? '' : val
+                                                        })
+                                                    }}
+                                                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm"
+                                                >
+                                                    {DASHSCOPE_MODELS.map(group => (
+                                                        <optgroup key={group.group} label={group.group}>
+                                                            {group.models.map(m => (
+                                                                <option key={m.value} value={m.value}>{m.label}</option>
+                                                            ))}
+                                                        </optgroup>
                                                     ))}
-                                                </optgroup>
-                                            ))}
-                                            <option value="custom">{t('settings.asr.customModel')}</option>
-                                        </select>
-                                    )
-                                })()}
+                                                    <option value="custom">{t('settings.asr.customModel')}</option>
+                                                </select>
+                                            )
+                                        })()}
 
-                                {/* Custom Model Input */}
-                                {(() => {
-                                    const allModels = DASHSCOPE_MODELS.flatMap(g => g.models.map(m => m.value))
-                                    const isCustom = !allModels.includes(cloudForm.model_name)
+                                        {/* Custom Model Input */}
+                                        {(() => {
+                                            const allModels = DASHSCOPE_MODELS.flatMap(g => g.models.map(m => m.value))
+                                            const isCustom = !allModels.includes(cloudForm.model_name)
 
-                                    if (isCustom) {
-                                        return (
-                                            <div className="mt-2">
-                                                <input
-                                                    type="text"
-                                                    value={cloudForm.model_name === 'custom' ? '' : cloudForm.model_name}
-                                                    onChange={e => setCloudForm({ ...cloudForm, model_name: e.target.value })}
-                                                    placeholder={t('settings.asr.customModelPlaceholder')}
-                                                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono focus:border-[var(--color-primary)] outline-none"
-                                                    autoFocus
-                                                />
-                                                <div className="text-xs text-[var(--color-text-muted)] mt-1">
-                                                    {t('settings.asr.customModelHint')}
-                                                </div>
+                                            if (isCustom) {
+                                                return (
+                                                    <div className="mt-2">
+                                                        <input
+                                                            type="text"
+                                                            value={cloudForm.model_name === 'custom' ? '' : cloudForm.model_name}
+                                                            onChange={e => setCloudForm({ ...cloudForm, model_name: e.target.value })}
+                                                            placeholder={t('settings.asr.customModelPlaceholder')}
+                                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono focus:border-[var(--color-primary)] outline-none"
+                                                            autoFocus
+                                                        />
+                                                        <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                                                            {t('settings.asr.customModelHint')}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            }
+                                            return null
+                                        })()}
+
+                                        <div className="text-xs text-[var(--color-text-muted)] mt-1 flex flex-col gap-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <Icons.Zap className="w-3 h-3 text-amber-500" />
+                                                <span>{t('settings.asr.realtimeHint')}</span>
                                             </div>
-                                        )
-                                    }
-                                    return null
-                                })()}
-
-                                <div className="text-xs text-[var(--color-text-muted)] mt-1 flex flex-col gap-1">
-                                    <div className="flex items-center gap-1.5">
-                                        <Icons.Zap className="w-3 h-3 text-amber-500" />
-                                        <span>{t('settings.asr.realtimeHint')}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <Icons.Cpu className="w-3 h-3 text-blue-500" />
+                                                <span>{t('settings.asr.multimodalHint')}</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <Icons.Cpu className="w-3 h-3 text-blue-500" />
-                                        <span>{t('settings.asr.multimodalHint')}</span>
-                                    </div>
-                                </div>
-                                </div>
                                 </>
                             )}
                         </div>

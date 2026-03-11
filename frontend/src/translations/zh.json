@@ -243,7 +243,29 @@
             "confirmDelete": "确定要删除此配置吗?",
             "configUpdated": "ASR 配置已更新",
             "configUpdateFailed": "配置更新失败",
-            "statusRefreshed": "状态已刷新"
+            "statusRefreshed": "状态已刷新",
+            "workerEndpoints": "本地 Worker 端点",
+            "workerEndpointsHint": "本地运行的 ASR Worker 进程地址。修改后立即生效，无需重启。",
+            "addWorker": "添加 Worker",
+            "editWorker": "编辑 Worker URL",
+            "deleteWorker": "移除",
+            "confirmDeleteWorker": "确定移除 Worker \"{{engine}}\" ?",
+            "workerEngine": "引擎名称",
+            "workerEnginePlaceholder": "如 sensevoice、whisper、qwen3asr",
+            "workerUrl": "Worker 地址 (URL)",
+            "workerUrlPlaceholder": "http://localhost:8001",
+            "workerUrlHint": "Server 访问该 Worker 的 HTTP 地址。本机运行填 localhost，远程 GPU 服务器填对应 IP 或主机名。",
+            "workerSaved": "Worker 地址已更新",
+            "workerSaveFailed": "保存失败",
+            "workerRemoved": "Worker 已移除",
+            "workerRemoveFailed": "移除失败",
+            "noWorkers": "暂无本地 Worker 配置",
+            "enginePresets": "SenseVoice (8001)",
+            "enginePresetsList": [
+                "sensevoice",
+                "whisper",
+                "qwen3asr"
+            ]
         },
         "prompt": {
             "title": "提示词管理",

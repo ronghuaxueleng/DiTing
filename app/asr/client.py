@@ -16,7 +16,8 @@ CLOUD_ENGINES = {"bailian", "openai_asr"}
 
 class ASRClient:
     def __init__(self):
-        self.workers = settings.ASR_WORKERS
+        # Bootstrap defaults from config/env (only used on first run)
+        self.workers = dict(settings.ASR_WORKERS)  # mutable copy
         self.availability = {}  # {"sensevoice": True, "whisper": False}
         self.latency = {}       # {"sensevoice": 0.0, "whisper": -1}
         self._check_task = None
@@ -39,8 +40,12 @@ class ASRClient:
              "active_engine": None # Explicitly selected active engine
         }
         
-        # Load persisted config from DB
+        # Load persisted config from DB (may override self.workers)
         self._load_config_from_db()
+        
+        # If no workers loaded from DB yet, persist the bootstrap defaults
+        # This ensures first-run env/config values get saved to DB
+        self._ensure_workers_in_db()
         
         # Set default active engine if not loaded
         if not self.config.get("active_engine") and self.config["priority"]:
@@ -86,6 +91,13 @@ class ASRClient:
     def _load_config_from_db(self):
         """Load ASR config from system_configs table."""
         try:
+            # Worker URLs (overrides bootstrap defaults)
+            saved_workers = get_system_config("asr_workers")
+            if saved_workers:
+                loaded_workers = json.loads(saved_workers)
+                self.workers = loaded_workers
+                logger.info(f"📂 Loaded ASR workers from DB: {list(self.workers.keys())}")
+
             # Priority
             saved_priority = get_system_config("asr_priority")
             if saved_priority:
@@ -125,6 +137,23 @@ class ASRClient:
 
         except Exception as e:
             logger.warning(f"⚠️ Failed to load ASR config from DB: {e}")
+
+    def _ensure_workers_in_db(self):
+        """If worker URLs have never been saved to DB yet, persist current (bootstrap) values."""
+        try:
+            existing = get_system_config("asr_workers")
+            if not existing:
+                self._save_workers_to_db()
+                logger.info("📄 Bootstrap worker URLs persisted to DB")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to persist bootstrap workers to DB: {e}")
+
+    def _save_workers_to_db(self):
+        """Persist current worker URL map to DB."""
+        try:
+            set_system_config("asr_workers", json.dumps(self.workers))
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to save ASR workers to DB: {e}")
 
     def _save_config_to_db(self):
         """Save ASR config to system_configs table."""
@@ -245,6 +274,52 @@ class ASRClient:
         
         # Persist to DB
         self._save_config_to_db()
+
+    def update_workers(self, workers: Dict[str, str]):
+        """
+        Replace the full worker URL map at runtime.
+        New engines are added to priority; removed engines are cleaned up.
+        """
+        old_engines = set(self.workers.keys())
+        new_engines = set(workers.keys())
+
+        self.workers = dict(workers)
+
+        # Sync availability/latency state
+        for engine in new_engines - old_engines:
+            self.availability[engine] = False
+            self.latency[engine] = -1.0
+            if engine not in self.config["priority"]:
+                self.config["priority"].append(engine)
+            logger.info(f"➕ Worker [{engine}] added")
+
+        for engine in old_engines - new_engines:
+            self.availability.pop(engine, None)
+            self.latency.pop(engine, None)
+            self.shared_paths.pop(engine, None)
+            self._last_health.pop(engine, None)
+            if engine in self.config["priority"]:
+                self.config["priority"].remove(engine)
+            if self.config.get("active_engine") == engine:
+                self.config["active_engine"] = self.config["priority"][0] if self.config["priority"] else None
+            logger.info(f"➖ Worker [{engine}] removed")
+
+        self._save_workers_to_db()
+        self._save_config_to_db()
+        logger.info(f"⚙️ ASR Workers Updated: {list(self.workers.keys())}")
+
+    def add_worker(self, engine: str, url: str):
+        """Add or update a single worker URL at runtime."""
+        new_workers = dict(self.workers)
+        new_workers[engine] = url
+        self.update_workers(new_workers)
+
+    def remove_worker(self, engine: str):
+        """Remove a single worker at runtime."""
+        if engine not in self.workers:
+            raise ValueError(f"Engine '{engine}' not found in workers")
+        new_workers = {k: v for k, v in self.workers.items() if k != engine}
+        self.update_workers(new_workers)
 
     def select_worker(self, preferred_engine: str = None) -> str:
         """

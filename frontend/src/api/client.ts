@@ -607,6 +607,15 @@ export async function updateASRConfig(config: { priority?: string[], strict_mode
     await fetchJson(`${API_BASE}/asr/config`, { method: 'POST', body: JSON.stringify(config) })
 }
 
+export async function updateASRWorkers(workers: Record<string, string>): Promise<ASRStatus> {
+    return fetchJson(`${API_BASE}/asr/workers`, { method: 'PUT', body: JSON.stringify({ workers }) })
+}
+
+export async function deleteASRWorker(engine: string): Promise<ASRStatus> {
+    return fetchJson(`${API_BASE}/asr/workers/${encodeURIComponent(engine)}`, { method: 'DELETE' })
+}
+
+
 export async function toggleASRStrict(strict: boolean): Promise<void> {
     await updateASRConfig({ strict_mode: strict })
 }
