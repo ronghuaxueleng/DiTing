@@ -392,7 +392,7 @@ export default function Detail() {
     const isLoading = isVideoLoading || isSegmentsLoading
 
     // Media Player Logic
-    const renderPlayer = () => {
+    const renderPlayer = (compact = false) => {
         return (
             <VideoPlayer
                 video={video}
@@ -412,6 +412,7 @@ export default function Detail() {
                 setShowAppendCacheMenu={setShowAppendCacheMenu}
                 updatePolicyMutation={updatePolicyMutation}
                 handleAppendCache={handleAppendCache}
+                compact={compact}
             />
         )
     }
@@ -522,7 +523,7 @@ export default function Detail() {
                                             flex: vertCollapsed === 'bottom' ? '1 1 100%' : `0 0 ${topPanelPct}%`,
                                         }}
                                     >
-                                        {renderPlayer()}
+                                        {renderPlayer(true)}
                                     </div>
                                 )}
 
