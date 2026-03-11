@@ -302,7 +302,7 @@ export default function Dashboard() {
             </div>
 
             {/* Content Area */}
-            <div className="w-full px-4 sm:px-6 lg:px-8 pb-8">
+            <div className={`w-full px-4 sm:px-6 lg:px-8 ${viewMode === 'notes' && !isLoading && data?.items?.length !== 0 ? 'hidden' : 'pb-8'}`}>
                 {isLoading ? (
                     <div className="flex justify-center py-20">
                         <div className="animate-spin h-8 w-8 border-4 border-[var(--color-primary)] border-t-transparent rounded-full" />
@@ -357,7 +357,7 @@ export default function Dashboard() {
 
             {/* Notes View — master-detail layout, viewport-constrained so each panel scrolls independently */}
             {viewMode === 'notes' && (
-                <div className="w-full px-4 sm:px-6 lg:px-8 pb-4 flex flex-col lg:flex-row gap-4 overflow-hidden" style={{ height: 'calc(100vh - 260px)' }}>
+                <div className="w-full px-4 sm:px-6 lg:px-8 pb-4 flex flex-col lg:flex-row gap-4 overflow-hidden" style={{ height: 'calc(100vh - 210px)' }}>
                     {/* Left: video list (compact, scrolls independently) */}
                     <div className={`lg:w-80 flex-shrink-0 flex flex-col border border-[var(--color-border)] rounded-xl bg-[var(--color-card)] overflow-hidden ${selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
                         {/* Scrollable list area */}

@@ -102,6 +102,21 @@ export default function DashboardFilterBar({
 
                     {/* Quick Filter Chips */}
                     <button
+                        onClick={() => toggleFilter('notes')}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-all flex items-center gap-1.5 ${hasNotes === true
+                            ? 'bg-teal-500/15 border-teal-500/30 text-teal-600 dark:text-teal-400'
+                            : hasNotes === false
+                                ? 'bg-red-500/10 border-red-500/20 text-red-500'
+                                : 'bg-[var(--color-card)] border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]'
+                            }`}
+                    >
+                        <Icons.BookOpen className="w-3 h-3" />
+                        {hasNotes === false ? t('dashboard.filters.noNotes') : t('dashboard.filters.hasNotes')}
+                    </button>
+
+                    <div className="h-5 w-px bg-[var(--color-border)] mx-0.5" />
+
+                    <button
                         onClick={() => toggleFilter('segments')}
                         className={`px-3 py-1.5 text-xs rounded-full border transition-all flex items-center gap-1.5 ${hasSegments === true
                             ? 'bg-purple-500/15 border-purple-500/30 text-purple-500'
@@ -124,18 +139,6 @@ export default function DashboardFilterBar({
                     >
                         <Icons.Sparkles className="w-3 h-3" />
                         {hasAI === false ? t('dashboard.filters.noAI') : t('dashboard.filters.hasAI')}
-                    </button>
-                    <button
-                        onClick={() => toggleFilter('notes')}
-                        className={`px-3 py-1.5 text-xs rounded-full border transition-all flex items-center gap-1.5 ${hasNotes === true
-                            ? 'bg-teal-500/15 border-teal-500/30 text-teal-600 dark:text-teal-400'
-                            : hasNotes === false
-                                ? 'bg-red-500/10 border-red-500/20 text-red-500'
-                                : 'bg-[var(--color-card)] border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]'
-                            }`}
-                    >
-                        <Icons.BookOpen className="w-3 h-3" />
-                        {hasNotes === false ? t('dashboard.filters.noNotes') : t('dashboard.filters.hasNotes')}
                     </button>
                     <button
                         onClick={() => toggleFilter('cached')}
