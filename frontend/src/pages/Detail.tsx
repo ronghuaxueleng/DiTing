@@ -58,9 +58,19 @@ export default function Detail() {
     // Resizable split pane state
     const SNAP_THRESHOLD = 8  // percentage: below this → collapse left, above (100 - this) → collapse right
     const DEFAULT_WIDTH = 40
-    const [leftPanelWidth, setLeftPanelWidth] = useState(DEFAULT_WIDTH) // percentage
-    const [collapsedPanel, setCollapsedPanel] = useState<'left' | 'right' | null>(null)
-    const lastWidthBeforeCollapseRef = useRef(DEFAULT_WIDTH)
+    const [leftPanelWidth, setLeftPanelWidth] = useState(() => {
+        const saved = localStorage.getItem('detail-split-width')
+        return saved ? parseFloat(saved) : DEFAULT_WIDTH
+    }) // percentage
+    const [collapsedPanel, setCollapsedPanel] = useState<'left' | 'right' | null>(() => {
+        return (localStorage.getItem('detail-split-collapsed') as 'left' | 'right' | null) || null
+    })
+    const lastWidthBeforeCollapseRef = useRef(
+        (() => {
+            const saved = localStorage.getItem('detail-split-last-width')
+            return saved ? parseFloat(saved) : DEFAULT_WIDTH
+        })()
+    )
     const isDraggingRef = useRef(false)
     const containerRef = useRef<HTMLDivElement>(null)
     const leftColumnRef = useRef<HTMLDivElement>(null)
@@ -69,24 +79,38 @@ export default function Detail() {
     const applyDragWidth = useCallback((rawWidth: number) => {
         if (rawWidth < SNAP_THRESHOLD) {
             // Snap collapse left panel
-            if (!collapsedPanel) lastWidthBeforeCollapseRef.current = leftPanelWidth
+            if (!collapsedPanel) {
+                lastWidthBeforeCollapseRef.current = leftPanelWidth
+                localStorage.setItem('detail-split-last-width', String(leftPanelWidth))
+            }
             setCollapsedPanel('left')
+            localStorage.setItem('detail-split-collapsed', 'left')
             setLeftPanelWidth(0)
+            localStorage.setItem('detail-split-width', '0')
         } else if (rawWidth > 100 - SNAP_THRESHOLD) {
             // Snap collapse right panel
-            if (!collapsedPanel) lastWidthBeforeCollapseRef.current = leftPanelWidth
+            if (!collapsedPanel) {
+                lastWidthBeforeCollapseRef.current = leftPanelWidth
+                localStorage.setItem('detail-split-last-width', String(leftPanelWidth))
+            }
             setCollapsedPanel('right')
+            localStorage.setItem('detail-split-collapsed', 'right')
             setLeftPanelWidth(100)
+            localStorage.setItem('detail-split-width', '100')
         } else {
             setCollapsedPanel(null)
+            localStorage.removeItem('detail-split-collapsed')
             setLeftPanelWidth(rawWidth)
+            localStorage.setItem('detail-split-width', String(rawWidth))
         }
     }, [collapsedPanel, leftPanelWidth])
 
     const expandCollapsedPanel = useCallback(() => {
         const restoreWidth = lastWidthBeforeCollapseRef.current || DEFAULT_WIDTH
         setCollapsedPanel(null)
+        localStorage.removeItem('detail-split-collapsed')
         setLeftPanelWidth(restoreWidth)
+        localStorage.setItem('detail-split-width', String(restoreWidth))
     }, [])
 
     const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
