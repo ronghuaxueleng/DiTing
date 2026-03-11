@@ -30,6 +30,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import VideoPlayer from '../components/VideoPlayer'
+import { preprocessLaTeX } from '../utils/markdown'
 
 export default function Detail() {
     const { t } = useTranslation()
@@ -729,7 +730,7 @@ export default function Detail() {
                                         ) : (
                                             video?.notes ? (
                                                 <div className="prose prose-sm dark:prose-invert max-w-none text-[var(--color-text)]">
-                                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{video.notes}</ReactMarkdown>
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{preprocessLaTeX(video.notes)}</ReactMarkdown>
                                                 </div>
                                             ) : (
                                                 <div

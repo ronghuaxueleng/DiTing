@@ -7,6 +7,7 @@ import type { AISummary } from '../api/types'
 import { createManualSummary, updateManualSummary } from '../api'
 import Icons from './ui/Icons'
 import DiffModal from './DiffModal'
+import { preprocessLaTeX } from '../utils/markdown'
 
 interface SummaryNodeProps {
     node: AISummary & { children?: AISummary[] }
@@ -249,7 +250,7 @@ export default function SummaryNode({ node, transcriptionId, onDelete, onResync,
                     }}
                 >
                     <div className="markdown-body">
-                        <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{node.summary}</Markdown>
+                        <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{preprocessLaTeX(node.summary)}</Markdown>
                     </div>
                 </div>
             )}

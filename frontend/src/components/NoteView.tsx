@@ -13,6 +13,7 @@ import {
 } from '../api/client'
 import { useToast } from '../contexts/ToastContext'
 import Icons from './ui/Icons'
+import { preprocessLaTeX } from '../utils/markdown'
 
 interface NoteViewProps {
     sourceId: string
@@ -1091,7 +1092,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                 <div className="note-read-layout">
                     <div className="note-content" ref={contentRef}>
                         <Markdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
-                            {activeNote.content}
+                            {preprocessLaTeX(activeNote.content)}
                         </Markdown>
                     </div>
                     <NoteTOC
