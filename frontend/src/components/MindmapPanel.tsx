@@ -48,7 +48,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
     const mmRef = useRef<Markmap | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const [isEmpty, setIsEmpty] = useState(false)
-    const [syncEnabled, setSyncEnabled] = useState(false)
+    const [syncEnabled, setSyncEnabled] = useState(true)
 
     // Depth control
     const [maxDepth, setMaxDepth] = useState(6)     // currently selected max depth to show
