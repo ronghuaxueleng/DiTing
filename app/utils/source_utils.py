@@ -151,32 +151,31 @@ def reconstruct_url(source_id: str, original_source: str = None) -> str:
     # Return the ID itself as a fallback or empty string
     return ""
 
-def resolve_bilibili_bvid(url_or_bvid: str) -> str | None:
+def resolve_bilibili_id(url_or_bvid: str) -> str | None:
     """
-    Extract BV ID from URL, b23.tv short link, or raw BV ID string.
+    Extract normalized BV ID (including _p suffix) from URL, b23.tv short link, or raw BV ID string.
     """
     if not url_or_bvid:
         return None
         
     url_or_bvid = url_or_bvid.strip()
     
-    # 1. Check for BV match directly
-    bv_match = re.search(r'(BV[a-zA-Z0-9]{10})', url_or_bvid)
-    if bv_match:
-        return bv_match.group(1)
-        
-    # 2. Check for b23.tv short link
+    # 1. Check for b23.tv short link
     if "b23.tv" in url_or_bvid:
         try:
             import requests
             # Resolve short URL
             resp = requests.head(url_or_bvid, allow_redirects=True, timeout=5)
-            # Check resolved URL
-            bv_match = re.search(r'(BV[a-zA-Z0-9]{10})', resp.url)
-            if bv_match:
-                return bv_match.group(1)
+            normalized = normalize_source_id(resp.url, "bilibili")
+            if normalized and normalized.startswith("BV"):
+                return normalized
         except Exception:
             pass
+            
+    # 2. Extract directly
+    normalized = normalize_source_id(url_or_bvid, "bilibili")
+    if normalized and normalized.startswith("BV"):
+        return normalized
             
     return None
 

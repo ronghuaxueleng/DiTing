@@ -72,7 +72,13 @@ def compute_embed_url(source_id: str, source_type: str) -> str | None:
             match = re.search(r"BV\w+", source_id)
             bvid = match.group(0) if match else None
         if bvid:
-            return f"//player.bilibili.com/player.html?bvid={bvid}&autoplay=0"
+            # Extract page parameter from _p suffix (e.g. BVxxx_p2 -> bvid=BVxxx, p=2)
+            page_param = ""
+            if "_p" in bvid:
+                parts = bvid.split("_p")
+                bvid = parts[0]
+                page_param = f"&p={parts[1]}"
+            return f"//player.bilibili.com/player.html?bvid={bvid}&autoplay=0{page_param}"
     elif source_type == 'youtube':
         return f"https://www.youtube.com/embed/{source_id}"
     elif source_type == 'douyin':
@@ -474,7 +480,9 @@ async def refresh_metadata(source_id: str, format_cover, download_cover_fn) -> d
         }
 
     # Default: Bilibili
-    info = get_video_info(source_id)
+    # Strip _p suffix for API call (e.g. BVxxx_p2 -> BVxxx)
+    api_bvid = source_id.split('_p')[0] if source_id.startswith('BV') else source_id
+    info = get_video_info(api_bvid)
     if not info:
         if source_id.startswith('BV'):
             raise ValueError("Bilibili 元数据获取失败")

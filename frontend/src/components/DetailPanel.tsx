@@ -42,8 +42,11 @@ export default function DetailPanel({ video, onClose, onRefresh }: DetailPanelPr
         if (video.original_source) return video.original_source
 
         switch (video.source_type) {
-            case 'bilibili':
-                return `https://www.bilibili.com/video/${video.source_id}`
+            case 'bilibili': {
+                const baseId = video.source_id.includes('_p') ? video.source_id.split('_p')[0] : video.source_id
+                const pSuffix = video.source_id.includes('_p') ? `?p=${video.source_id.split('_p')[1]}` : ''
+                return `https://www.bilibili.com/video/${baseId}${pSuffix}`
+            }
             case 'youtube':
                 return `https://www.youtube.com/watch?v=${video.source_id}`
             case 'douyin':

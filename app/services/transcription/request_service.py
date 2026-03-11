@@ -21,7 +21,7 @@ from app.services.storage import storage
 from app.utils.media_utils import extract_video_frame, detect_media_type
 from app.utils.source_utils import (
     normalize_source_id,
-    resolve_bilibili_bvid,
+    resolve_bilibili_id,
     resolve_youtube_video_id,
     resolve_douyin_url,
 )
@@ -93,9 +93,11 @@ def prepare_bilibili_transcription(request) -> dict:
     url_input = item.get("url")
     source_id_input = item.get("source_id")
 
-    bvid = resolve_bilibili_bvid(url_input) or resolve_bilibili_bvid(source_id_input)
-    if not bvid:
+    source_id = resolve_bilibili_id(url_input) or resolve_bilibili_id(source_id_input)
+    if not source_id:
         raise ValueError("Invalid Bilibili URL or BV ID")
+
+    bvid = source_id.split('_p')[0]
 
     title = item.get("title")
     cover = item.get("cover")
@@ -106,13 +108,17 @@ def prepare_bilibili_transcription(request) -> dict:
         if info:
             title = title or info['title']
             cover = cover or info['cover']
+            if "_p" in source_id:
+                p_val = source_id.split('_p')[1]
+                title = f"{title} (P{p_val})"
 
-    original_source = f"https://www.bilibili.com/video/{bvid}"
-    if url_input and bvid in url_input and url_input.startswith("http"):
-        original_source = url_input
+    original_source = item.get("url")
+    if not original_source or not original_source.startswith("http"):
+        from app.utils.source_utils import reconstruct_url
+        original_source = reconstruct_url(source_id)
 
     return dict(
-        source_id=bvid,
+        source_id=source_id,
         original_source=original_source,
         source_type="bilibili",
         title=title,
