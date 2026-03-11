@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import type { AISummary } from '../api/types'
 import { createManualSummary, updateManualSummary } from '../api'
 import Icons from './ui/Icons'
@@ -247,7 +249,7 @@ export default function SummaryNode({ node, transcriptionId, onDelete, onResync,
                     }}
                 >
                     <div className="markdown-body">
-                        <Markdown remarkPlugins={[remarkGfm]}>{node.summary}</Markdown>
+                        <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{node.summary}</Markdown>
                     </div>
                 </div>
             )}

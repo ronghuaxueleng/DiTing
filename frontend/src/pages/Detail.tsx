@@ -27,6 +27,8 @@ import Icons from '../components/ui/Icons'
 import { useToast } from '../contexts/ToastContext'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import VideoPlayer from '../components/VideoPlayer'
 
 export default function Detail() {
@@ -727,7 +729,7 @@ export default function Detail() {
                                         ) : (
                                             video?.notes ? (
                                                 <div className="prose prose-sm dark:prose-invert max-w-none text-[var(--color-text)]">
-                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{video.notes}</ReactMarkdown>
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{video.notes}</ReactMarkdown>
                                                 </div>
                                             ) : (
                                                 <div

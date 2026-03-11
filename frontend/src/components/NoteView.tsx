@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import { useTranslation } from 'react-i18next'
 
 import type { Segment, VideoNote, LLMProvider, Task, Video } from '../api/types'
@@ -26,7 +28,7 @@ interface NoteViewProps {
     onActiveHeadingChange?: (headingText: string | null) => void
 }
 
-const REMARK_PLUGINS = [remarkGfm]
+const REMARK_PLUGINS = [remarkGfm, remarkMath]
 
 interface TocItem {
     level: number  // 1=h1, 2=h2, 3=h3
@@ -1088,7 +1090,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
             {activeNote && !isEditing && (
                 <div className="note-read-layout">
                     <div className="note-content" ref={contentRef}>
-                        <Markdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
+                        <Markdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
                             {activeNote.content}
                         </Markdown>
                     </div>
