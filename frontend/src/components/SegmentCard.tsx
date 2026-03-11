@@ -56,19 +56,9 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
     const hasVisibleAi = summaryTree.length > 0
     const [showTranscription, setShowTranscription] = useState(!hasVisibleAi)
     const [showPreprocessPreview, setShowPreprocessPreview] = useState(false)
-    const previewRef = useRef<HTMLDivElement>(null)
-
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (showPreprocessPreview && previewRef.current && !previewRef.current.contains(event.target as Node)) {
-                setShowPreprocessPreview(false)
-            }
-        }
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [showPreprocessPreview])
 
     const aiSectionRef = useRef<HTMLDivElement>(null)
+    // previewRef removed — preview is now inline, no click-outside needed
 
     const handleSave = async () => {
         if (text === (segment.text || '')) return setIsEditing(false)
@@ -305,13 +295,16 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
                             </div>
                         ) : showTranscription ? (
                             <div className="mt-4">
-                                {/* Preprocess preview bar — shown inline when text has SRT metadata */}
+                                {/* Preprocess toggle — inline, replaces transcription view */}
                                 {hasSrtMetadata(segment.text || '') && (
-                                    <div className="relative mb-3" ref={previewRef}>
+                                    <div className="mb-3 flex items-center gap-2">
                                         <button
-                                            className="text-[11px] px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors flex items-center gap-1.5"
+                                            className={`text-[11px] px-2 py-1 rounded border transition-colors flex items-center gap-1.5 ${showPreprocessPreview
+                                                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                                                    : 'border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]'
+                                                }`}
                                             onClick={() => setShowPreprocessPreview(!showPreprocessPreview)}
-                                            title="预览去除时间戳后的文本"
+                                            title={showPreprocessPreview ? '查看原始文本' : '预览去除时间戳后的文本'}
                                         >
                                             <Icons.Subtitles className="w-3 h-3" />
                                             预处理预览
@@ -323,20 +316,19 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
                                             })()}
                                         </button>
                                         {showPreprocessPreview && (
-                                            <div
-                                                className="mt-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg overflow-hidden"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <div className="p-3 text-xs leading-5 text-[var(--color-text-muted)] max-h-48 overflow-y-auto whitespace-pre-wrap font-mono select-text cursor-text">
-                                                    {stripSubtitleMetadata(segment.text || '') || <span className="italic opacity-50">暂无内容</span>}
-                                                </div>
-                                            </div>
+                                            <span className="text-[10px] text-[var(--color-text-muted)] opacity-60">已过滤字幕元数据</span>
                                         )}
                                     </div>
                                 )}
-                                <p className="text-sm leading-7 text-[var(--color-text)] whitespace-pre-wrap selection:bg-[var(--color-primary)]/30">
-                                    {highlightText ? highlightedText : cleanEmotionTags(segment.text || '')}
-                                </p>
+                                {showPreprocessPreview ? (
+                                    <p className="text-sm leading-7 text-[var(--color-text-muted)] whitespace-pre-wrap selection:bg-[var(--color-primary)]/30 font-mono">
+                                        {stripSubtitleMetadata(segment.text || '') || <span className="italic opacity-50">暂无内容</span>}
+                                    </p>
+                                ) : (
+                                    <p className="text-sm leading-7 text-[var(--color-text)] whitespace-pre-wrap selection:bg-[var(--color-primary)]/30">
+                                        {highlightText ? highlightedText : cleanEmotionTags(segment.text || '')}
+                                    </p>
+                                )}
                             </div>
                         ) : null}
 
