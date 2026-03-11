@@ -598,10 +598,83 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
         setEditContent(activeNote?.content ?? '')
         setIsEditing(true)
         setShowGenPanel(false)
-        setTimeout(() => textareaRef.current?.focus(), 50)
+
+        // Find line number of the active TOC item to scroll to
+        let targetLine = 0
+        if (activeTocId && tocItems.length > 0) {
+            const activeItem = tocItems.find(t => t.id === activeTocId)
+            if (activeItem) {
+                targetLine = activeItem.lineNumber - 1 // 0-indexed
+            }
+        }
+
+        setTimeout(() => {
+            if (!textareaRef.current || !activeNote) return
+            const el = textareaRef.current
+            el.focus()
+
+            if (targetLine > 0) {
+                // Approximate scroll position by calculating character offset and lines
+                const lines = activeNote.content.split('\n')
+                const charsUpToLine = lines.slice(0, targetLine).join('\n').length
+
+                // Set cursor position to the heading
+                el.setSelectionRange(charsUpToLine, charsUpToLine)
+
+                // Scroll the textarea so the cursor is near the top
+                // We use a rough estimation of line height (24px)
+                el.scrollTop = targetLine * 24
+            }
+        }, 50)
     }
-    const handleSave = () => { if (activeNote) saveMut.mutate(editContent) }
-    const handleCancelEdit = () => { setIsEditing(false); setEditContent(activeNote?.content ?? '') }
+    const restoreScrollPositionFromEditor = () => {
+        if (!textareaRef.current || !activeNote) return
+
+        // Find user's cursor position in the text
+        const cursorPosition = textareaRef.current.selectionStart
+        const textUpToCursor = textareaRef.current.value.substring(0, cursorPosition)
+        const linesUpToCursor = textUpToCursor.split('\n')
+        const currentLineNum = linesUpToCursor.length
+
+        // Find the most recent heading before or at this line
+        let closestHeadingId: string | null = null
+        let closestHeadingLine = -1
+
+        for (const item of tocItems) {
+            if (item.lineNumber <= currentLineNum && item.lineNumber > closestHeadingLine) {
+                closestHeadingId = item.id
+                closestHeadingLine = item.lineNumber
+            }
+        }
+
+        if (closestHeadingId) {
+            // Need to wait for read mode to mount
+            setTimeout(() => {
+                const el = document.getElementById(closestHeadingId!)
+                if (el && contentRef.current) {
+                    const containerTop = contentRef.current.getBoundingClientRect().top
+                    const elTop = el.getBoundingClientRect().top
+                    contentRef.current.scrollTo({
+                        top: contentRef.current.scrollTop + (elTop - containerTop) - 10,
+                        behavior: 'instant' // Instant scroll to avoid jarring animation when switching modes
+                    })
+                }
+            }, 50)
+        }
+    }
+
+    const handleSave = () => {
+        if (activeNote) {
+            restoreScrollPositionFromEditor()
+            saveMut.mutate(editContent)
+        }
+    }
+
+    const handleCancelEdit = () => {
+        restoreScrollPositionFromEditor()
+        setIsEditing(false)
+        setEditContent(activeNote?.content ?? '')
+    }
     const handleExport = async () => {
         if (!activeNote) return
         try {
