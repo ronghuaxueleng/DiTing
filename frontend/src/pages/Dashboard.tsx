@@ -260,6 +260,7 @@ export default function Dashboard() {
                     hasCached={hasCached}
                     isSubtitle={isSubtitle}
                     includeArchived={includeArchived}
+                    viewMode={viewMode}
                     tags={tags}
                     onUpdateFilter={updateFilter}
                 />
