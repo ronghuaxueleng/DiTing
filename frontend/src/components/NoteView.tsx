@@ -382,6 +382,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
     const [activeTocId, setActiveTocId] = useState<string | null>(null)
     const [hideScreenshots, setHideScreenshots] = useState<boolean>(() => localStorage.getItem('note-hide-screenshots') === 'true')
     const [isCapturing, setIsCapturing] = useState(false)
+    const [expandedVersionId, setExpandedVersionId] = useState<number | null>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     const qkey = ['notes', sourceId]
@@ -1143,37 +1144,76 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                     setCustomPrompt={setCustomPrompt}
                 />
             )}
-
             {/* ---- VERSION HISTORY PANEL ---- */}
             {showVersions && notes.length > 0 && (
                 <div className="note-version-panel">
-                    {notes.map(note => (
-                        <div key={note.id}
-                            className={`note-version-item ${note.is_active ? 'active' : ''}`}>
-                            <button className="note-version-select"
-                                onClick={() => !note.is_active && activateMut.mutate(note.id)}
-                                title={note.gen_params?.user_prompt ? `💡 ${note.gen_params.user_prompt}` : undefined}>
-                                <span className="note-version-model">{note.model ?? 'AI'}</span>
-                                <span className="note-version-date">{fmtDate(note.created_at)}</span>
-                                {note.is_edited && <span className="note-version-edited">✏️</span>}
-                                {note.style && <span className="note-version-style">{note.style}</span>}
-                                {note.gen_params?.screenshot_density && (
-                                    <span className="note-version-badge">📷 {note.gen_params.screenshot_density}</span>
+                    {notes.map(note => {
+                        const isExpanded = expandedVersionId === note.id
+                        return (
+                            <div key={note.id} className="flex flex-col mb-2 last:mb-0">
+                                <div className={`note-version-item ${note.is_active ? 'active' : ''}`}>
+                                    <button className="note-version-select flex-1 text-left"
+                                        onClick={() => !note.is_active && activateMut.mutate(note.id)}>
+                                        <span className="note-version-model">{note.model ?? 'AI'}</span>
+                                        <span className="note-version-date">{fmtDate(note.created_at)}</span>
+                                        {note.is_edited && <span className="note-version-edited">✏️</span>}
+                                        {note.style && <span className="note-version-style">{note.style}</span>}
+                                    </button>
+
+                                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                                        <button
+                                            className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-muted)] rounded transition-colors"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setExpandedVersionId(isExpanded ? null : note.id)
+                                            }}
+                                            title={t('detail.aiNotes.showDetails', '查看生成参数')}
+                                        >
+                                            {isExpanded ? <Icons.ChevronUp className="w-3.5 h-3.5" /> : <Icons.ChevronDown className="w-3.5 h-3.5" />}
+                                        </button>
+                                        <button className="p-1.5 text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setPendingDelete(note.id)
+                                            }}
+                                            title={t('detail.aiNotes.deleteVersion')}>
+                                            <Icons.Trash className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Expanded Details Inline */}
+                                {isExpanded && (
+                                    <div className="mt-1 ml-4 pl-3 pr-2 py-2 border-l-2 border-[var(--color-primary)]/30 bg-[var(--color-card)] rounded-r-md text-xs text-[var(--color-text-muted)] space-y-1.5 animate-in slide-in-from-top-1 fade-in duration-200">
+                                        {note.gen_params?.user_prompt && (
+                                            <div className="flex gap-2 items-start">
+                                                <Icons.MessageSquare className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--color-primary)]" />
+                                                <span className="break-all whitespace-pre-wrap">{note.gen_params.user_prompt}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] opacity-80 mt-2">
+                                            {note.gen_params?.screenshot_density && (
+                                                <span className="flex items-center gap-1">
+                                                    <Icons.Camera className="w-3 h-3" />
+                                                    {note.gen_params.screenshot_density}
+                                                </span>
+                                            )}
+                                            {note.gen_params?.transcription_version && (
+                                                <span className="flex items-center gap-1">
+                                                    <Icons.FileText className="w-3 h-3" />
+                                                    {note.gen_params.transcription_version}
+                                                </span>
+                                            )}
+                                            <span className="flex items-center gap-1">
+                                                <Icons.Cpu className="w-3 h-3" />
+                                                {note.model ?? 'AI'}
+                                            </span>
+                                        </div>
+                                    </div>
                                 )}
-                                {note.gen_params?.transcription_version && (
-                                    <span className="note-version-badge">🎤 {note.gen_params.transcription_version}</span>
-                                )}
-                                {note.gen_params?.user_prompt && (
-                                    <span className="note-version-badge" title={note.gen_params.user_prompt}>💡</span>
-                                )}
-                            </button>
-                            <button className="note-version-delete"
-                                onClick={() => setPendingDelete(note.id)}
-                                title={t('detail.aiNotes.deleteVersion')}>
-                                <Icons.Trash />
-                            </button>
-                        </div>
-                    ))}
+                            </div>
+                        )
+                    })}
                 </div>
             )}
 
