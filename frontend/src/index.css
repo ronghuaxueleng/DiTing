@@ -1444,3 +1444,24 @@ body {
 .vert-split-player iframe {
   object-fit: contain;
 }
+
+/* ============================================================
+   Markmap Theme Overrides (Dark/Light Mode Support)
+   ============================================================ */
+
+.mindmap-svg .markmap-node foreignObject {
+  color: var(--color-text) !important;
+}
+
+.mindmap-svg .markmap-node foreignObject div {
+  color: var(--color-text) !important;
+}
+
+.mindmap-svg .markmap-node circle {
+  fill: var(--color-bg) !important;
+  stroke: var(--color-primary) !important;
+}
+
+.mindmap-svg .markmap-link {
+  stroke: var(--color-border) !important;
+}
