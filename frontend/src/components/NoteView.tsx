@@ -18,6 +18,7 @@ interface NoteViewProps {
     video?: Video
     onSeek: (timeSeconds: number) => void
     playerRef?: React.RefObject<HTMLVideoElement | HTMLAudioElement>
+    onOpenMindmap?: () => void
 }
 
 const REMARK_PLUGINS = [remarkGfm]
@@ -352,7 +353,7 @@ function GeneratePanel({
 }
 
 // ---- Main Component ----
-export default function NoteView({ sourceId, segments, video, onSeek, playerRef }: NoteViewProps) {
+export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap }: NoteViewProps) {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
@@ -863,6 +864,16 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef 
                                 title={t('detail.aiNotes.exportMd')}>
                                 <Icons.Download />
                             </button>
+                            {/* Mindmap quick-open */}
+                            {onOpenMindmap && (
+                                <button
+                                    className="note-btn note-btn-icon"
+                                    onClick={onOpenMindmap}
+                                    title={t('detail.aiNotes.mindmap', '思维导图')}
+                                >
+                                    <Icons.GitBranch />
+                                </button>
+                            )}
                             {/* Toggle screenshots visibility */}
                             <button
                                 className={`note-btn note-btn-icon ${hideScreenshots ? 'active' : ''}`}

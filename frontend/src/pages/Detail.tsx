@@ -7,16 +7,19 @@ import {
     deleteVideoCache,
     getVideo,
     getVideoSegments,
+    getNotes,
     updateVideoCachePolicy,
     updateVideoNotes,
     type CacheEntry,
     type Segment,
-    type Video
+    type Video,
+    type VideoNote
 } from '../api'
 import ReactMarkdown from 'react-markdown'
 import AISummaryModal from '../components/AISummaryModal'
 import ConfirmModal from '../components/ConfirmModal'
 import ImmersiveView from '../components/ImmersiveView'
+import MindmapPanel from '../components/MindmapPanel'
 import NoteView from '../components/NoteView'
 import RetranscribeModal from '../components/RetranscribeModal'
 import SegmentCard, { type RefineContext } from '../components/SegmentCard'
@@ -38,14 +41,14 @@ export default function Detail() {
 
     // Player State
     const [activeTab, setActiveTab] = useState<'local' | 'stream' | 'embed'>('local')
-    const [contentTab, setContentTabRaw] = useState<'segments' | 'immersive' | 'notes'>(() => {
-        return (localStorage.getItem('detail-content-tab') as 'segments' | 'immersive' | 'notes') || 'segments'
+    const [contentTab, setContentTabRaw] = useState<'segments' | 'immersive' | 'notes' | 'mindmap'>(() => {
+        return (localStorage.getItem('detail-content-tab') as 'segments' | 'immersive' | 'notes' | 'mindmap') || 'segments'
     })
-    const setContentTab = useCallback((tab: 'segments' | 'immersive' | 'notes') => {
+    const setContentTab = useCallback((tab: 'segments' | 'immersive' | 'notes' | 'mindmap') => {
         setContentTabRaw(tab)
         localStorage.setItem('detail-content-tab', tab)
     }, [])
-    const [refPanelTab, setRefPanelTab] = useState<'segments' | 'immersive'>('segments')
+    const [refPanelTab, setRefPanelTab] = useState<'segments' | 'immersive' | 'mindmap'>('segments')
     const [currentTime, setCurrentTime] = useState(0)
     const playerRef = useRef<HTMLVideoElement | HTMLAudioElement>(null)
     const lastTimeRef = useRef(0)
@@ -188,6 +191,14 @@ export default function Detail() {
         enabled: !!sourceId,
         refetchInterval: isActive ? 5000 : 30000,
     })
+
+    // Notes query — same key as NoteView so it uses shared cache
+    const { data: notes = [] } = useQuery<VideoNote[]>({
+        queryKey: ['notes', sourceId],
+        queryFn: () => getNotes(sourceId!),
+        enabled: !!sourceId,
+    })
+    const activeNote = notes.find(n => n.is_active) ?? notes[0] ?? null
 
 
 
@@ -538,12 +549,32 @@ export default function Detail() {
                                             <Icons.Music className="w-3 h-3" />
                                             {t('detail.transcription.immersiveMode')}
                                         </button>
+                                        <button
+                                            onClick={() => setRefPanelTab('mindmap')}
+                                            className={`px-2.5 py-0.5 text-xs font-medium rounded transition-all flex items-center gap-1 ${refPanelTab === 'mindmap'
+                                                ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                                                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                }`}
+                                        >
+                                            <Icons.GitBranch className="w-3 h-3" />
+                                            {t('detail.aiNotes.mindmap', '导图')}
+                                        </button>
                                     </div>
                                 </div>
 
                                 {/* Content — takes remaining height, scrolls internally */}
                                 <div className="flex-1 min-h-0 overflow-y-auto">
-                                    {refPanelTab === 'segments' ? (
+                                    {refPanelTab === 'mindmap' ? (
+                                        <MindmapPanel
+                                            noteContent={activeNote?.content ?? ''}
+                                            onSeek={(time) => {
+                                                if (playerRef.current) {
+                                                    playerRef.current.currentTime = time
+                                                    playerRef.current.play()
+                                                }
+                                            }}
+                                        />
+                                    ) : refPanelTab === 'segments' ? (
                                         segments?.length === 0 ? (
                                             <div className="flex items-center justify-center h-full text-sm text-[var(--color-text-muted)]">
                                                 {t('detail.transcription.empty')}
@@ -640,6 +671,16 @@ export default function Detail() {
                                             <Icons.FileText className="w-3 h-3" />
                                             {t('detail.transcription.noteMode')}
                                         </button>
+                                        <button
+                                            onClick={() => setContentTab('mindmap')}
+                                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${contentTab === 'mindmap'
+                                                ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                                                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                }`}
+                                        >
+                                            <Icons.GitBranch className="w-3 h-3" />
+                                            {t('detail.aiNotes.mindmap', '导图')}
+                                        </button>
                                     </div>
                                 </div>
 
@@ -675,6 +716,18 @@ export default function Detail() {
                                             height="100%"
                                         />
                                     </div>
+                                ) : contentTab === 'mindmap' ? (
+                                    <div className={`flex-1 overflow-hidden ${mobileLayout === 'split' ? 'min-h-0' : 'lg:overflow-hidden'}`}>
+                                        <MindmapPanel
+                                            noteContent={activeNote?.content ?? ''}
+                                            onSeek={(time) => {
+                                                if (playerRef.current) {
+                                                    playerRef.current.currentTime = time
+                                                    playerRef.current.play()
+                                                }
+                                            }}
+                                        />
+                                    </div>
                                 ) : (
                                     <div className={`flex-1 overflow-hidden ${mobileLayout === 'split' ? '' : 'lg:overflow-hidden'}`}>
                                         <NoteView
@@ -688,6 +741,7 @@ export default function Detail() {
                                                 }
                                             }}
                                             playerRef={playerRef}
+                                            onOpenMindmap={() => setContentTab('mindmap')}
                                         />
                                     </div>
                                 )}

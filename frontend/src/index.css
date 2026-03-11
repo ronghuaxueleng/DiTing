@@ -1273,3 +1273,114 @@ body {
 .note-toc-slider::-moz-range-thumb:hover {
   transform: scale(1.2);
 }
+/* ============================================================
+   Mindmap Panel
+   ============================================================ */
+
+.mindmap-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.mindmap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-card-muted);
+  flex-shrink: 0;
+}
+
+.mindmap-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mindmap-tool-btn:hover:not(:disabled) {
+  background: var(--color-card);
+  color: var(--color-text);
+}
+
+.mindmap-tool-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mindmap-tool-btn--ai {
+  margin-left: auto;
+  color: var(--color-primary);
+  opacity: 0.45;
+}
+
+.mindmap-tool-label {
+  display: none;
+}
+
+@media (min-width: 600px) {
+  .mindmap-tool-label {
+    display: inline;
+  }
+}
+
+.mindmap-svg-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.mindmap-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.mindmap-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+.mindmap-empty-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+/* Timestamp hint label in mindmap toolbar */
+.mindmap-ts-hint {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  padding: 0 0.25rem;
+  white-space: nowrap;
+  display: none;
+}
+
+@media (min-width: 480px) {
+  .mindmap-ts-hint {
+    display: inline;
+  }
+}

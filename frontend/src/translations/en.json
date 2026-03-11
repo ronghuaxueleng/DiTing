@@ -855,7 +855,14 @@
             "captureUploading": "Uploading screenshot...",
             "captureSuccess": "Screenshot inserted into note",
             "captureFailed": "Screenshot failed",
-            "captureVideoOnly": "Screenshot only works in video mode"
+            "captureVideoOnly": "Screenshot only works in video mode",
+            "mindmap": "Mindmap",
+            "mindmapFit": "Fit View",
+            "mindmapExport": "Export SVG",
+            "mindmapAiOptimize": "AI Optimize",
+            "mindmapAiComingSoon": "AI Optimize Mindmap (Coming Soon)",
+            "mindmapEmpty": "No headings found in the note. Cannot generate mindmap.",
+            "mindmapTsHint": "Click timestamps to seek"
         }
     },
     "aiSummaryModal": {

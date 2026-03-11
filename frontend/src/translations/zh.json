@@ -869,7 +869,14 @@
             "captureUploading": "截图上传中...",
             "captureSuccess": "截图已插入笔记",
             "captureFailed": "截图失败",
-            "captureVideoOnly": "截图仅支持视频模式"
+            "captureVideoOnly": "截图仅支持视频模式",
+            "mindmap": "思维导图",
+            "mindmapFit": "适应视图",
+            "mindmapExport": "导出 SVG",
+            "mindmapAiOptimize": "AI 优化导图",
+            "mindmapAiComingSoon": "AI 优化导图（即将推出）",
+            "mindmapEmpty": "笔记中暂无标题层级，无法生成思维导图",
+            "mindmapTsHint": "点击时间戳跳转"
         }
     },
     "aiSummaryModal": {

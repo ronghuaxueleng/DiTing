@@ -733,6 +733,8 @@ const Icons = {
             <line x1="16" x2="16" y1="18" y2="22" />
         </svg>
     ),
+    GitBranch,
+    Maximize,
 }
 
 // Database
@@ -839,6 +841,29 @@ export function Archive({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
             <rect width="20" height="5" x="2" y="3" rx="1" />
             <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
             <path d="M10 12h4" />
+        </svg>
+    )
+}
+
+// GitBranch / Mindmap
+export function GitBranch({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+            <line x1="6" y1="3" x2="6" y2="15" />
+            <circle cx="18" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <path d="M18 9a9 9 0 0 1-9 9" />
+        </svg>
+    )
+}
+
+// Maximize / Fit View
+export function Maximize({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
         </svg>
     )
 }
