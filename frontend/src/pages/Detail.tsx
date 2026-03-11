@@ -94,6 +94,7 @@ export default function Detail() {
         return (localStorage.getItem('detail-vert-collapsed') as 'top' | 'bottom' | null) || null
     })
     const vertDraggingRef = useRef(false)
+    const scrollToNoteHeadingRef = useRef<((headingText: string) => void) | null>(null)
 
     const applyDragWidth = useCallback((rawWidth: number) => {
         if (rawWidth < SNAP_THRESHOLD) {
@@ -617,6 +618,7 @@ export default function Detail() {
                                                             playerRef.current.play()
                                                         }
                                                     }}
+                                                    onNodeClick={(text) => scrollToNoteHeadingRef.current?.(text)}
                                                 />
                                             ) : refPanelTab === 'segments' ? (
                                                 segments?.length === 0 ? (
@@ -878,6 +880,7 @@ export default function Detail() {
                                             }}
                                             playerRef={playerRef}
                                             onOpenMindmap={() => setContentTab('mindmap')}
+                                            scrollToHeadingRef={scrollToNoteHeadingRef}
                                         />
                                     </div>
                                 )}

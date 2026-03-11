@@ -8,6 +8,7 @@ import Icons from './ui/Icons'
 interface MindmapPanelProps {
     noteContent: string
     onSeek?: (seconds: number) => void
+    onNodeClick?: (headingText: string) => void
 }
 
 const transformer = new Transformer()
@@ -40,7 +41,7 @@ function applyFoldDepth(node: IPureNode, foldDepth: number, current = 0): IPureN
     } as IPureNode
 }
 
-export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps) {
+export default function MindmapPanel({ noteContent, onSeek, onNodeClick }: MindmapPanelProps) {
     const { t } = useTranslation()
     const svgRef = useRef<SVGSVGElement>(null)
     const mmRef = useRef<Markmap | null>(null)
@@ -98,6 +99,29 @@ export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps)
         svg.addEventListener('click', handleClick, true)
         return () => svg.removeEventListener('click', handleClick, true)
     }, [onSeek])
+
+    // Event delegation for node-heading clicks (navigate to note section)
+    useEffect(() => {
+        const svg = svgRef.current
+        if (!svg || !onNodeClick) return
+        const handleClick = (e: Event) => {
+            const target = e.target as HTMLElement
+            // Ignore timestamp link clicks (they stopPropagation)
+            if (target?.classList?.contains('mindmap-ts-link')) return
+            // Find closest foreignObject div that markmap renders
+            const fo = (target as HTMLElement).closest?.('foreignObject')
+            if (!fo) return
+            const div = fo.querySelector('div')
+            if (!div) return
+            // Get plain text, stripping any injected HTML spans
+            const text = div.innerText?.trim() || div.textContent?.trim() || ''
+            // Strip timestamp patterns from text
+            const cleaned = text.replace(/\u23f1\s*\d{1,2}:\d{2}(?::\d{2})?/g, '').trim()
+            if (cleaned) onNodeClick(cleaned)
+        }
+        svg.addEventListener('click', handleClick, true)
+        return () => svg.removeEventListener('click', handleClick, true)
+    }, [onNodeClick])
 
     // Initialize markmap once
     useEffect(() => {

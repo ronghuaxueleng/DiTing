@@ -20,6 +20,8 @@ interface NoteViewProps {
     playerRef?: React.RefObject<HTMLVideoElement | HTMLAudioElement>
     onOpenMindmap?: () => void
     onOpenDetail?: () => void
+    /** Imperative handle: set to a fn to scroll the note to a heading by text */
+    scrollToHeadingRef?: React.MutableRefObject<((headingText: string) => void) | null>
 }
 
 const REMARK_PLUGINS = [remarkGfm]
@@ -354,7 +356,7 @@ function GeneratePanel({
 }
 
 // ---- Main Component ----
-export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap, onOpenDetail }: NoteViewProps) {
+export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap, onOpenDetail, scrollToHeadingRef }: NoteViewProps) {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
@@ -425,7 +427,33 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
         activeNote ? extractToc(activeNote.content) : []
         , [activeNote?.id, activeNote?.content])
 
-    // Build a line-number → TOC id map for deterministic heading ID assignment
+    // Expose scrollToHeading imperative handle
+    useEffect(() => {
+        if (!scrollToHeadingRef) return
+        scrollToHeadingRef.current = (headingText: string) => {
+            // Strip markdown formatting from search text for comparison
+            const normalize = (s: string) =>
+                s.replace(/\*\*/g, '').replace(/⏱\s*[\d:]+/g, '').trim().toLowerCase()
+            const needle = normalize(headingText)
+            const match = tocItems.find(item => normalize(item.text) === needle)
+                ?? tocItems.find(item => normalize(item.text).includes(needle))
+                ?? tocItems.find(item => needle.includes(normalize(item.text)))
+            if (match) {
+                const el = document.getElementById(match.id)
+                if (el && contentRef.current) {
+                    const containerTop = contentRef.current.getBoundingClientRect().top
+                    const elTop = el.getBoundingClientRect().top
+                    contentRef.current.scrollTo({
+                        top: contentRef.current.scrollTop + (elTop - containerTop) - 10,
+                        behavior: 'smooth'
+                    })
+                    setActiveTocId(match.id)
+                }
+            }
+        }
+        return () => { if (scrollToHeadingRef) scrollToHeadingRef.current = null }
+    }, [tocItems, scrollToHeadingRef])
+
     const tocLineMap = useMemo(() => {
         const map = new Map<number, string>()
         for (const item of tocItems) {
