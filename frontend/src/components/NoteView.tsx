@@ -733,6 +733,44 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
 
     // Custom Markdown components — inject IDs on headings and clickable ⏱ timestamps
 
+    // ---- Manual Image Deletion ----
+    const handleDeleteImage = useCallback(async (src: string) => {
+        if (!activeNote) return
+
+        try {
+            // Escape src for regex
+            const escapedSrc = src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            // Match exactly this image markdown, optionally with title: ![alt](src) or ![alt](src "title")
+            // We use a non-global regex to only remove the first instance we find, to be safe.
+            const regex = new RegExp(`!\\[.*?\\]\\(${escapedSrc}(?:\\s+".*?")?\\)`)
+
+            const newContent = activeNote.content.replace(regex, '')
+
+            if (newContent !== activeNote.content) {
+                // Optimistic update to prevent scroll jumping
+                queryClient.setQueryData(qkey, (old: VideoNote[] | undefined) => {
+                    if (!old) return old
+                    return old.map(n => n.id === activeNote.id ? { ...n, content: newContent } : n)
+                })
+
+                // Fire and forget, handle errors by invalidating
+                updateNote(activeNote.id, newContent).catch((e: any) => {
+                    console.error('Delete image failed:', e)
+                    queryClient.invalidateQueries({ queryKey: qkey })
+                    showToast('error', t('detail.aiNotes.deleteFailed', '删除失败'))
+                })
+
+                showToast('success', t('detail.aiNotes.imageDeleted', '图片已删除'))
+            }
+        } catch (e: any) {
+            console.error('Delete image process failed:', e)
+        }
+    }, [activeNote, queryClient, qkey, showToast, t])
+
+    // Stable wrapper for callbacks used inside markdown components to prevent component remounting
+    const callbacksRef = useRef({ onSeek, tocLineMap, hideScreenshots, handleDeleteImage, t })
+    callbacksRef.current = { onSeek, tocLineMap, hideScreenshots, handleDeleteImage, t }
+
     // Custom Markdown components — inject IDs on headings and clickable ⏱ timestamps
     const markdownComponents = useMemo(() => {
         function renderTimestamps(children: React.ReactNode): React.ReactNode {
@@ -748,7 +786,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                                 onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
-                                    onSeek(secs)
+                                    callbacksRef.current.onSeek(secs)
                                 }}
                                 onMouseDown={(e) => {
                                     // Prevent browser auto-focus which causes scroll jumps
@@ -772,6 +810,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
 
         const makeHeading = (Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') =>
             ({ children, node, ...props }: any) => {
+                const { tocLineMap } = callbacksRef.current
                 // Use the AST node's line number to look up the deterministic TOC id
                 const line = node?.position?.start?.line
                 const id = (line && tocLineMap.get(line)) || `note-h-unknown-${line ?? 'x'}`
@@ -788,20 +827,34 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
             p: ({ children, ...props }: any) => <p {...props}>{renderTimestamps(children)}</p>,
             li: ({ children, ...props }: any) => <li {...props}>{renderTimestamps(children)}</li>,
             img: ({ src, alt, ...props }: any) => {
+                const { hideScreenshots, handleDeleteImage, t } = callbacksRef.current
                 const isScreenshot = src && src.includes('/api/note-screenshots/')
                 if (isScreenshot && hideScreenshots) return null
                 return (
-                    <img
-                        src={src}
-                        alt={alt}
-                        className={isScreenshot ? 'note-screenshot' : undefined}
-                        loading="lazy"
-                        {...props}
-                    />
+                    <span className="relative inline-block group note-image-container">
+                        <img
+                            src={src}
+                            alt={alt}
+                            className={isScreenshot ? 'note-screenshot' : undefined}
+                            loading="lazy"
+                            {...props}
+                        />
+                        <button
+                            className="absolute top-2 right-2 bg-black/50 text-white rounded-md p-1 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 shadow-sm"
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleDeleteImage(src)
+                            }}
+                            title={t('detail.aiNotes.deleteImage', '删除图片')}
+                        >
+                            <Icons.X className="w-4 h-4" />
+                        </button>
+                    </span>
                 )
             },
         }
-    }, [onSeek, tocLineMap, hideScreenshots])
+    }, [])
 
     // ---- Render ----
 
