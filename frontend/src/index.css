@@ -1465,3 +1465,15 @@ body {
 .mindmap-svg .markmap-link {
   stroke: var(--color-border) !important;
 }
+
+/* KaTeX block formula overflow support */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 1rem 0;
+  margin: 0;
+}
+
+.katex-display>.katex {
+  white-space: normal;
+}
