@@ -42,6 +42,10 @@ export default function Detail() {
     // Player State
     const [activeTab, setActiveTab] = useState<'local' | 'stream' | 'embed'>('local')
     const [contentTab, setContentTabRaw] = useState<'segments' | 'immersive' | 'notes' | 'mindmap'>(() => {
+        const urlTab = searchParams.get('tab')
+        if (urlTab && ['segments', 'immersive', 'notes', 'mindmap'].includes(urlTab)) {
+            return urlTab as 'segments' | 'immersive' | 'notes' | 'mindmap'
+        }
         return (localStorage.getItem('detail-content-tab') as 'segments' | 'immersive' | 'notes' | 'mindmap') || 'segments'
     })
     const setContentTab = useCallback((tab: 'segments' | 'immersive' | 'notes' | 'mindmap') => {

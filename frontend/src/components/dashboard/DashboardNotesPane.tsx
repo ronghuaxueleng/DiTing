@@ -4,6 +4,7 @@
  * Loads segments for the selected video and renders NoteView.
  */
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { getVideoSegments } from '../../api/client'
 import NoteView from '../NoteView'
 import type { Video } from '../../api/types'
@@ -15,6 +16,7 @@ interface Props {
 
 export default function DashboardNotesPane({ video }: Props) {
     const { t } = useTranslation()
+    const navigate = useNavigate()
 
     const { data: segments = [] } = useQuery({
         queryKey: ['segments', video?.source_id],
@@ -37,12 +39,13 @@ export default function DashboardNotesPane({ video }: Props) {
     return (
         <div className="dash-notes-pane flex flex-col h-full w-full relative">
             {/* NoteView — fills remaining space, scrolls internally */}
-            <div className="dash-notes-content flex-1 min-h-0 overflow-hidden p-4 lg:p-6">
+            <div className="dash-notes-content flex-1 min-h-0 overflow-hidden px-4 pt-2 pb-4 lg:px-5 lg:pt-2 lg:pb-5">
                 <NoteView
                     sourceId={video.source_id}
                     segments={segments}
                     video={video}
                     onSeek={() => { }} // no player in dashboard
+                    onOpenDetail={() => navigate(`/detail/${encodeURIComponent(video.source_id)}?tab=notes`)}
                 />
             </div>
         </div>

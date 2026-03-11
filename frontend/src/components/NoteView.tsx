@@ -19,6 +19,7 @@ interface NoteViewProps {
     onSeek: (timeSeconds: number) => void
     playerRef?: React.RefObject<HTMLVideoElement | HTMLAudioElement>
     onOpenMindmap?: () => void
+    onOpenDetail?: () => void
 }
 
 const REMARK_PLUGINS = [remarkGfm]
@@ -353,7 +354,7 @@ function GeneratePanel({
 }
 
 // ---- Main Component ----
-export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap }: NoteViewProps) {
+export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap, onOpenDetail }: NoteViewProps) {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
@@ -839,6 +840,16 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                         >
                             <Icons.Clock />
                             <span>{notes.length}</span>
+                        </button>
+                    )}
+                    {/* Open full detail page */}
+                    {onOpenDetail && (
+                        <button
+                            className="note-btn note-btn-icon"
+                            onClick={onOpenDetail}
+                            title={t('detail.aiNotes.openDetail', '打开详情页')}
+                        >
+                            <Icons.ExternalLink />
                         </button>
                     )}
                 </div>
