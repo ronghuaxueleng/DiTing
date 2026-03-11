@@ -1405,3 +1405,26 @@ body {
 .mindmap-depth-slider {
   width: 72px;
 }
+
+/* Vertical split player section: constrain video to allocated space */
+.vert-split-player > div {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.vert-split-player > div > .aspect-video,
+.vert-split-player > div > [class*="aspect-video"],
+.vert-split-player > div > div:has(video),
+.vert-split-player > div > div:has(iframe),
+.vert-split-player > div > div:has(audio) {
+  aspect-ratio: auto !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+}
+.vert-split-player video,
+.vert-split-player iframe {
+  object-fit: contain;
+}

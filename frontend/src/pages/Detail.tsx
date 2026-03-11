@@ -79,6 +79,18 @@ export default function Detail() {
     const leftColumnRef = useRef<HTMLDivElement>(null)
     const [stickyHeight, setStickyHeight] = useState(0)
 
+    // Vertical split state (left panel: player top / ref panel bottom, in AI notes mode)
+    const VERT_SNAP_THRESHOLD = 8
+    const DEFAULT_TOP_PCT = 55
+    const [topPanelPct, setTopPanelPct] = useState(() => {
+        const saved = localStorage.getItem('detail-vert-split')
+        return saved ? parseFloat(saved) : DEFAULT_TOP_PCT
+    })
+    const [vertCollapsed, setVertCollapsed] = useState<'top' | 'bottom' | null>(() => {
+        return (localStorage.getItem('detail-vert-collapsed') as 'top' | 'bottom' | null) || null
+    })
+    const vertDraggingRef = useRef(false)
+
     const applyDragWidth = useCallback((rawWidth: number) => {
         if (rawWidth < SNAP_THRESHOLD) {
             // Snap collapse left panel
@@ -170,6 +182,68 @@ export default function Detail() {
         window.addEventListener('touchcancel', handleTouchEnd)
     }, [applyDragWidth])
 
+    // ---- Vertical split helpers (left panel: player top / ref bottom) ----
+    const applyVertDragPct = useCallback((rawPct: number) => {
+        if (rawPct < VERT_SNAP_THRESHOLD) {
+            if (!vertCollapsed) {
+                localStorage.setItem('detail-vert-last-top', String(topPanelPct))
+            }
+            setVertCollapsed('top')
+            localStorage.setItem('detail-vert-collapsed', 'top')
+            setTopPanelPct(0)
+            localStorage.setItem('detail-vert-split', '0')
+        } else if (rawPct > 100 - VERT_SNAP_THRESHOLD) {
+            if (!vertCollapsed) {
+                localStorage.setItem('detail-vert-last-top', String(topPanelPct))
+            }
+            setVertCollapsed('bottom')
+            localStorage.setItem('detail-vert-collapsed', 'bottom')
+            setTopPanelPct(100)
+            localStorage.setItem('detail-vert-split', '100')
+        } else {
+            setVertCollapsed(null)
+            localStorage.removeItem('detail-vert-collapsed')
+            setTopPanelPct(rawPct)
+            localStorage.setItem('detail-vert-split', String(rawPct))
+        }
+    }, [vertCollapsed, topPanelPct, VERT_SNAP_THRESHOLD])
+
+    const expandVertCollapsed = useCallback(() => {
+        const saved = localStorage.getItem('detail-vert-last-top')
+        const restore = saved ? parseFloat(saved) : DEFAULT_TOP_PCT
+        setVertCollapsed(null)
+        localStorage.removeItem('detail-vert-collapsed')
+        setTopPanelPct(restore)
+        localStorage.setItem('detail-vert-split', String(restore))
+    }, [DEFAULT_TOP_PCT])
+
+    const handleVertDividerMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault()
+        vertDraggingRef.current = true
+        const leftCol = leftColumnRef.current
+        if (!leftCol) return
+        const startY = e.clientY
+        const rect = leftCol.getBoundingClientRect()
+        const containerH = rect.height
+        const startPct = topPanelPct
+        document.body.style.cursor = 'row-resize'
+        document.body.style.userSelect = 'none'
+        const onMove = (ev: MouseEvent) => {
+            if (!vertDraggingRef.current) return
+            const delta = ev.clientY - startY
+            const newPct = startPct + (delta / containerH) * 100
+            applyVertDragPct(Math.max(0, Math.min(100, newPct)))
+        }
+        const onUp = () => {
+            vertDraggingRef.current = false
+            document.body.style.cursor = ''
+            document.body.style.userSelect = ''
+            window.removeEventListener('mousemove', onMove)
+            window.removeEventListener('mouseup', onUp)
+        }
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+    }, [topPanelPct, applyVertDragPct])
 
 
     const { data: video, isLoading: isVideoLoading } = useQuery({
@@ -430,183 +504,240 @@ export default function Detail() {
                 {(!isDesktop || collapsedPanel !== 'left') && (
                     <div
                         ref={leftColumnRef}
-                        className={`w-full lg:flex-shrink-0 lg:overflow-y-auto lg:pr-3 ${mobileLayout === 'split' ? 'sticky top-0 z-30 bg-[var(--color-bg)] pb-2 border-b lg:border-none border-[var(--color-border)] lg:relative lg:pb-4 lg:space-y-6' : 'space-y-6 pb-4'}`}
+                        className={`w-full lg:flex-shrink-0 lg:pr-3 ${(contentTab === 'notes' || contentTab === 'mindmap') && isDesktop
+                            ? 'flex flex-col overflow-hidden'
+                            : `lg:overflow-y-auto ${mobileLayout === 'split' ? 'sticky top-0 z-30 bg-[var(--color-bg)] pb-2 border-b lg:border-none border-[var(--color-border)] lg:relative lg:pb-4 lg:space-y-6' : 'space-y-6 pb-4'}`
+                            }`}
                         style={isDesktop ? { width: `${leftPanelWidth}%` } : undefined}
                     >
 
-                        {renderPlayer()}
-
-                        {/* Notes Section — hidden on mobile in split mode, and hidden when AI notes tab is active */}
-                        {contentTab !== 'notes' && <div className={`bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm transition-all duration-200 ${isEditingNotes ? 'ring-2 ring-[var(--color-primary)]/20' : ''} ${mobileLayout === 'split' ? 'hidden lg:block' : ''}`}>
-                            <div className="px-4 py-3 border-b border-[var(--color-border)] flex justify-between items-center bg-[var(--color-card-muted)]">
-                                <h3 className="font-medium text-sm flex items-center gap-2">
-                                    {t('detail.notes.title')}
-                                </h3>
-                                <div className="flex items-center gap-2">
-                                    {!isEditingNotes ? (
-                                        <button
-                                            onClick={() => {
-                                                setNotesContent(video?.notes || '')
-                                                setIsEditingNotes(true)
-                                            }}
-                                            className="px-2 py-1 text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg)] rounded transition-all"
-                                        >
-                                            <div className="flex items-center gap-1">
-                                                <Icons.Edit className="w-3 h-3" />
-                                                <span>{t('detail.notes.edit')}</span>
-                                            </div>
-                                        </button>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => setIsEditingNotes(false)}
-                                                className="px-2 py-1 text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] rounded transition-all"
-                                            >
-                                                {t('detail.notes.cancel')}
-                                            </button>
-                                            <button
-                                                onClick={() => updateNotesMutation.mutate(notesContent)}
-                                                disabled={updateNotesMutation.isPending}
-                                                className="px-3 py-1 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-1 shadow-sm"
-                                            >
-                                                <Icons.Save className="w-3 h-3" />
-                                                <span>{updateNotesMutation.isPending ? t('detail.notes.saving') : t('detail.notes.save')}</span>
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="p-4 min-h-[120px] lg:min-h-[200px] max-h-[400px] lg:max-h-[600px] overflow-y-auto bg-[var(--color-bg)]/50">
-                                {isEditingNotes ? (
-                                    <div className="space-y-3">
-                                        <textarea
-                                            value={notesContent}
-                                            onChange={(e) => setNotesContent(e.target.value)}
-                                            className="w-full h-64 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-3 text-sm focus:ring-1 focus:ring-[var(--color-primary)] outline-none resize-none font-mono leading-relaxed"
-                                            placeholder={t('detail.notes.placeholder')}
-                                            autoFocus
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                                                    updateNotesMutation.mutate(notesContent)
-                                                }
-                                            }}
-                                        />
-                                        <div className="flex justify-between items-center">
-                                            <p className="text-[10px] text-[var(--color-text-muted)]">
-                                                {t('detail.notes.tip')}
-                                            </p>
-                                        </div>
+                        {/* ------- AI Notes mode: vertical split layout (desktop only) ------- */}
+                        {(contentTab === 'notes' || contentTab === 'mindmap') && isDesktop ? (
+                            <>
+                                {/* Top: Video Player */}
+                                {vertCollapsed !== 'top' && (
+                                    <div
+                                        className="vert-split-player flex flex-col min-h-0 overflow-hidden"
+                                        style={{
+                                            flex: vertCollapsed === 'bottom' ? '1 1 100%' : `0 0 ${topPanelPct}%`,
+                                        }}
+                                    >
+                                        {renderPlayer()}
                                     </div>
-                                ) : (
-                                    video?.notes ? (
-                                        <div className="prose prose-sm dark:prose-invert max-w-none text-[var(--color-text)]">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{video.notes}</ReactMarkdown>
-                                        </div>
-                                    ) : (
-                                        <div
-                                            className="h-32 flex flex-col items-center justify-center text-[var(--color-text-muted)] cursor-pointer hover:bg-[var(--color-bg-muted)]/50 rounded-lg border border-dashed border-[var(--color-border)] transition-all duration-200 group"
-                                            onClick={() => {
-                                                setNotesContent('')
-                                                setIsEditingNotes(true)
-                                            }}
-                                        >
-                                            <div className="w-10 h-10 rounded-full bg-[var(--color-bg-muted)] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                                <Icons.Edit className="w-5 h-5 opacity-50" />
-                                            </div>
-                                            <span className="text-sm">{t('detail.notes.empty')}</span>
-                                        </div>
-                                    )
                                 )}
-                            </div>
-                        </div>}
 
-                        {/* Reference Panel — replaces handwritten notes when AI notes tab is active */}
-                        {contentTab === 'notes' && (
-                            <div className={`ref-panel bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm ${mobileLayout === 'split' ? 'hidden lg:flex' : 'flex'} flex-col`} style={{ height: '40vh', minHeight: '260px' }}>
-                                {/* Mini tab header */}
-                                <div className="px-4 py-2.5 border-b border-[var(--color-border)] flex items-center justify-between bg-[var(--color-card-muted)] shrink-0">
-                                    <span className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">
-                                        {t('detail.refPanel.title')}
-                                    </span>
-                                    <div className="flex bg-[var(--color-bg)] p-0.5 rounded-md">
-                                        <button
-                                            onClick={() => setRefPanelTab('segments')}
-                                            className={`px-2.5 py-0.5 text-xs font-medium rounded transition-all ${refPanelTab === 'segments'
-                                                ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
-                                                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-                                                }`}
-                                        >
-                                            {t('detail.transcription.listMode')}
-                                        </button>
-                                        <button
-                                            onClick={() => setRefPanelTab('immersive')}
-                                            className={`px-2.5 py-0.5 text-xs font-medium rounded transition-all flex items-center gap-1 ${refPanelTab === 'immersive'
-                                                ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
-                                                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-                                                }`}
-                                        >
-                                            <Icons.Music className="w-3 h-3" />
-                                            {t('detail.transcription.immersiveMode')}
-                                        </button>
-                                        <button
-                                            onClick={() => setRefPanelTab('mindmap')}
-                                            className={`px-2.5 py-0.5 text-xs font-medium rounded transition-all flex items-center gap-1 ${refPanelTab === 'mindmap'
-                                                ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
-                                                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-                                                }`}
-                                        >
-                                            <Icons.GitBranch className="w-3 h-3" />
-                                            {t('detail.aiNotes.mindmap', '导图')}
-                                        </button>
+                                {/* Collapsed-top expand button */}
+                                {vertCollapsed === 'top' && (
+                                    <button
+                                        onClick={expandVertCollapsed}
+                                        className="flex items-center justify-center h-6 w-full hover:bg-[var(--color-card-muted)] rounded-b-lg transition-colors group shrink-0"
+                                        title="展开视频"
+                                    >
+                                        <Icons.ChevronDown className="w-4 h-4 text-[var(--color-text-muted)] group-hover:text-[var(--color-primary)] transition-colors" />
+                                    </button>
+                                )}
+
+                                {/* Horizontal drag divider */}
+                                {!vertCollapsed && (
+                                    <div
+                                        className="flex items-center justify-center h-4 my-0.5 cursor-row-resize group flex-shrink-0 select-none touch-none"
+                                        onMouseDown={handleVertDividerMouseDown}
+                                    >
+                                        <div className="h-1 w-12 rounded-full bg-[var(--color-border)] group-hover:bg-[var(--color-primary)] group-hover:w-20 group-active:bg-[var(--color-primary)] transition-all duration-200 opacity-50 group-hover:opacity-100" />
                                     </div>
-                                </div>
+                                )}
 
-                                {/* Content — takes remaining height, scrolls internally */}
-                                <div className="flex-1 min-h-0 overflow-y-auto">
-                                    {refPanelTab === 'mindmap' ? (
-                                        <MindmapPanel
-                                            noteContent={activeNote?.content ?? ''}
-                                            onSeek={(time) => {
-                                                if (playerRef.current) {
-                                                    playerRef.current.currentTime = time
-                                                    playerRef.current.play()
-                                                }
-                                            }}
-                                        />
-                                    ) : refPanelTab === 'segments' ? (
-                                        segments?.length === 0 ? (
-                                            <div className="flex items-center justify-center h-full text-sm text-[var(--color-text-muted)]">
-                                                {t('detail.transcription.empty')}
+                                {/* Collapsed-bottom expand button */}
+                                {vertCollapsed === 'bottom' && (
+                                    <button
+                                        onClick={expandVertCollapsed}
+                                        className="flex items-center justify-center h-6 w-full hover:bg-[var(--color-card-muted)] rounded-t-lg transition-colors group shrink-0"
+                                        title="展开参照面板"
+                                    >
+                                        <Icons.ChevronUp className="w-4 h-4 text-[var(--color-text-muted)] group-hover:text-[var(--color-primary)] transition-colors" />
+                                    </button>
+                                )}
+
+                                {/* Bottom: Reference Panel */}
+                                {vertCollapsed !== 'bottom' && (
+                                    <div className={`ref-panel bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm flex flex-col min-h-0`}
+                                        style={{ flex: vertCollapsed === 'top' ? '1 1 100%' : `1 1 ${100 - topPanelPct}%` }}
+                                    >
+                                        {/* Mini tab header */}
+                                        <div className="px-4 py-2.5 border-b border-[var(--color-border)] flex items-center justify-between bg-[var(--color-card-muted)] shrink-0">
+                                            <span className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">
+                                                {t('detail.refPanel.title')}
+                                            </span>
+                                            <div className="flex bg-[var(--color-bg)] p-0.5 rounded-md">
+                                                <button
+                                                    onClick={() => setRefPanelTab('segments')}
+                                                    className={`px-2.5 py-0.5 text-xs font-medium rounded transition-all ${refPanelTab === 'segments'
+                                                        ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                                                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                        }`}
+                                                >
+                                                    {t('detail.transcription.listMode')}
+                                                </button>
+                                                <button
+                                                    onClick={() => setRefPanelTab('immersive')}
+                                                    className={`px-2.5 py-0.5 text-xs font-medium rounded transition-all flex items-center gap-1 ${refPanelTab === 'immersive'
+                                                        ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                                                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                        }`}
+                                                >
+                                                    <Icons.Music className="w-3 h-3" />
+                                                    {t('detail.transcription.immersiveMode')}
+                                                </button>
+                                                <button
+                                                    onClick={() => setRefPanelTab('mindmap')}
+                                                    className={`px-2.5 py-0.5 text-xs font-medium rounded transition-all flex items-center gap-1 ${refPanelTab === 'mindmap'
+                                                        ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                                                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                        }`}
+                                                >
+                                                    <Icons.GitBranch className="w-3 h-3" />
+                                                    {t('detail.aiNotes.mindmap', '导图')}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Content */}
+                                        <div className="flex-1 min-h-0 overflow-y-auto">
+                                            {refPanelTab === 'mindmap' ? (
+                                                <MindmapPanel
+                                                    noteContent={activeNote?.content ?? ''}
+                                                    onSeek={(time) => {
+                                                        if (playerRef.current) {
+                                                            playerRef.current.currentTime = time
+                                                            playerRef.current.play()
+                                                        }
+                                                    }}
+                                                />
+                                            ) : refPanelTab === 'segments' ? (
+                                                segments?.length === 0 ? (
+                                                    <div className="flex items-center justify-center h-full text-sm text-[var(--color-text-muted)]">
+                                                        {t('detail.transcription.empty')}
+                                                    </div>
+                                                ) : (
+                                                    <div className="p-3 space-y-3">
+                                                        {segments?.map((segment) => (
+                                                            <SegmentCard
+                                                                key={segment.id}
+                                                                segment={segment}
+                                                                onRefresh={refetchSegments}
+                                                                highlightText={highlightQuery}
+                                                                onOpenAiModal={(seg, refineCtx) => setAiModalState({ segment: seg, refineContext: refineCtx })}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                )
+                                            ) : (
+                                                <ImmersiveView
+                                                    segments={segments || []}
+                                                    currentTime={currentTime}
+                                                    onSeek={(time) => {
+                                                        if (playerRef.current) {
+                                                            playerRef.current.currentTime = time
+                                                            playerRef.current.play()
+                                                        }
+                                                    }}
+                                                    height="100%"
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            /* ------- Non-notes mode: original scroll layout ------- */
+                            <>
+                                {renderPlayer()}
+
+                                {/* Notes Section */}
+                                {contentTab !== 'notes' && <div className={`bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm transition-all duration-200 ${isEditingNotes ? 'ring-2 ring-[var(--color-primary)]/20' : ''} ${mobileLayout === 'split' ? 'hidden lg:block' : ''}`}>
+                                    <div className="px-4 py-3 border-b border-[var(--color-border)] flex justify-between items-center bg-[var(--color-card-muted)]">
+                                        <h3 className="font-medium text-sm flex items-center gap-2">
+                                            {t('detail.notes.title')}
+                                        </h3>
+                                        <div className="flex items-center gap-2">
+                                            {!isEditingNotes ? (
+                                                <button
+                                                    onClick={() => {
+                                                        setNotesContent(video?.notes || '')
+                                                        setIsEditingNotes(true)
+                                                    }}
+                                                    className="px-2 py-1 text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg)] rounded transition-all"
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        <Icons.Edit className="w-3 h-3" />
+                                                        <span>{t('detail.notes.edit')}</span>
+                                                    </div>
+                                                </button>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        onClick={() => setIsEditingNotes(false)}
+                                                        className="px-2 py-1 text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] rounded transition-all"
+                                                    >
+                                                        {t('detail.notes.cancel')}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => updateNotesMutation.mutate(notesContent)}
+                                                        disabled={updateNotesMutation.isPending}
+                                                        className="px-3 py-1 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-1 shadow-sm"
+                                                    >
+                                                        <Icons.Save className="w-3 h-3" />
+                                                        <span>{updateNotesMutation.isPending ? t('detail.notes.saving') : t('detail.notes.save')}</span>
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 min-h-[120px] lg:min-h-[200px] max-h-[400px] lg:max-h-[600px] overflow-y-auto bg-[var(--color-bg)]/50">
+                                        {isEditingNotes ? (
+                                            <div className="space-y-3">
+                                                <textarea
+                                                    value={notesContent}
+                                                    onChange={(e) => setNotesContent(e.target.value)}
+                                                    className="w-full h-64 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-3 text-sm focus:ring-1 focus:ring-[var(--color-primary)] outline-none resize-none font-mono leading-relaxed"
+                                                    placeholder={t('detail.notes.placeholder')}
+                                                    autoFocus
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                                            updateNotesMutation.mutate(notesContent)
+                                                        }
+                                                    }}
+                                                />
+                                                <div className="flex justify-between items-center">
+                                                    <p className="text-[10px] text-[var(--color-text-muted)]">
+                                                        {t('detail.notes.tip')}
+                                                    </p>
+                                                </div>
                                             </div>
                                         ) : (
-                                            <div className="p-3 space-y-3">
-                                                {segments?.map((segment) => (
-                                                    <SegmentCard
-                                                        key={segment.id}
-                                                        segment={segment}
-                                                        onRefresh={refetchSegments}
-                                                        highlightText={highlightQuery}
-                                                        onOpenAiModal={(seg, refineCtx) => setAiModalState({ segment: seg, refineContext: refineCtx })}
-                                                    />
-                                                ))}
-                                            </div>
-                                        )
-                                    ) : (
-                                        <ImmersiveView
-                                            segments={segments || []}
-                                            currentTime={currentTime}
-                                            onSeek={(time) => {
-                                                if (playerRef.current) {
-                                                    playerRef.current.currentTime = time
-                                                    playerRef.current.play()
-                                                }
-                                            }}
-                                            height="100%"
-                                        />
-                                    )}
-                                </div>
-                            </div>
+                                            video?.notes ? (
+                                                <div className="prose prose-sm dark:prose-invert max-w-none text-[var(--color-text)]">
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{video.notes}</ReactMarkdown>
+                                                </div>
+                                            ) : (
+                                                <div
+                                                    className="h-32 flex flex-col items-center justify-center text-[var(--color-text-muted)] cursor-pointer hover:bg-[var(--color-bg-muted)]/50 rounded-lg border border-dashed border-[var(--color-border)] transition-all duration-200 group"
+                                                    onClick={() => {
+                                                        setNotesContent('')
+                                                        setIsEditingNotes(true)
+                                                    }}
+                                                >
+                                                    <div className="w-10 h-10 rounded-full bg-[var(--color-bg-muted)] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                                        <Icons.Edit className="w-5 h-5 opacity-50" />
+                                                    </div>
+                                                    <span className="text-sm">{t('detail.notes.empty')}</span>
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                </div>}
+                            </>
                         )}
 
                     </div>
