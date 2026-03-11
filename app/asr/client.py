@@ -223,7 +223,8 @@ class ASRClient:
                 "type": "worker",
                 "online": self.availability.get(engine, False),
                 "latency": self.latency.get(engine, -1),
-                "url": url
+                "url": url,
+                "shared_paths": self.shared_paths.get(engine, [])
             }
         # Cloud (only configured ones)
         for ce in self._configured_clouds:

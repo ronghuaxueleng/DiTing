@@ -480,6 +480,19 @@ export default function ASRTab() {
                                         </span>
                                     </div>
                                     <div className="text-xs text-[var(--color-text-muted)] mt-0.5 font-mono truncate">{info.url}</div>
+                                    {info.online && (
+                                        <div className="text-[10px] mt-0.5 flex items-center gap-1">
+                                            {info.shared_paths && info.shared_paths.length > 0 ? (
+                                                <span className="text-green-600 dark:text-green-400" title={info.shared_paths.map((p: any) => typeof p === 'string' ? p : `${p.server} → ${p.worker}`).join(', ')}>
+                                                    📂 Path Mode ({info.shared_paths.length} shared {info.shared_paths.length === 1 ? 'dir' : 'dirs'})
+                                                </span>
+                                            ) : (
+                                                <span className="text-[var(--color-text-muted)]" title="No shared directories configured — files will be uploaded to worker">
+                                                    📤 Upload Mode
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                     <button
