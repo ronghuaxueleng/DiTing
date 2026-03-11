@@ -48,7 +48,18 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
     const mmRef = useRef<Markmap | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const [isEmpty, setIsEmpty] = useState(false)
-    const [syncEnabled, setSyncEnabled] = useState(true)
+    const [syncEnabled, setSyncEnabled] = useState(() => {
+        const saved = localStorage.getItem('mindmap-sync-enabled')
+        return saved ? saved === 'true' : true // Default to true if not set
+    })
+
+    const toggleSync = useCallback(() => {
+        setSyncEnabled(prev => {
+            const next = !prev
+            localStorage.setItem('mindmap-sync-enabled', String(next))
+            return next
+        })
+    }, [])
 
     // Depth control
     const [maxDepth, setMaxDepth] = useState(6)     // currently selected max depth to show
@@ -323,7 +334,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                 {activeHeadingText !== undefined && (
                     <button
                         className={`mindmap-tool-btn ${syncEnabled ? 'mindmap-tool-btn--active' : ''}`}
-                        onClick={() => setSyncEnabled(v => !v)}
+                        onClick={toggleSync}
                         title={syncEnabled
                             ? t('detail.aiNotes.mindmapSyncOff', '关闭笔记同步定位')
                             : t('detail.aiNotes.mindmapSyncOn', '开启笔记同步定位')

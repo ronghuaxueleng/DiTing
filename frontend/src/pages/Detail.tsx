@@ -55,7 +55,14 @@ export default function Detail() {
         setContentTabRaw(tab)
         localStorage.setItem('detail-content-tab', tab)
     }, [])
-    const [refPanelTab, setRefPanelTab] = useState<'segments' | 'immersive' | 'mindmap'>('segments')
+    const [refPanelTab, setRefPanelTabRaw] = useState<'segments' | 'immersive' | 'mindmap'>(() => {
+        return (localStorage.getItem('detail-ref-panel-tab') as 'segments' | 'immersive' | 'mindmap') || 'mindmap'
+    })
+    const setRefPanelTab = useCallback((tab: 'segments' | 'immersive' | 'mindmap') => {
+        setRefPanelTabRaw(tab)
+        localStorage.setItem('detail-ref-panel-tab', tab)
+    }, [])
+
     const [currentTime, setCurrentTime] = useState(0)
     const playerRef = useRef<HTMLVideoElement | HTMLAudioElement>(null)
     const lastTimeRef = useRef(0)
