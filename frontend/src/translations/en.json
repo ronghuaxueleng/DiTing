@@ -828,7 +828,12 @@
             "transcribeUnsupported": "Transcription from here is not supported for this source type",
             "transcribeStarted": "Transcription task started",
             "customPrompt": "Additional Instructions",
-            "customPromptPlaceholder": "Optional: add custom instructions, e.g. add timestamps to all sections, focus on price comparison, etc."
+            "customPromptPlaceholder": "Optional: add custom instructions, e.g. add timestamps to all sections, focus on price comparison, etc.",
+            "captureScreenshot": "Capture screenshot",
+            "captureUploading": "Uploading screenshot...",
+            "captureSuccess": "Screenshot inserted into note",
+            "captureFailed": "Screenshot failed",
+            "captureVideoOnly": "Screenshot only works in video mode"
         }
     },
     "aiSummaryModal": {

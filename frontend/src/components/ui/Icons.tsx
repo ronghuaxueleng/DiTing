@@ -553,6 +553,17 @@ export function UploadCloud({ className = 'w-4 h-4', strokeWidth = 2 }: IconProp
     )
 }
 
+// Camera / Screenshot
+export function Camera({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth}
+                d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+            <circle cx="12" cy="13" r="4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} />
+        </svg>
+    )
+}
+
 // Export all as namespace for easy usage: Icons.Edit, Icons.Trash, etc.
 const Icons = {
     Edit,
@@ -620,6 +631,7 @@ const Icons = {
         </svg>
     ),
     Image,
+    Camera,
     Quote: ({ className, strokeWidth }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M10 14h4m-2 4v-4m6-10l-2.09 6.26a2 2 0 01-1.91 1.34H11V5.4L13.1 2.3a1 1 0 011.3 0L16 4zM6 9H4v12h12v-2" />

@@ -663,6 +663,7 @@ export default function Detail() {
                                                     playerRef.current.play()
                                                 }
                                             }}
+                                            playerRef={playerRef}
                                         />
                                     </div>
                                 )}

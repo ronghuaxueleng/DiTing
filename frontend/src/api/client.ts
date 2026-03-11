@@ -711,3 +711,20 @@ export async function activateNote(noteId: number): Promise<void> {
 export async function deleteNote(noteId: number): Promise<void> {
     await fetchJson(`${API_BASE}/notes/${noteId}`, { method: 'DELETE' })
 }
+
+export async function uploadNoteScreenshot(
+    sourceId: string,
+    blob: Blob
+): Promise<{ url: string; filename: string }> {
+    const form = new FormData()
+    form.append('file', blob, 'screenshot.jpg')
+    const response = await fetch(`${API_BASE}/note-screenshots/${encodeURIComponent(sourceId)}/upload`, {
+        method: 'POST',
+        body: form,
+    })
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Upload failed' }))
+        throw new Error(error.detail || `HTTP ${response.status}`)
+    }
+    return response.json()
+}

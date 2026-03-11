@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import type { Segment, VideoNote, LLMProvider, Task, Video } from '../api/types'
 import {
     getNotes, generateNote, updateNote, resetNote, activateNote, deleteNote,
-    getLLMProviders, getTasks, cancelTask, retranscribe
+    getLLMProviders, getTasks, cancelTask, retranscribe, uploadNoteScreenshot
 } from '../api/client'
 import { useToast } from '../contexts/ToastContext'
 import Icons from './ui/Icons'
@@ -17,6 +17,7 @@ interface NoteViewProps {
     segments: Segment[]
     video?: Video
     onSeek: (timeSeconds: number) => void
+    playerRef?: React.RefObject<HTMLVideoElement | HTMLAudioElement>
 }
 
 const REMARK_PLUGINS = [remarkGfm]
@@ -351,7 +352,7 @@ function GeneratePanel({
 }
 
 // ---- Main Component ----
-export default function NoteView({ sourceId, segments, video, onSeek }: NoteViewProps) {
+export default function NoteView({ sourceId, segments, video, onSeek, playerRef }: NoteViewProps) {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
@@ -371,6 +372,7 @@ export default function NoteView({ sourceId, segments, video, onSeek }: NoteView
     const [pendingReset, setPendingReset] = useState<boolean>(false)
     const [activeTocId, setActiveTocId] = useState<string | null>(null)
     const [hideScreenshots, setHideScreenshots] = useState<boolean>(() => localStorage.getItem('note-hide-screenshots') === 'true')
+    const [isCapturing, setIsCapturing] = useState(false)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     const qkey = ['notes', sourceId]
@@ -593,6 +595,99 @@ export default function NoteView({ sourceId, segments, video, onSeek }: NoteView
         if (e.key === 'Escape') handleCancelEdit()
     }, [editContent, activeNote])
 
+    // ---- Manual Screenshot Capture ----
+    const handleCapture = useCallback(async () => {
+        const video = playerRef?.current
+        if (!video || !(video instanceof HTMLVideoElement)) {
+            showToast('error', t('detail.aiNotes.captureVideoOnly'))
+            return
+        }
+        if (!activeNote) return
+
+        setIsCapturing(true)
+        try {
+            // 1. Draw current frame to canvas
+            const canvas = document.createElement('canvas')
+            canvas.width = video.videoWidth || 1280
+            canvas.height = video.videoHeight || 720
+            const ctx = canvas.getContext('2d')
+            if (!ctx) throw new Error('Canvas not supported')
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+            // 2. Export to JPEG blob
+            const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.85))
+            if (!blob) throw new Error('Canvas export failed')
+
+            // 3. Upload to backend
+            const { url } = await uploadNoteScreenshot(sourceId, blob)
+
+            // 4. Build markdown snippet
+            const secs = video.currentTime
+            const m = Math.floor(secs / 60)
+            const s = Math.floor(secs % 60)
+            const ts = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+            const imgMd = `\n![⏱ ${ts}](${url})\n`
+
+            if (isEditing && textareaRef.current) {
+                // ---- Edit mode: insert at cursor ----
+                const el = textareaRef.current
+                const start = el.selectionStart ?? el.value.length
+                const end = el.selectionEnd ?? start
+                const newContent = el.value.slice(0, start) + imgMd + el.value.slice(end)
+                setEditContent(newContent)
+                // Restore cursor after inserted text
+                setTimeout(() => {
+                    el.focus()
+                    el.setSelectionRange(start + imgMd.length, start + imgMd.length)
+                }, 0)
+            } else {
+                // ---- Read mode: insert after current active section ----
+                const content = activeNote.content
+                let insertPos = content.length // fallback: append
+
+                if (activeTocId) {
+                    // Find the active TOC item's line number
+                    const activeTocItem = tocItems.find(item => item.id === activeTocId)
+                    if (activeTocItem) {
+                        const lines = content.split('\n')
+                        const headingLineIdx = activeTocItem.lineNumber - 1 // 0-indexed
+                        const headingLevel = activeTocItem.level
+
+                        // Find the end of this section: next heading of same or higher level
+                        let sectionEndIdx = lines.length
+                        for (let i = headingLineIdx + 1; i < lines.length; i++) {
+                            const hm = lines[i]!.match(/^(#{1,6})\s/)
+                            if (hm && hm[1]!.length <= headingLevel) {
+                                sectionEndIdx = i
+                                break
+                            }
+                        }
+
+                        // Walk back past trailing blank lines to place screenshot before empty gap
+                        while (sectionEndIdx > headingLineIdx + 1 && lines[sectionEndIdx - 1]!.trim() === '') {
+                            sectionEndIdx--
+                        }
+
+                        // Compute char position
+                        insertPos = lines.slice(0, sectionEndIdx).join('\n').length
+                    }
+                }
+
+                const newContent = content.slice(0, insertPos) + imgMd + content.slice(insertPos)
+                // Save directly without entering edit mode
+                await updateNote(activeNote.id, newContent)
+                queryClient.invalidateQueries({ queryKey: qkey })
+            }
+
+            showToast('success', t('detail.aiNotes.captureSuccess'))
+        } catch (e: any) {
+            console.error('Screenshot capture failed:', e)
+            showToast('error', t('detail.aiNotes.captureFailed'))
+        } finally {
+            setIsCapturing(false)
+        }
+    }, [playerRef, activeNote, isEditing, editContent, activeTocId, tocItems, sourceId, queryClient])
+
     // Custom Markdown components — inject IDs on headings and clickable ⏱ timestamps
 
     // Custom Markdown components — inject IDs on headings and clickable ⏱ timestamps
@@ -780,6 +875,17 @@ export default function NoteView({ sourceId, segments, video, onSeek }: NoteView
                             >
                                 <Icons.Image />
                             </button>
+                            {/* Capture screenshot button — only for video (not audio) */}
+                            {playerRef?.current instanceof HTMLVideoElement && (
+                                <button
+                                    className="note-btn note-btn-icon"
+                                    onClick={handleCapture}
+                                    disabled={isCapturing}
+                                    title={t('detail.aiNotes.captureScreenshot')}
+                                >
+                                    {isCapturing ? <Icons.Loader className="animate-spin" /> : <Icons.Camera />}
+                                </button>
+                            )}
                             {/* Regenerate → opens config panel */}
                             <button
                                 className={`note-btn note-btn-primary ${showGenPanel ? 'active' : ''}`}
@@ -793,6 +899,17 @@ export default function NoteView({ sourceId, segments, video, onSeek }: NoteView
 
                     {activeNote && isEditing && (
                         <>
+                            {/* Capture screenshot button in edit mode too */}
+                            {playerRef?.current instanceof HTMLVideoElement && (
+                                <button
+                                    className="note-btn note-btn-icon"
+                                    onClick={handleCapture}
+                                    disabled={isCapturing}
+                                    title={t('detail.aiNotes.captureScreenshot')}
+                                >
+                                    {isCapturing ? <Icons.Loader className="animate-spin" /> : <Icons.Camera />}
+                                </button>
+                            )}
                             <button className="note-btn note-btn-secondary" onClick={handleCancelEdit}>
                                 {t('detail.aiNotes.cancel')}
                             </button>

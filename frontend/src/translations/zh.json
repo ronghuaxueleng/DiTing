@@ -842,7 +842,12 @@
             "transcribeUnsupported": "当前视频源不支持从此处发起转录",
             "transcribeStarted": "转录任务已启动",
             "customPrompt": "附加指令",
-            "customPromptPlaceholder": "可选：临时补充要求，如所有小节都需要时间跳转、重点分析价格对比等"
+            "customPromptPlaceholder": "可选：临时补充要求，如所有小节都需要时间跳转、重点分析价格对比等",
+            "captureScreenshot": "截图当前画面",
+            "captureUploading": "截图上传中...",
+            "captureSuccess": "截图已插入笔记",
+            "captureFailed": "截图失败",
+            "captureVideoOnly": "截图仅支持视频模式"
         }
     },
     "aiSummaryModal": {
