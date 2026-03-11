@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Transformer } from 'markmap-lib'
 import { Markmap } from 'markmap-view'
 import { useTranslation } from 'react-i18next'
@@ -12,11 +12,10 @@ interface MindmapPanelProps {
 const transformer = new Transformer()
 
 /**
- * Parse timestamp strings of common formats into total seconds.
- *   [HH:MM:SS]  [MM:SS]  00:01:23  01:23
+ * Parse timestamp strings like "06:14" or "01:23:45" into total seconds.
  */
 function parseTimestamp(raw: string): number | null {
-    const clean = raw.replace(/[\[\]]/g, '').trim()
+    const clean = raw.trim()
     const parts = clean.split(':').map(Number)
     if (parts.some(isNaN)) return null
     if (parts.length === 3) return (parts[0]! * 3600) + (parts[1]! * 60) + parts[2]!
@@ -25,12 +24,9 @@ function parseTimestamp(raw: string): number | null {
 }
 
 /**
- * Matches timestamps in two common note formats:
+ * Matches timestamps in note content (both formats):
  *   - Bracketed:  [06:14]  [01:23:45]
- *   - Emoji:      ⏱ 06:14   ⏱ 01:23:45   (with optional space after emoji)
- *
- * Capture group 1 = time string from bracketed form
- * Capture group 2 = time string from emoji form
+ *   - Emoji:      ⏱ 06:14   ⏱ 01:23:45   ⏱06:14
  */
 const TIMESTAMP_RE = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]|\u23f1\s*(\d{1,2}:\d{2}(?::\d{2})?)/g
 
@@ -41,6 +37,13 @@ export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps)
     const containerRef = useRef<HTMLDivElement>(null)
     const [isEmpty, setIsEmpty] = useState(false)
 
+    // Prevent content-reference-change from triggering re-renders
+    // by memoising on the actual string value
+    const stableContent = useMemo(() => noteContent, [noteContent])
+
+    // Track the last-rendered content to avoid setData on same content
+    const renderedContentRef = useRef<string>('')
+
     // Build markmap data from markdown
     const buildData = useCallback((content: string) => {
         // Strip screenshot images — they add noise to the mindmap
@@ -49,74 +52,53 @@ export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps)
         return root
     }, [])
 
-    // Walk SVG text nodes and inject clickable timestamp spans
+    // Walk foreignObject HTML divs and inject clickable timestamp <span>s
     const injectTimestampLinks = useCallback(() => {
         if (!svgRef.current || !onSeek) return
         const svg = svgRef.current
 
-        // Find all <text> elements with foreignObject or plain <text> elements
-        const textEls = svg.querySelectorAll<SVGTextElement>('text')
-        textEls.forEach((textEl) => {
-            const raw = textEl.textContent || ''
-            if (!TIMESTAMP_RE.test(raw)) return
+        // Markmap renders text inside: <foreignObject> → <div> → <div>
+        const divs = svg.querySelectorAll<HTMLDivElement>('foreignObject div div')
+        divs.forEach((div) => {
+            const html = div.innerHTML
+            if (!TIMESTAMP_RE.test(html)) return
             TIMESTAMP_RE.lastIndex = 0
 
-            // Build a new tspan-based structure replacing timestamps with styled spans
-            // We operate on the DOM directly as SVG text doesn't support innerHTML well
-            const parent = textEl.parentElement
-            if (!parent) return
+            // Replace timestamp text with clickable HTML spans
+            const newHtml = html.replace(TIMESTAMP_RE, (fullMatch, bracketTime?: string, emojiTime?: string) => {
+                const timeStr = bracketTime ?? emojiTime
+                if (!timeStr) return fullMatch
+                const seconds = parseTimestamp(timeStr)
+                if (seconds === null) return fullMatch
+                return `<span class="mindmap-ts-link" data-seek-seconds="${seconds}" style="color:var(--color-primary,#6366f1);font-weight:600;cursor:pointer;text-decoration:underline;border-radius:2px;padding:0 2px;">${fullMatch}</span>`
+            })
 
-            // Clone to preserve attributes
-            const newText = textEl.cloneNode(false) as SVGTextElement
-
-            let lastIndex = 0
-            let match: RegExpExecArray | null
-            TIMESTAMP_RE.lastIndex = 0
-
-            while ((match = TIMESTAMP_RE.exec(raw)) !== null) {
-                // Text before the timestamp
-                if (match.index > lastIndex) {
-                    const before = document.createElementNS('http://www.w3.org/2000/svg', 'tspan')
-                    before.textContent = raw.slice(lastIndex, match.index)
-                    newText.appendChild(before)
-                }
-
-                // Timestamp tspan — styled and clickable
-                // match[1] = bracketed form, match[2] = emoji form
-                const timeStr = match[1] ?? match[2]
-                const seconds = timeStr != null ? parseTimestamp(timeStr) : null
-                const tsSpan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan')
-                tsSpan.textContent = match[0]
-                tsSpan.setAttribute('class', 'mindmap-ts-link')
-                tsSpan.style.fill = 'var(--color-primary, #6366f1)'
-                tsSpan.style.fontWeight = '600'
-                tsSpan.style.cursor = 'pointer'
-                tsSpan.style.textDecoration = 'underline'
-                if (seconds !== null) {
-                    tsSpan.addEventListener('click', (e) => {
-                        e.stopPropagation()
-                        onSeek(seconds)
-                    })
-                }
-                newText.appendChild(tsSpan)
-                lastIndex = match.index + match[0].length
-            }
-
-            // Remaining text after last timestamp
-            if (lastIndex < raw.length) {
-                const after = document.createElementNS('http://www.w3.org/2000/svg', 'tspan')
-                after.textContent = raw.slice(lastIndex)
-                newText.appendChild(after)
-            }
-
-            // Only replace if we actually added tspans
-            if (newText.childNodes.length > 0) {
-                textEl.replaceWith(newText)
+            if (newHtml !== html) {
+                div.innerHTML = newHtml
             }
         })
     }, [onSeek])
 
-    // Initialize markmap on mount
+    // Event delegation: capture clicks on timestamp spans anywhere in the SVG
+    useEffect(() => {
+        const svg = svgRef.current
+        if (!svg || !onSeek) return
+
+        const handleClick = (e: Event) => {
+            const target = e.target as HTMLElement
+            if (!target.classList?.contains('mindmap-ts-link')) return
+            e.stopPropagation()
+            const seconds = Number(target.getAttribute('data-seek-seconds'))
+            if (!isNaN(seconds)) {
+                onSeek(seconds)
+            }
+        }
+
+        svg.addEventListener('click', handleClick, true)
+        return () => svg.removeEventListener('click', handleClick, true)
+    }, [onSeek])
+
+    // Initialize markmap on mount (only once)
     useEffect(() => {
         if (!svgRef.current) return
         mmRef.current = Markmap.create(svgRef.current, {
@@ -131,23 +113,27 @@ export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps)
         }
     }, [])
 
-    // Update data when noteContent changes
+    // Update data ONLY when the actual content text changes
     useEffect(() => {
         if (!mmRef.current) return
-        const root = buildData(noteContent)
-        const hasHeadings = /^#{1,6}\s/m.test(noteContent)
+        // Skip if content hasn't actually changed
+        if (renderedContentRef.current === stableContent) return
+        renderedContentRef.current = stableContent
+
+        const hasHeadings = /^#{1,6}\s/m.test(stableContent)
         setIsEmpty(!hasHeadings)
         if (hasHeadings) {
+            const root = buildData(stableContent)
             mmRef.current.setData(root)
-            // Fit + inject links after render
+            // Fit + inject links after render completes
             setTimeout(() => {
                 mmRef.current?.fit()
                 injectTimestampLinks()
-            }, 350) // slightly longer than animation duration
+            }, 400)
         }
-    }, [noteContent, buildData, injectTimestampLinks])
+    }, [stableContent, buildData, injectTimestampLinks])
 
-    // Re-fit when container resizes
+    // Re-fit when container resizes (but do NOT re-setData)
     useEffect(() => {
         const el = containerRef.current
         if (!el) return
