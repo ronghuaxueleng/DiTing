@@ -11,10 +11,7 @@ import BatchTagEditor from '../components/BatchTagEditor'
 import DetailPanel from '../components/DetailPanel'
 import DashboardNotesPane from '../components/dashboard/DashboardNotesPane'
 import Pagination from '../components/Pagination'
-import DashboardFilterBar from '../components/dashboard/DashboardFilterBar'
-import DashboardDisplayToolbar from '../components/dashboard/DashboardDisplayToolbar'
-import DashboardSelectionToolbar from '../components/dashboard/DashboardSelectionToolbar'
-import DashboardActiveFilters from '../components/dashboard/DashboardActiveFilters'
+import DashboardFilterRibbon from '../components/dashboard/DashboardFilterRibbon'
 import DashboardBatchActionBar from '../components/dashboard/DashboardBatchActionBar'
 import { useState, useEffect, useRef } from 'react'
 
@@ -247,65 +244,50 @@ export default function Dashboard() {
 
     return (
         <>
-            {/* Filters Section */}
-            <div className="w-full px-4 sm:px-6 lg:px-8 py-4 space-y-4">
-                <DashboardFilterBar
-                    sourceType={sourceType}
-                    status={status}
-                    selectedTagId={selectedTagId}
-                    tagExclude={tagExclude}
-                    hasSegments={hasSegments}
-                    hasAI={hasAI}
-                    hasNotes={hasNotes}
-                    hasCached={hasCached}
-                    isSubtitle={isSubtitle}
-                    includeArchived={includeArchived}
-                    viewMode={viewMode}
-                    tags={tags}
-                    onUpdateFilter={updateFilter}
-                />
+            {/* Filters Ribbon */}
+            <DashboardFilterRibbon
+                filterBarProps={{
+                    sourceType, status, selectedTagId, tagExclude,
+                    hasSegments, hasAI, hasNotes, hasCached, isSubtitle,
+                    includeArchived, viewMode, tags, onUpdateFilter: updateFilter
+                }}
+                toolbarProps={{
+                    sortBy, limit, viewMode, selectionMode,
+                    onUpdateParams: updateParams, onUpdateFilter: updateFilter,
+                    onToggleSelectionMode: toggleSelectionMode,
+                    onShowTagManager: () => setShowTagManager(true)
+                }}
+                activeFiltersProps={{
+                    sourceType, status, selectedTagId, tagExclude,
+                    hasSegments, hasAI, hasNotes, hasCached, isSubtitle,
+                    includeArchived, searchQuery, tags,
+                    onUpdateFilter: updateFilter, onUpdateParams: updateParams
+                }}
+                selectionMode={selectionMode}
+                selectedCount={selectedIds.size}
+                onSelectAll={handleSelectAll}
+                onDeselectAll={handleDeselectAll}
+                sourceType={sourceType}
+                status={status}
+                selectedTagId={selectedTagId}
+                tagExclude={tagExclude}
+                hasSegments={hasSegments}
+                hasAI={hasAI}
+                hasNotes={hasNotes}
+                hasCached={hasCached}
+                isSubtitle={isSubtitle}
+                includeArchived={includeArchived}
+                searchQuery={searchQuery}
+                sortBy={sortBy}
+                viewMode={viewMode}
+                tags={tags}
+            />
 
-                <DashboardDisplayToolbar
-                    sortBy={sortBy}
-                    limit={limit}
-                    viewMode={viewMode}
-                    selectionMode={selectionMode}
-                    onUpdateParams={updateParams}
-                    onUpdateFilter={updateFilter}
-                    onToggleSelectionMode={toggleSelectionMode}
-                    onShowTagManager={() => setShowTagManager(true)}
-                />
-
-                {selectionMode && (
-                    <DashboardSelectionToolbar
-                        selectedCount={selectedIds.size}
-                        onSelectAll={handleSelectAll}
-                        onDeselectAll={handleDeselectAll}
-                    />
-                )}
-
-                <DashboardActiveFilters
-                    sourceType={sourceType}
-                    status={status}
-                    selectedTagId={selectedTagId}
-                    tagExclude={tagExclude}
-                    hasSegments={hasSegments}
-                    hasAI={hasAI}
-                    hasNotes={hasNotes}
-                    hasCached={hasCached}
-                    isSubtitle={isSubtitle}
-                    includeArchived={includeArchived}
-                    searchQuery={searchQuery}
-                    tags={tags}
-                    onUpdateFilter={updateFilter}
-                    onUpdateParams={updateParams}
-                />
-            </div>
 
             {/* Content Area */}
             <div className={`w-full px-4 sm:px-6 lg:px-8 ${viewMode === 'notes' && !isLoading && data?.items?.length !== 0 ? 'hidden' : 'pb-8'}`}>
                 {isLoading ? (
-                    <div className="flex justify-center py-20">
+                    <div className="flex justify-center py-20" >
                         <div className="animate-spin h-8 w-8 border-4 border-[var(--color-primary)] border-t-transparent rounded-full" />
                     </div>
                 ) : data?.items?.length === 0 ? (
@@ -357,112 +339,124 @@ export default function Dashboard() {
             </div>
 
             {/* Notes View — master-detail layout, viewport-constrained so each panel scrolls independently */}
-            {viewMode === 'notes' && (
-                <div className="w-full px-4 sm:px-6 lg:px-8 pb-4 flex flex-col lg:flex-row gap-4 overflow-hidden" style={{ height: 'calc(100vh - 210px)' }}>
-                    {/* Left: video list (compact, scrolls independently) */}
-                    <div className={`lg:w-80 flex-shrink-0 flex flex-col border border-[var(--color-border)] rounded-xl bg-[var(--color-card)] overflow-hidden ${selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
-                        {/* Scrollable list area */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 p-2">
-                            {(data?.items || []).map(video => (
-                                <button
-                                    key={video.source_id}
-                                    className={`dash-notes-list-item flex items-start gap-3 p-2.5 text-left rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0 ${selectedNoteVideo?.source_id === video.source_id ? 'active bg-[var(--color-primary)]/10 ring-1 ring-[var(--color-primary)]/40' : ''}`}
-                                    onClick={() => setSelectedNoteVideo(video)}
-                                >
-                                    {video.cover && (
-                                        <img src={video.cover} alt="" className="dash-notes-list-cover w-20 h-14 object-cover rounded bg-black/10 shrink-0" />
-                                    )}
-                                    <div className="dash-notes-list-info flex flex-col flex-1 min-w-0">
-                                        <span className="dash-notes-list-title text-sm font-medium line-clamp-2 text-[var(--color-text)]">{video.title}</span>
-                                        {video.ai_count > 0 && (
-                                            <span className="dash-notes-list-badge mt-1 text-xs px-1.5 py-0.5 rounded bg-[var(--color-primary)]/15 text-[var(--color-primary)] w-max border border-[var(--color-primary)]/20">✨ {video.ai_count}</span>
+            {
+                viewMode === 'notes' && (
+                    <div className="w-full px-4 sm:px-6 lg:px-8 pb-4 flex flex-col lg:flex-row gap-4 overflow-hidden" style={{ height: 'calc(100vh - 210px)' }}>
+                        {/* Left: video list (compact, scrolls independently) */}
+                        <div className={`lg:w-80 flex-shrink-0 flex flex-col border border-[var(--color-border)] rounded-xl bg-[var(--color-card)] overflow-hidden ${selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
+                            {/* Scrollable list area */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 p-2">
+                                {(data?.items || []).map(video => (
+                                    <button
+                                        key={video.source_id}
+                                        className={`dash-notes-list-item flex items-start gap-3 p-2.5 text-left rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0 ${selectedNoteVideo?.source_id === video.source_id ? 'active bg-[var(--color-primary)]/10 ring-1 ring-[var(--color-primary)]/40' : ''}`}
+                                        onClick={() => setSelectedNoteVideo(video)}
+                                    >
+                                        {video.cover && (
+                                            <img src={video.cover} alt="" className="dash-notes-list-cover w-20 h-14 object-cover rounded bg-black/10 shrink-0" />
                                         )}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                        {/* Pagination pinned at bottom */}
-                        {(data?.total ?? 0) > limit && (
-                            <div className="shrink-0 border-t border-[var(--color-border)] p-2 bg-[var(--color-card)]">
-                                <div className="flex items-center justify-center gap-1">
-                                    <button
-                                        onClick={() => updateParams({ page: String(Math.max(1, page - 1)) })}
-                                        disabled={page === 1}
-                                        className="px-2 py-1 text-xs bg-[var(--color-border)] hover:bg-[var(--color-border)]/80 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                    >‹</button>
-                                    <span className="text-xs text-[var(--color-text-muted)] px-2">{page} / {totalPages}</span>
-                                    <button
-                                        onClick={() => updateParams({ page: String(Math.min(totalPages, page + 1)) })}
-                                        disabled={page === totalPages}
-                                        className="px-2 py-1 text-xs bg-[var(--color-border)] hover:bg-[var(--color-border)]/80 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                    >›</button>
-                                </div>
+                                        <div className="dash-notes-list-info flex flex-col flex-1 min-w-0">
+                                            <span className="dash-notes-list-title text-sm font-medium line-clamp-2 text-[var(--color-text)]">{video.title}</span>
+                                            {video.ai_count > 0 && (
+                                                <span className="dash-notes-list-badge mt-1 text-xs px-1.5 py-0.5 rounded bg-[var(--color-primary)]/15 text-[var(--color-primary)] w-max border border-[var(--color-primary)]/20">✨ {video.ai_count}</span>
+                                            )}
+                                        </div>
+                                    </button>
+                                ))}
                             </div>
-                        )}
-                    </div>
+                            {/* Pagination pinned at bottom */}
+                            {(data?.total ?? 0) > limit && (
+                                <div className="shrink-0 border-t border-[var(--color-border)] p-2 bg-[var(--color-card)]">
+                                    <div className="flex items-center justify-center gap-1">
+                                        <button
+                                            onClick={() => updateParams({ page: String(Math.max(1, page - 1)) })}
+                                            disabled={page === 1}
+                                            className="px-2 py-1 text-xs bg-[var(--color-border)] hover:bg-[var(--color-border)]/80 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                        >‹</button>
+                                        <span className="text-xs text-[var(--color-text-muted)] px-2">{page} / {totalPages}</span>
+                                        <button
+                                            onClick={() => updateParams({ page: String(Math.min(totalPages, page + 1)) })}
+                                            disabled={page === totalPages}
+                                            className="px-2 py-1 text-xs bg-[var(--color-border)] hover:bg-[var(--color-border)]/80 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                        >›</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
-                    {/* Right: NoteView pane (scrolls independently) */}
-                    <div className={`dash-notes-pane-wrapper flex-1 min-w-0 bg-[var(--color-card)] rounded-xl border border-[var(--color-border)] overflow-hidden shadow-sm flex flex-col ${!selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
-                        {selectedNoteVideo && (
-                            <button
-                                className="lg:hidden p-3 border-b border-[var(--color-border)] text-[var(--color-text-muted)] flex items-center gap-2 bg-black/5 dark:bg-white/5 font-medium hover:text-[var(--color-text)] transition-colors shrink-0"
-                                onClick={() => setSelectedNoteVideo(null)}
-                            >
-                                <span>←</span> {t('common.back', 'Back')}
-                            </button>
-                        )}
-                        <DashboardNotesPane video={selectedNoteVideo} />
+                        {/* Right: NoteView pane (scrolls independently) */}
+                        <div className={`dash-notes-pane-wrapper flex-1 min-w-0 bg-[var(--color-card)] rounded-xl border border-[var(--color-border)] overflow-hidden shadow-sm flex flex-col ${!selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
+                            {selectedNoteVideo && (
+                                <button
+                                    className="lg:hidden p-3 border-b border-[var(--color-border)] text-[var(--color-text-muted)] flex items-center gap-2 bg-black/5 dark:bg-white/5 font-medium hover:text-[var(--color-text)] transition-colors shrink-0"
+                                    onClick={() => setSelectedNoteVideo(null)}
+                                >
+                                    <span>←</span> {t('common.back', 'Back')}
+                                </button>
+                            )}
+                            <DashboardNotesPane video={selectedNoteVideo} />
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
-            {selectedVideo && (
-                <DetailPanel
-                    video={selectedVideo}
-                    onClose={() => setSelectedVideo(null)}
-                    onRefresh={refetch}
-                />
-            )}
+            {
+                selectedVideo && (
+                    <DetailPanel
+                        video={selectedVideo}
+                        onClose={() => setSelectedVideo(null)}
+                        onRefresh={refetch}
+                    />
+                )
+            }
 
             {/* Tag Manager Modal */}
-            {showTagManager && (
-                <TagManager onClose={() => setShowTagManager(false)} />
-            )}
+            {
+                showTagManager && (
+                    <TagManager onClose={() => setShowTagManager(false)} />
+                )
+            }
 
             {/* Floating Batch Action Bar */}
-            {selectionMode && (
-                <DashboardBatchActionBar
-                    selectedCount={selectedIds.size}
-                    includeArchived={includeArchived}
-                    onShowBatchTagEditor={() => setShowBatchTagEditor(true)}
-                    onShowBatchDeleteConfirm={() => setShowBatchDeleteConfirm(true)}
-                    onBatchArchive={handleBatchArchive}
-                    onCancelSelection={toggleSelectionMode}
-                />
-            )}
+            {
+                selectionMode && (
+                    <DashboardBatchActionBar
+                        selectedCount={selectedIds.size}
+                        includeArchived={includeArchived}
+                        onShowBatchTagEditor={() => setShowBatchTagEditor(true)}
+                        onShowBatchDeleteConfirm={() => setShowBatchDeleteConfirm(true)}
+                        onBatchArchive={handleBatchArchive}
+                        onCancelSelection={toggleSelectionMode}
+                    />
+                )
+            }
 
             {/* Batch Delete Confirm */}
-            {showBatchDeleteConfirm && (
-                <ConfirmModal
-                    isOpen={showBatchDeleteConfirm}
-                    title={t('dashboard.batch.delete')}
-                    message={t('dashboard.batch.deleteConfirm', { count: selectedIds.size })}
-                    confirmText={batchThinking ? t('common.loading') : t('common.delete')}
-                    cancelText={t('common.cancel')}
-                    variant="danger"
-                    onConfirm={handleBatchDelete}
-                    onCancel={() => setShowBatchDeleteConfirm(false)}
-                />
-            )}
+            {
+                showBatchDeleteConfirm && (
+                    <ConfirmModal
+                        isOpen={showBatchDeleteConfirm}
+                        title={t('dashboard.batch.delete')}
+                        message={t('dashboard.batch.deleteConfirm', { count: selectedIds.size })}
+                        confirmText={batchThinking ? t('common.loading') : t('common.delete')}
+                        cancelText={t('common.cancel')}
+                        variant="danger"
+                        onConfirm={handleBatchDelete}
+                        onCancel={() => setShowBatchDeleteConfirm(false)}
+                    />
+                )
+            }
 
             {/* Batch Tag Editor */}
-            {showBatchTagEditor && (
-                <BatchTagEditor
-                    count={selectedIds.size}
-                    onConfirm={handleBatchTags}
-                    onClose={() => setShowBatchTagEditor(false)}
-                />
-            )}
+            {
+                showBatchTagEditor && (
+                    <BatchTagEditor
+                        count={selectedIds.size}
+                        onConfirm={handleBatchTags}
+                        onClose={() => setShowBatchTagEditor(false)}
+                    />
+                )
+            }
         </>
     )
 }
