@@ -862,7 +862,8 @@
             "mindmapAiOptimize": "AI Optimize",
             "mindmapAiComingSoon": "AI Optimize Mindmap (Coming Soon)",
             "mindmapEmpty": "No headings found in the note. Cannot generate mindmap.",
-            "mindmapTsHint": "Click timestamps to seek"
+            "mindmapTsHint": "Click timestamps to seek",
+            "mindmapDepthHint": "Show up to level {{level}}"
         }
     },
     "aiSummaryModal": {

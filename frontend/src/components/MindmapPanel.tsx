@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Transformer } from 'markmap-lib'
 import { Markmap } from 'markmap-view'
+import type { IPureNode } from 'markmap-common'
 import { useTranslation } from 'react-i18next'
 import Icons from './ui/Icons'
 
@@ -11,24 +12,33 @@ interface MindmapPanelProps {
 
 const transformer = new Transformer()
 
-/**
- * Parse timestamp strings like "06:14" or "01:23:45" into total seconds.
- */
+/** Parse "MM:SS" or "HH:MM:SS" into seconds */
 function parseTimestamp(raw: string): number | null {
-    const clean = raw.trim()
-    const parts = clean.split(':').map(Number)
+    const parts = raw.trim().split(':').map(Number)
     if (parts.some(isNaN)) return null
     if (parts.length === 3) return (parts[0]! * 3600) + (parts[1]! * 60) + parts[2]!
     if (parts.length === 2) return (parts[0]! * 60) + parts[1]!
     return null
 }
 
-/**
- * Matches timestamps in note content (both formats):
- *   - Bracketed:  [06:14]  [01:23:45]
- *   - Emoji:      ⏱ 06:14   ⏱ 01:23:45   ⏱06:14
- */
+/** Matches ⏱ 06:14  or  [06:14]  (both MM:SS and HH:MM:SS) */
 const TIMESTAMP_RE = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]|\u23f1\s*(\d{1,2}:\d{2}(?::\d{2})?)/g
+
+/** Get the maximum depth present in a markmap tree */
+function getMaxDepth(node: IPureNode, current = 0): number {
+    if (!node.children?.length) return current
+    return Math.max(...node.children.map(c => getMaxDepth(c, current + 1)))
+}
+
+/** Clone tree and fold nodes at depth >= foldDepth */
+function applyFoldDepth(node: IPureNode, foldDepth: number, current = 0): IPureNode {
+    const fold = current >= foldDepth ? 1 : 0
+    return {
+        ...node,
+        payload: { ...(node.payload ?? {}), fold },
+        children: node.children?.map(c => applyFoldDepth(c, foldDepth, current + 1)) ?? [],
+    } as IPureNode
+}
 
 export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps) {
     const { t } = useTranslation()
@@ -37,34 +47,32 @@ export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps)
     const containerRef = useRef<HTMLDivElement>(null)
     const [isEmpty, setIsEmpty] = useState(false)
 
-    // Prevent content-reference-change from triggering re-renders
-    // by memoising on the actual string value
-    const stableContent = useMemo(() => noteContent, [noteContent])
+    // Depth control
+    const [maxDepth, setMaxDepth] = useState(6)     // currently selected max depth to show
+    const [treeMaxDepth, setTreeMaxDepth] = useState(6) // actual depth found in note
 
-    // Track the last-rendered content to avoid setData on same content
+    // Prevent reset on same-content renders
     const renderedContentRef = useRef<string>('')
+    // Track when only depth changed (to skip fit/re-inject)
+    const depthOnlyChangeRef = useRef(false)
 
-    // Build markmap data from markdown
-    const buildData = useCallback((content: string) => {
-        // Strip screenshot images — they add noise to the mindmap
+    const buildRoot = useCallback((content: string) => {
         const cleaned = content.replace(/!\[.*?\]\(.*?\)/g, '')
         const { root } = transformer.transform(cleaned)
         return root
     }, [])
 
-    // Walk foreignObject HTML divs and inject clickable timestamp <span>s
+    const rootCacheRef = useRef<IPureNode | null>(null)
+
+    // Inject timestamp click spans into Markmap's foreignObject divs
     const injectTimestampLinks = useCallback(() => {
         if (!svgRef.current || !onSeek) return
         const svg = svgRef.current
-
-        // Markmap renders text inside: <foreignObject> → <div> → <div>
         const divs = svg.querySelectorAll<HTMLDivElement>('foreignObject div div')
         divs.forEach((div) => {
             const html = div.innerHTML
             if (!TIMESTAMP_RE.test(html)) return
             TIMESTAMP_RE.lastIndex = 0
-
-            // Replace timestamp text with clickable HTML spans
             const newHtml = html.replace(TIMESTAMP_RE, (fullMatch, bracketTime?: string, emojiTime?: string) => {
                 const timeStr = bracketTime ?? emojiTime
                 if (!timeStr) return fullMatch
@@ -72,33 +80,26 @@ export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps)
                 if (seconds === null) return fullMatch
                 return `<span class="mindmap-ts-link" data-seek-seconds="${seconds}" style="color:var(--color-primary,#6366f1);font-weight:600;cursor:pointer;text-decoration:underline;border-radius:2px;padding:0 2px;">${fullMatch}</span>`
             })
-
-            if (newHtml !== html) {
-                div.innerHTML = newHtml
-            }
+            if (newHtml !== html) div.innerHTML = newHtml
         })
     }, [onSeek])
 
-    // Event delegation: capture clicks on timestamp spans anywhere in the SVG
+    // Event delegation for timestamp clicks
     useEffect(() => {
         const svg = svgRef.current
         if (!svg || !onSeek) return
-
         const handleClick = (e: Event) => {
             const target = e.target as HTMLElement
-            if (!target.classList?.contains('mindmap-ts-link')) return
+            if (!target?.classList?.contains('mindmap-ts-link')) return
             e.stopPropagation()
             const seconds = Number(target.getAttribute('data-seek-seconds'))
-            if (!isNaN(seconds)) {
-                onSeek(seconds)
-            }
+            if (!isNaN(seconds)) onSeek(seconds)
         }
-
         svg.addEventListener('click', handleClick, true)
         return () => svg.removeEventListener('click', handleClick, true)
     }, [onSeek])
 
-    // Initialize markmap on mount (only once)
+    // Initialize markmap once
     useEffect(() => {
         if (!svgRef.current) return
         mmRef.current = Markmap.create(svgRef.current, {
@@ -113,40 +114,57 @@ export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps)
         }
     }, [])
 
-    // Update data ONLY when the actual content text changes
+    // Memoize content string to avoid re-renders from parent's refetch
+    const stableContent = useMemo(() => noteContent, [noteContent])
+
+    // Update markmap when content changes
     useEffect(() => {
         if (!mmRef.current) return
-        // Skip if content hasn't actually changed
         if (renderedContentRef.current === stableContent) return
         renderedContentRef.current = stableContent
 
         const hasHeadings = /^#{1,6}\s/m.test(stableContent)
         setIsEmpty(!hasHeadings)
-        if (hasHeadings) {
-            const root = buildData(stableContent)
-            mmRef.current.setData(root)
-            // Fit + inject links after render completes
-            setTimeout(() => {
-                mmRef.current?.fit()
-                injectTimestampLinks()
-            }, 400)
-        }
-    }, [stableContent, buildData, injectTimestampLinks])
+        if (!hasHeadings) return
 
-    // Re-fit when container resizes (but do NOT re-setData)
+        const root = buildRoot(stableContent)
+        rootCacheRef.current = root
+        const depth = getMaxDepth(root)
+        setTreeMaxDepth(depth)
+        // Reset depth slider to show all when note changes
+        setMaxDepth(depth)
+
+        const foldedRoot = applyFoldDepth(root, maxDepth)
+        mmRef.current.setData(foldedRoot)
+        setTimeout(() => {
+            mmRef.current?.fit()
+            injectTimestampLinks()
+        }, 400)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stableContent, buildRoot])
+
+    // Apply depth filter when slider changes (no fit reset, no re-inject delay)
+    useEffect(() => {
+        if (!mmRef.current || !rootCacheRef.current) return
+        if (!depthOnlyChangeRef.current) { depthOnlyChangeRef.current = true; return }
+
+        const foldedRoot = applyFoldDepth(rootCacheRef.current, maxDepth)
+        mmRef.current.setData(foldedRoot)
+        // Wait for render then re-inject links (nodes may have been toggled)
+        setTimeout(injectTimestampLinks, 350)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [maxDepth])
+
+    // Re-fit on container resize (without resetting data/zoom fully)
     useEffect(() => {
         const el = containerRef.current
         if (!el) return
-        const observer = new ResizeObserver(() => {
-            mmRef.current?.fit()
-        })
+        const observer = new ResizeObserver(() => { mmRef.current?.fit() })
         observer.observe(el)
         return () => observer.disconnect()
     }, [])
 
-    const handleFit = () => {
-        mmRef.current?.fit()
-    }
+    const handleFit = () => mmRef.current?.fit()
 
     const handleExportSvg = () => {
         if (!svgRef.current) return
@@ -157,7 +175,6 @@ export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps)
         clone.setAttribute('width', String(bbox.width + 40))
         clone.setAttribute('height', String(bbox.height + 40))
         clone.setAttribute('viewBox', `${bbox.x - 20} ${bbox.y - 20} ${bbox.width + 40} ${bbox.height + 40}`)
-
         const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
         bg.setAttribute('x', String(bbox.x - 20))
         bg.setAttribute('y', String(bbox.y - 20))
@@ -165,14 +182,11 @@ export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps)
         bg.setAttribute('height', String(bbox.height + 40))
         bg.setAttribute('fill', '#ffffff')
         clone.insertBefore(bg, clone.firstChild)
-
         const xml = new XMLSerializer().serializeToString(clone)
         const blob = new Blob([xml], { type: 'image/svg+xml' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
-        a.href = url
-        a.download = 'mindmap.svg'
-        a.click()
+        a.href = url; a.download = 'mindmap.svg'; a.click()
         URL.revokeObjectURL(url)
     }
 
@@ -180,26 +194,35 @@ export default function MindmapPanel({ noteContent, onSeek }: MindmapPanelProps)
         <div className="mindmap-panel" ref={containerRef}>
             {/* Toolbar */}
             <div className="mindmap-toolbar">
-                <button
-                    className="mindmap-tool-btn"
-                    onClick={handleFit}
-                    title={t('detail.aiNotes.mindmapFit', '适应视图')}
-                >
+                <button className="mindmap-tool-btn" onClick={handleFit}
+                    title={t('detail.aiNotes.mindmapFit', '适应视图')}>
                     <Icons.Maximize className="w-3.5 h-3.5" />
                 </button>
-                <button
-                    className="mindmap-tool-btn"
-                    onClick={handleExportSvg}
-                    title={t('detail.aiNotes.mindmapExport', '导出 SVG')}
-                >
+                <button className="mindmap-tool-btn" onClick={handleExportSvg}
+                    title={t('detail.aiNotes.mindmapExport', '导出 SVG')}>
                     <Icons.Download className="w-3.5 h-3.5" />
                 </button>
-                {/* AI Optimize — reserved, not yet implemented */}
-                <button
-                    className="mindmap-tool-btn mindmap-tool-btn--ai"
-                    disabled
-                    title={t('detail.aiNotes.mindmapAiComingSoon', 'AI 优化导图（即将推出）')}
-                >
+
+                {/* Depth slider — only shown when tree has multiple levels */}
+                {treeMaxDepth > 1 && (
+                    <div className="mindmap-depth-control">
+                        <span className="mindmap-depth-label">H{maxDepth}</span>
+                        <input
+                            type="range"
+                            min={1}
+                            max={treeMaxDepth}
+                            step={1}
+                            value={maxDepth}
+                            onChange={e => { depthOnlyChangeRef.current = true; setMaxDepth(Number(e.target.value)) }}
+                            className="note-toc-slider mindmap-depth-slider"
+                            title={t('detail.aiNotes.mindmapDepthHint', `显示到第 ${maxDepth} 级`)}
+                        />
+                    </div>
+                )}
+
+                {/* AI Optimize — reserved */}
+                <button className="mindmap-tool-btn mindmap-tool-btn--ai" disabled
+                    title={t('detail.aiNotes.mindmapAiComingSoon', 'AI 优化导图（即将推出）')}>
                     <Icons.Sparkles className="w-3.5 h-3.5" />
                     <span className="mindmap-tool-label">{t('detail.aiNotes.mindmapAiOptimize', 'AI 优化')}</span>
                 </button>

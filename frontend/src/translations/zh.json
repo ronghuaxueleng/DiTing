@@ -876,7 +876,8 @@
             "mindmapAiOptimize": "AI 优化导图",
             "mindmapAiComingSoon": "AI 优化导图（即将推出）",
             "mindmapEmpty": "笔记中暂无标题层级，无法生成思维导图",
-            "mindmapTsHint": "点击时间戳跳转"
+            "mindmapTsHint": "点击时间戳跳转",
+            "mindmapDepthHint": "显示到第 {{level}} 级"
         }
     },
     "aiSummaryModal": {
