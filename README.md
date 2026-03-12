@@ -17,6 +17,8 @@
 <div align="center">
   <img src="doc/assets/demo.png" alt="DiTing Demo" width="90%">
   <img src="doc/assets/demo02.png" alt="DiTing Detail" width="90%">
+  <img src="doc/assets/demo03.png" alt="DiTing Mindmap" width="90%">
+  <img src="doc/assets/demo04.png" alt="DiTing Browser" width="90%">
 </div>
 
 ---
