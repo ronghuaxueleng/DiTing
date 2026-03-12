@@ -64,6 +64,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
     // Depth control
     const [maxDepth, setMaxDepth] = useState(6)     // currently selected max depth to show
     const [treeMaxDepth, setTreeMaxDepth] = useState(6) // actual depth found in note
+    const [depthTriggerId, setDepthTriggerId] = useState(0) // Forces filter re-apply even on same depth
 
     // Prevent reset on same-content renders
     const renderedContentRef = useRef<string>('')
@@ -184,6 +185,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                 // Cap at the maximum depth the tree actually has
                 const newDepth = Math.min(requestedDepth, Math.max(1, treeMaxDepth))
                 setMaxDepth(newDepth)
+                setDepthTriggerId(prev => prev + 1) // Always trigger even if depth number is the same
                 return
             }
 
@@ -524,14 +526,25 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
     // Apply depth filter when slider changes (no fit reset, no re-inject delay)
     useEffect(() => {
         if (!mmRef.current || !rootCacheRef.current) return
-        if (!depthOnlyChangeRef.current) { depthOnlyChangeRef.current = true; return }
-
+        depthOnlyChangeRef.current = true
         const foldedRoot = applyFoldDepth(rootCacheRef.current, maxDepth)
         mmRef.current.setData(foldedRoot)
+        // Optionally center it after folding
+        setTimeout(() => {
+            if (focusedGRef.current) {
+                const updatedG = Array.from(svgRef.current?.querySelectorAll('g.markmap-node') || []).find(
+                    g => (g as any).__data__ === (focusedGRef.current as any)?.__data__
+                )
+                if (updatedG) panToNode(updatedG as SVGGElement)
+                else mmRef.current?.fit()
+            } else {
+                mmRef.current?.fit()
+            }
+        }, 100)
         // Wait for render then re-inject links (nodes may have been toggled)
         setTimeout(injectTimestampLinks, 350)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [maxDepth])
+    }, [maxDepth, depthTriggerId])
 
     // Re-fit on container resize (without resetting data/zoom fully)
     useEffect(() => {
