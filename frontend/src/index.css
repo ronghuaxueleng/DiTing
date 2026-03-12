@@ -1466,6 +1466,22 @@ body {
   stroke: var(--color-border) !important;
 }
 
+/* ============================================================
+ * Mindmap Keyboard Focus styles
+ * ============================================================ */
+
+.mindmap-node-kb-focus > foreignObject {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 4px rgba(var(--color-primary-rgb, 99, 102, 241), 0.2);
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .mindmap-node-kb-focus > foreignObject {
+  box-shadow: 0 0 0 4px rgba(var(--color-primary-rgb, 99, 102, 241), 0.35);
+}
+
 /* KaTeX block formula overflow support */
 .katex-display {
   overflow-x: auto;

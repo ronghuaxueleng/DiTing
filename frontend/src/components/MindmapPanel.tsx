@@ -14,6 +14,21 @@ interface MindmapPanelProps {
 
 const transformer = new Transformer()
 
+// Stable identity for D3 hierarchy nodes across re-renders
+let _uidSeq = 0
+const nodeUidMap = new WeakMap<object, string>()
+function getNodeUid(d3Node: any): string | undefined {
+    // d3Node.data is the original IPureNode
+    const key = d3Node?.data
+    if (!key || typeof key !== 'object') return undefined
+    let uid = nodeUidMap.get(key)
+    if (!uid) {
+        uid = `mm_${++_uidSeq}`
+        nodeUidMap.set(key, uid)
+    }
+    return uid
+}
+
 /** Parse "MM:SS" or "HH:MM:SS" into seconds */
 function parseTimestamp(raw: string): number | null {
     const parts = raw.trim().split(':').map(Number)
@@ -69,6 +84,142 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
     const renderedContentRef = useRef<string>('')
     // Track when only depth changed (to skip fit/re-inject)
     const depthOnlyChangeRef = useRef(false)
+
+    // Keyboard navigation state
+    const focusedGRef = useRef<SVGGElement | null>(null)
+
+    const panToNode = useCallback((targetG: SVGGElement) => {
+        const svg = svgRef.current
+        if (!svg) return
+        const fo = targetG.querySelector('foreignObject') || targetG
+        const foRect = fo.getBoundingClientRect()
+        const svgRect = svg.getBoundingClientRect()
+        const cx = foRect.left + foRect.width / 2 - svgRect.left
+        const cy = foRect.top + foRect.height / 2 - svgRect.top
+        const dx = svgRect.width / 2 - cx
+        const dy = svgRect.height / 2 - cy
+        const g = svg.querySelector('g') as SVGGElement | null
+        if (g) {
+            const currentTransform = g.getAttribute('transform') || ''
+            const m = currentTransform.match(/translate\(([^,]+),\s*([^)]+)\)\s*scale\(([^)]+)\)/)
+            if (m) {
+                const tx = parseFloat(m[1]!) + dx
+                const ty = parseFloat(m[2]!) + dy
+                const scale = parseFloat(m[3]!)
+                g.style.transition = 'transform 0.2s ease'
+                g.setAttribute('transform', `translate(${tx}, ${ty}) scale(${scale})`)
+                setTimeout(() => { g.style.transition = '' }, 250)
+                const zoomState = (svg as any).__zoom
+                if (zoomState) {
+                    zoomState.x = tx
+                    zoomState.y = ty
+                    zoomState.k = scale
+                }
+            }
+        }
+    }, [])
+
+    // Helper to visually update focus
+    const updateFocusRing = useCallback((targetG: SVGGElement | null) => {
+        if (!svgRef.current) return
+        svgRef.current.querySelectorAll('.mindmap-node-kb-focus').forEach(el => el.classList.remove('mindmap-node-kb-focus'))
+        focusedGRef.current = targetG
+        if (targetG) {
+            targetG.classList.add('mindmap-node-kb-focus')
+            panToNode(targetG)
+        }
+    }, [panToNode])
+
+    // Keyboard event handler
+    const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (!mmRef.current || !svgRef.current) return
+        
+        // Only handle specific keys
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter'].includes(e.key)) return
+        
+        e.preventDefault()
+
+        const svg = svgRef.current
+        const allNodes = () => Array.from(svg.querySelectorAll('g.markmap-node')) as SVGGElement[]
+        
+        // Helper: find DOM <g> by stable UID
+        const findG = (uid: string | undefined) => {
+            if (!uid) return undefined
+            return allNodes().find(n => getNodeUid((n as any).__data__) === uid)
+        }
+
+        // If nothing is focused, focus the root
+        if (!focusedGRef.current || !svg.contains(focusedGRef.current)) {
+            const rootG = svg.querySelector('g.markmap-node') as SVGGElement | null
+            if (rootG) updateFocusRing(rootG)
+            return
+        }
+
+        const currentG = focusedGRef.current
+        const d3Node = (currentG as any).__data__
+        if (!d3Node) return
+
+        const currentUid = getNodeUid(d3Node)
+
+        // Space / Enter: Toggle expand/collapse, keep focus on same node
+        if (e.key === ' ' || e.key === 'Enter') {
+            const circle = currentG.querySelector('circle') as SVGCircleElement | null
+            if (circle) circle.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+            // Re-bind after markmap re-renders the DOM
+            setTimeout(() => {
+                const newG = findG(currentUid)
+                if (newG) updateFocusRing(newG)
+            }, 400)
+            return
+        }
+
+        if (e.key === 'ArrowLeft') {
+            // Go to parent
+            if (d3Node.parent) {
+                const parentUid = getNodeUid(d3Node.parent)
+                const parentG = findG(parentUid)
+                if (parentG) updateFocusRing(parentG)
+            }
+        }
+        else if (e.key === 'ArrowRight') {
+            // Go to first child (expand first if collapsed)
+            if (d3Node.children && d3Node.children.length > 0) {
+                // Already expanded
+                const childUid = getNodeUid(d3Node.children[0])
+                const childG = findG(childUid)
+                if (childG) updateFocusRing(childG)
+            } else if (d3Node._children && d3Node._children.length > 0) {
+                // Collapsed — expand, then move
+                const circle = currentG.querySelector('circle') as SVGCircleElement | null
+                if (circle) circle.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+                setTimeout(() => {
+                    const newG = findG(currentUid)
+                    const updated = newG ? (newG as any).__data__ : null
+                    if (updated?.children?.length) {
+                        const childUid = getNodeUid(updated.children[0])
+                        const childG = findG(childUid)
+                        if (childG) updateFocusRing(childG)
+                    }
+                }, 400)
+            }
+            // No children at all → do nothing
+        }
+        else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            // Navigate siblings
+            if (d3Node.parent) {
+                const siblings = d3Node.parent.children || d3Node.parent._children
+                if (siblings) {
+                    const idx = siblings.findIndex((s: any) => getNodeUid(s) === currentUid)
+                    const next = e.key === 'ArrowDown' ? idx + 1 : idx - 1
+                    if (next >= 0 && next < siblings.length) {
+                        const sibUid = getNodeUid(siblings[next])
+                        const sibG = findG(sibUid)
+                        if (sibG) updateFocusRing(sibG)
+                    }
+                }
+            }
+        }
+    }, [updateFocusRing])
 
     const buildRoot = useCallback((content: string) => {
         const cleaned = content.replace(/!\[.*?\]\(.*?\)/g, '')
@@ -293,6 +444,18 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
         URL.revokeObjectURL(url)
     }
 
+    const handleSvgWrapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        // Ensure the container receives keyboard focus so arrow keys work immediately
+        e.currentTarget.focus({ preventScroll: true })
+
+        // Find if a specific node was clicked
+        const target = e.target as HTMLElement
+        const gNode = target.closest('g.markmap-node') as SVGGElement | null
+        if (gNode) {
+            updateFocusRing(gNode)
+        }
+    }, [updateFocusRing])
+
     return (
         <div className="mindmap-panel" ref={containerRef}>
             {/* Toolbar */}
@@ -352,7 +515,13 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
             </div>
 
             {/* SVG Canvas */}
-            <div className="mindmap-svg-wrap">
+            <div 
+                className="mindmap-svg-wrap" 
+                tabIndex={0} 
+                onKeyDown={handleKeyDown} 
+                onClick={handleSvgWrapClick}
+                style={{ outline: 'none' }} 
+            >
                 {isEmpty && (
                     <div className="mindmap-empty">
                         <span className="mindmap-empty-icon">🧭</span>
