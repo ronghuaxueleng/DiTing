@@ -173,10 +173,19 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
         const handler = (e: KeyboardEvent) => {
             if (!isKbActiveRef.current) return
             if (!mmRef.current || !svgRef.current) return
-            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter'].includes(e.key)) return
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter', '1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) return
 
             e.preventDefault()
             e.stopPropagation()
+
+            // Depth control (1-9)
+            if (e.key >= '1' && e.key <= '9') {
+                const requestedDepth = parseInt(e.key, 10)
+                // Cap at the maximum depth the tree actually has
+                const newDepth = Math.min(requestedDepth, Math.max(1, treeMaxDepth))
+                setMaxDepth(newDepth)
+                return
+            }
 
             const svg = svgRef.current
             const allG = () => Array.from(svg.querySelectorAll('g.markmap-node')) as SVGGElement[]
