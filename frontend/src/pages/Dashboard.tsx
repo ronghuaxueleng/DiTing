@@ -260,7 +260,7 @@ export default function Dashboard() {
                         filterBarProps={{
                     sourceType, status, selectedTagId, tagExclude,
                     hasSegments, hasAI, hasNotes, hasCached, isSubtitle,
-                    includeArchived, viewMode, tags, onUpdateFilter: updateFilter
+                    includeArchived, tags, onUpdateFilter: updateFilter
                 }}
                 toolbarProps={{
                     sortBy, limit, viewMode, selectionMode,

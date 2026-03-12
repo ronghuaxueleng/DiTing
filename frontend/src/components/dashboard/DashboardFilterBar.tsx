@@ -13,7 +13,6 @@ export interface DashboardFilterBarProps {
     hasCached?: boolean
     isSubtitle?: boolean
     includeArchived: string | null
-    viewMode: string
     tags?: Tag[]
     onUpdateFilter: (updates: Record<string, string | null>) => void
 }
@@ -29,7 +28,6 @@ export default function DashboardFilterBar({
     hasCached,
     isSubtitle,
     includeArchived,
-    viewMode,
     tags,
     onUpdateFilter
 }: DashboardFilterBarProps) {
@@ -45,16 +43,6 @@ export default function DashboardFilterBar({
         const currentVal = key === 'segments' ? hasSegments : key === 'ai' ? hasAI : key === 'notes' ? hasNotes : key === 'cached' ? hasCached : isSubtitle
         const nextVal = currentVal === undefined ? '1' : currentVal === true ? '0' : null
 
-        if (key === 'notes') {
-            if (nextVal === '1') {
-                // Entering "has notes" state → switch to notes view
-                onUpdateFilter({ notes: nextVal, view: 'notes' })
-            } else {
-                // Leaving "has notes" state → if currently in notes view, revert to default
-                onUpdateFilter({ notes: nextVal, ...(viewMode === 'notes' ? { view: null } : {}) })
-            }
-            return
-        }
 
         onUpdateFilter({ [key]: nextVal })
     }
