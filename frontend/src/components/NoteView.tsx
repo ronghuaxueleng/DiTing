@@ -1151,9 +1151,19 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                         const isExpanded = expandedVersionId === note.id
                         return (
                             <div key={note.id} className="flex flex-col mb-2 last:mb-0">
-                                <div className={`note-version-item ${note.is_active ? 'active' : ''}`}>
+                                <div 
+                                    className={`note-version-item ${note.is_active ? 'active' : ''} cursor-pointer hover:bg-[var(--color-bg-muted)]`}
+                                    onClick={() => setExpandedVersionId(isExpanded ? null : note.id)}
+                                >
                                     <button className="note-version-select flex-1 text-left"
-                                        onClick={() => !note.is_active && activateMut.mutate(note.id)}>
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!note.is_active) {
+                                                activateMut.mutate(note.id);
+                                            } else {
+                                                setExpandedVersionId(isExpanded ? null : note.id)
+                                            }
+                                        }}>
                                         <span className="note-version-model">{note.model ?? 'AI'}</span>
                                         <span className="note-version-date">{fmtDate(note.created_at)}</span>
                                         {note.is_edited && <span className="note-version-edited">✏️</span>}

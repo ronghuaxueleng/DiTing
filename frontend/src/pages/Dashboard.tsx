@@ -244,9 +244,11 @@ export default function Dashboard() {
 
     return (
         <>
-            {/* Filters Ribbon */}
-            <DashboardFilterRibbon
-                filterBarProps={{
+            <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden relative">
+                {/* Filters Ribbon */}
+                <div className="shrink-0 pt-4 z-10 block">
+                    <DashboardFilterRibbon
+                        filterBarProps={{
                     sourceType, status, selectedTagId, tagExclude,
                     hasSegments, hasAI, hasNotes, hasCached, isSubtitle,
                     includeArchived, viewMode, tags, onUpdateFilter: updateFilter
@@ -282,10 +284,11 @@ export default function Dashboard() {
                 viewMode={viewMode}
                 tags={tags}
             />
+            </div>
 
 
             {/* Content Area */}
-            <div className={`w-full px-4 sm:px-6 lg:px-8 ${viewMode === 'notes' && !isLoading && data?.items?.length !== 0 ? 'hidden' : 'pb-8'}`}>
+            <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar w-full px-4 sm:px-6 lg:px-8 ${viewMode === 'notes' && !isLoading && data?.items?.length !== 0 ? 'hidden' : 'pb-8'}`}>
                 {isLoading ? (
                     <div className="flex justify-center py-20" >
                         <div className="animate-spin h-8 w-8 border-4 border-[var(--color-primary)] border-t-transparent rounded-full" />
@@ -341,7 +344,7 @@ export default function Dashboard() {
             {/* Notes View — master-detail layout, viewport-constrained so each panel scrolls independently */}
             {
                 viewMode === 'notes' && (
-                    <div className="w-full px-4 sm:px-6 lg:px-8 pb-4 flex flex-col lg:flex-row gap-4 overflow-hidden" style={{ height: 'calc(100vh - 210px)' }}>
+                    <div className="flex-1 min-h-0 w-full px-4 sm:px-6 lg:px-8 pb-4 flex flex-col lg:flex-row gap-4 overflow-hidden">
                         {/* Left: video list (compact, scrolls independently) */}
                         <div className={`lg:w-80 flex-shrink-0 flex flex-col border border-[var(--color-border)] rounded-xl bg-[var(--color-card)] overflow-hidden ${selectedNoteVideo ? 'hidden lg:flex' : 'flex'}`}>
                             {/* Scrollable list area */}
@@ -399,6 +402,7 @@ export default function Dashboard() {
                     </div>
                 )
             }
+            </div>
 
             {
                 selectedVideo && (
