@@ -14,21 +14,6 @@ interface MindmapPanelProps {
 
 const transformer = new Transformer()
 
-// Stable identity for D3 hierarchy nodes across re-renders
-let _uidSeq = 0
-const nodeUidMap = new WeakMap<object, string>()
-function getNodeUid(d3Node: any): string | undefined {
-    // d3Node.data is the original IPureNode
-    const key = d3Node?.data
-    if (!key || typeof key !== 'object') return undefined
-    let uid = nodeUidMap.get(key)
-    if (!uid) {
-        uid = `mm_${++_uidSeq}`
-        nodeUidMap.set(key, uid)
-    }
-    return uid
-}
-
 /** Parse "MM:SS" or "HH:MM:SS" into seconds */
 function parseTimestamp(raw: string): number | null {
     const parts = raw.trim().split(':').map(Number)
@@ -87,6 +72,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
 
     // Keyboard navigation state
     const focusedGRef = useRef<SVGGElement | null>(null)
+    const isKbActiveRef = useRef(false)
 
     const panToNode = useCallback((targetG: SVGGElement) => {
         const svg = svgRef.current
@@ -130,94 +116,130 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
         }
     }, [panToNode])
 
-    // Keyboard event handler
-    const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (!mmRef.current || !svgRef.current) return
-        
-        // Only handle specific keys
-        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter'].includes(e.key)) return
-        
-        e.preventDefault()
+    // Native keyboard handler (not React synthetic — D3 zoom blocks div focus)
+    // __data__ on markmap's <g> elements is raw IPureNode: { content, children, payload, state }
+    // There is NO .parent and NO D3 hierarchy wrapper.
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (!isKbActiveRef.current) return
+            if (!mmRef.current || !svgRef.current) return
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter'].includes(e.key)) return
 
-        const svg = svgRef.current
-        const allNodes = () => Array.from(svg.querySelectorAll('g.markmap-node')) as SVGGElement[]
-        
-        // Helper: find DOM <g> by stable UID
-        const findG = (uid: string | undefined) => {
-            if (!uid) return undefined
-            return allNodes().find(n => getNodeUid((n as any).__data__) === uid)
-        }
+            e.preventDefault()
+            e.stopPropagation()
 
-        // If nothing is focused, focus the root
-        if (!focusedGRef.current || !svg.contains(focusedGRef.current)) {
-            const rootG = svg.querySelector('g.markmap-node') as SVGGElement | null
-            if (rootG) updateFocusRing(rootG)
-            return
-        }
+            const svg = svgRef.current
+            const allG = () => Array.from(svg.querySelectorAll('g.markmap-node')) as SVGGElement[]
 
-        const currentG = focusedGRef.current
-        const d3Node = (currentG as any).__data__
-        if (!d3Node) return
-
-        const currentUid = getNodeUid(d3Node)
-
-        // Space / Enter: Toggle expand/collapse, keep focus on same node
-        if (e.key === ' ' || e.key === 'Enter') {
-            const circle = currentG.querySelector('circle') as SVGCircleElement | null
-            if (circle) circle.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
-            // Re-bind after markmap re-renders the DOM
-            setTimeout(() => {
-                const newG = findG(currentUid)
-                if (newG) updateFocusRing(newG)
-            }, 400)
-            return
-        }
-
-        if (e.key === 'ArrowLeft') {
-            // Go to parent
-            if (d3Node.parent) {
-                const parentUid = getNodeUid(d3Node.parent)
-                const parentG = findG(parentUid)
-                if (parentG) updateFocusRing(parentG)
+            // If nothing focused, focus root
+            if (!focusedGRef.current || !svg.contains(focusedGRef.current)) {
+                const rootG = svg.querySelector('g.markmap-node') as SVGGElement | null
+                if (rootG) updateFocusRing(rootG)
+                return
             }
-        }
-        else if (e.key === 'ArrowRight') {
-            // Go to first child (expand first if collapsed)
-            if (d3Node.children && d3Node.children.length > 0) {
-                // Already expanded
-                const childUid = getNodeUid(d3Node.children[0])
-                const childG = findG(childUid)
-                if (childG) updateFocusRing(childG)
-            } else if (d3Node._children && d3Node._children.length > 0) {
-                // Collapsed — expand, then move
+
+            const currentG = focusedGRef.current
+            const currentNode = (currentG as any).__data__
+            if (!currentNode) return
+
+            // Build parent lookup: for each <g>, check if its __data__.children contains currentNode
+            const findParentG = (): SVGGElement | null => {
+                for (const g of allG()) {
+                    const nd = (g as any).__data__
+                    if (nd?.children && nd.children.includes(currentNode)) return g
+                }
+                return null
+            }
+
+            // Find which <g> renders a given __data__ object
+            const findGForNode = (nodeData: any): SVGGElement | undefined => {
+                return allG().find(g => (g as any).__data__ === nodeData)
+            }
+
+            if (e.key === ' ' || e.key === 'Enter') {
+                // Toggle expand/collapse
                 const circle = currentG.querySelector('circle') as SVGCircleElement | null
                 if (circle) circle.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+                // After markmap re-renders, the <g> element for current node may be new
                 setTimeout(() => {
-                    const newG = findG(currentUid)
-                    const updated = newG ? (newG as any).__data__ : null
-                    if (updated?.children?.length) {
-                        const childUid = getNodeUid(updated.children[0])
-                        const childG = findG(childUid)
-                        if (childG) updateFocusRing(childG)
-                    }
+                    // Re-find by matching the same __data__ object reference
+                    const newG = findGForNode(currentNode)
+                    if (newG) updateFocusRing(newG)
                 }, 400)
+                return
             }
-            // No children at all → do nothing
-        }
-        else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-            // Navigate siblings
-            if (d3Node.parent) {
-                const siblings = d3Node.parent.children || d3Node.parent._children
-                if (siblings) {
-                    const idx = siblings.findIndex((s: any) => getNodeUid(s) === currentUid)
-                    const next = e.key === 'ArrowDown' ? idx + 1 : idx - 1
-                    if (next >= 0 && next < siblings.length) {
-                        const sibUid = getNodeUid(siblings[next])
-                        const sibG = findG(sibUid)
-                        if (sibG) updateFocusRing(sibG)
-                    }
+
+            if (e.key === 'ArrowRight') {
+                // Go to first visible child
+                if (currentNode.children && currentNode.children.length > 0) {
+                    const firstChild = currentNode.children[0]
+                    const childG = findGForNode(firstChild)
+                    if (childG) updateFocusRing(childG)
+                }
+                // If no visible children, do nothing (collapsed or leaf)
+            }
+            else if (e.key === 'ArrowLeft') {
+                // Go to parent
+                const parentG = findParentG()
+                if (parentG) updateFocusRing(parentG)
+            }
+            else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                // Navigate siblings
+                const parentG = findParentG()
+                if (!parentG) return
+                const parentNode = (parentG as any).__data__
+                if (!parentNode?.children) return
+                const siblings = parentNode.children as any[]
+                const idx = siblings.indexOf(currentNode)
+                if (idx === -1) return
+                const next = e.key === 'ArrowDown' ? idx + 1 : idx - 1
+                if (next >= 0 && next < siblings.length) {
+                    const sibG = findGForNode(siblings[next])
+                    if (sibG) updateFocusRing(sibG)
                 }
             }
+        }
+
+        document.addEventListener('keydown', handler)
+        return () => document.removeEventListener('keydown', handler)
+    }, [updateFocusRing])
+
+    // Activate/deactivate keyboard mode on mousedown inside/outside mindmap
+    useEffect(() => {
+        const container = containerRef.current
+        if (!container) return
+
+        const onMouseDownInside = (e: MouseEvent) => {
+            isKbActiveRef.current = true
+            console.log('[Mindmap KB] activated via mousedown')
+            // Also set focus ring on clicked node
+            const target = e.target as HTMLElement
+            const gNode = target.closest?.('g.markmap-node') as SVGGElement | null
+            if (gNode) {
+                if (svgRef.current) {
+                    svgRef.current.querySelectorAll('.mindmap-node-kb-focus').forEach(el => el.classList.remove('mindmap-node-kb-focus'))
+                }
+                focusedGRef.current = gNode
+                gNode.classList.add('mindmap-node-kb-focus')
+                console.log('[Mindmap KB] focused node:', gNode.querySelector('foreignObject div')?.textContent?.trim()?.substring(0, 30))
+            }
+        }
+
+        const onMouseDownOutside = (e: MouseEvent) => {
+            if (!container.contains(e.target as Node)) {
+                isKbActiveRef.current = false
+                if (svgRef.current) {
+                    svgRef.current.querySelectorAll('.mindmap-node-kb-focus').forEach(el => el.classList.remove('mindmap-node-kb-focus'))
+                }
+                focusedGRef.current = null
+            }
+        }
+
+        container.addEventListener('mousedown', onMouseDownInside, true)
+        document.addEventListener('mousedown', onMouseDownOutside)
+        return () => {
+            container.removeEventListener('mousedown', onMouseDownInside, true)
+            document.removeEventListener('mousedown', onMouseDownOutside)
         }
     }, [updateFocusRing])
 
@@ -444,17 +466,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
         URL.revokeObjectURL(url)
     }
 
-    const handleSvgWrapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-        // Ensure the container receives keyboard focus so arrow keys work immediately
-        e.currentTarget.focus({ preventScroll: true })
 
-        // Find if a specific node was clicked
-        const target = e.target as HTMLElement
-        const gNode = target.closest('g.markmap-node') as SVGGElement | null
-        if (gNode) {
-            updateFocusRing(gNode)
-        }
-    }, [updateFocusRing])
 
     return (
         <div className="mindmap-panel" ref={containerRef}>
@@ -515,13 +527,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
             </div>
 
             {/* SVG Canvas */}
-            <div 
-                className="mindmap-svg-wrap" 
-                tabIndex={0} 
-                onKeyDown={handleKeyDown} 
-                onClick={handleSvgWrapClick}
-                style={{ outline: 'none' }} 
-            >
+            <div className="mindmap-svg-wrap">
                 {isEmpty && (
                     <div className="mindmap-empty">
                         <span className="mindmap-empty-icon">🧭</span>
