@@ -759,7 +759,7 @@
             }
         },
         "notes": {
-            "title": "📝 Notes",
+            "title": "AI Notes",
             "edit": "Edit",
             "cancel": "Cancel",
             "save": "Save",
@@ -770,7 +770,7 @@
         },
         "transcription": {
             "title": "Transcription",
-            "listMode": "List",
+            "listMode": "Transcript Summary",
             "immersiveMode": "Immersive",
             "noteMode": "AI Notes",
             "empty": "No transcription segments yet"

@@ -773,7 +773,7 @@
             }
         },
         "notes": {
-            "title": "📝 笔记",
+            "title": "AI笔记",
             "edit": "编辑",
             "cancel": "取消",
             "save": "保存",
@@ -784,7 +784,7 @@
         },
         "transcription": {
             "title": "转写内容",
-            "listMode": "列表模式",
+            "listMode": "转录总结",
             "immersiveMode": "沉浸模式",
             "noteMode": "AI 笔记",
             "empty": "暂无转写片段"
