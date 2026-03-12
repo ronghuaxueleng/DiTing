@@ -278,6 +278,58 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                 if (parentG) updateFocusRing(parentG)
             }
             else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                if (e.ctrlKey || e.metaKey) {
+                    // Zoom In/Out
+                    const g = svg.querySelector('g') as SVGGElement | null
+                    if (g) {
+                        const currentTransform = g.getAttribute('transform') || ''
+                        const m = currentTransform.match(/translate\(([^,]+)[, ]+([^)]+)\)(?:\s*scale\(([^)]+)\))?/)
+
+                        let tx = 0, ty = 0, scale = 1
+                        if (m) {
+                            tx = parseFloat(m[1]!)
+                            ty = parseFloat(m[2]!)
+                            scale = m[3] ? parseFloat(m[3]!) : 1
+                        }
+
+                        // ArrowUp = zoom out, ArrowDown = zoom in (standard browser behavior is often reversed, 
+                        // but let's map ArrowUp -> zoom in, ArrowDown -> zoom out like scrolling)
+                        const zoomFactor = e.key === 'ArrowUp' ? 1.2 : (1 / 1.2)
+                        const targetScale = scale * zoomFactor
+
+                        const svgRect = svg.getBoundingClientRect()
+
+                        // Default to screen center if no focused node
+                        let focalX = svgRect.width / 2
+                        let focalY = svgRect.height / 2
+
+                        // If we have a focused node, use its exact position as the zoom anchor
+                        if (currentG) {
+                            const fo = currentG.querySelector('foreignObject') || currentG
+                            const foRect = fo.getBoundingClientRect()
+                            focalX = foRect.left + foRect.width / 2 - svgRect.left
+                            focalY = foRect.top + foRect.height / 2 - svgRect.top
+                        }
+
+                        // Scale around the focal point
+                        const ratio = targetScale / scale
+                        const new_tx = (focalX / scale) - (focalX / scale - tx) * ratio
+                        const new_ty = (focalY / scale) - (focalY / scale - ty) * ratio
+
+                        g.style.transition = 'transform 0.1s ease-out'
+                        g.setAttribute('transform', `translate(${new_tx}, ${new_ty}) scale(${targetScale})`)
+                        setTimeout(() => { g.style.transition = '' }, 150)
+
+                        const zoomState = (svg as any).__zoom
+                        if (zoomState) {
+                            zoomState.x = new_tx
+                            zoomState.y = new_ty
+                            zoomState.k = targetScale
+                        }
+                    }
+                    return
+                }
+
                 // Navigate to next/prev sibling, or parent's sibling if at the edge
                 const isDown = e.key === 'ArrowDown'
                 let targetData = currentNode
