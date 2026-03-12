@@ -62,7 +62,10 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
     }, [])
 
     // Depth control
-    const [maxDepth, setMaxDepth] = useState(6)     // currently selected max depth to show
+    const [maxDepth, setMaxDepth] = useState(() => {
+        const saved = localStorage.getItem('mindmap-saved-depth')
+        return saved ? parseInt(saved, 10) : 2 // Default to H2 (depth = 2)
+    })     // currently selected max depth to show
     const [treeMaxDepth, setTreeMaxDepth] = useState(6) // actual depth found in note
     const [depthTriggerId, setDepthTriggerId] = useState(0) // Forces filter re-apply even on same depth
 
@@ -185,6 +188,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                 // Cap at the maximum depth the tree actually has
                 const newDepth = Math.min(requestedDepth, Math.max(1, treeMaxDepth))
                 setMaxDepth(newDepth)
+                localStorage.setItem('mindmap-saved-depth', newDepth.toString())
                 setDepthTriggerId(prev => prev + 1) // Always trigger even if depth number is the same
                 return
             }
@@ -379,7 +383,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
 
         document.addEventListener('keydown', handler)
         return () => document.removeEventListener('keydown', handler)
-    }, [updateFocusRing])
+    }, [updateFocusRing, treeMaxDepth]) // Added treeMaxDepth to dependencies
 
     // Activate/deactivate keyboard mode on mousedown inside/outside mindmap
     useEffect(() => {
@@ -477,7 +481,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
             // Get plain text, stripping any injected HTML spans
             const text = div.innerText?.trim() || div.textContent?.trim() || ''
             // Strip timestamp patterns from text
-            const cleaned = text.replace(/\u23f1\s*\d{1,2}:\d{2}(?::\d{2})?/g, '').trim()
+            const cleaned = text.replace(/\u23f1\s*\d{1,2}:\d{2}(?::\d{2})?/g, '').replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]/g, '').trim()
             if (cleaned) onNodeClick(cleaned)
         }
         svg.addEventListener('click', handleClick, true)
@@ -514,19 +518,30 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
 
         const root = buildRoot(stableContent)
         rootCacheRef.current = root
-        const depth = getMaxDepth(root)
-        setTreeMaxDepth(depth)
-        // Reset depth slider to show all when note changes
-        setMaxDepth(depth)
+        const maxD = getMaxDepth(root)
+        setTreeMaxDepth(maxD)
 
-        const foldedRoot = applyFoldDepth(root, maxDepth)
+        // Apply saved depth preference, capped by the actual max depth of the current note
+        const savedPrefStr = localStorage.getItem('mindmap-saved-depth')
+        const savedPref = savedPrefStr ? parseInt(savedPrefStr, 10) : 2
+        const initialTargetDepth = Math.min(savedPref, maxD)
+        const resolvedDepth = Math.max(1, initialTargetDepth) // Ensure depth is at least 1 (H1)
+
+        // Only update maxDepth state if it's different, to avoid unnecessary re-renders
+        if (maxDepth !== resolvedDepth) {
+            setMaxDepth(resolvedDepth)
+            // Persist this resolved depth if it changed, to ensure consistency
+            localStorage.setItem('mindmap-saved-depth', resolvedDepth.toString())
+        }
+
+        const foldedRoot = applyFoldDepth(root, resolvedDepth)
         mmRef.current.setData(foldedRoot)
         setTimeout(() => {
             mmRef.current?.fit()
             injectTimestampLinks()
         }, 400)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [stableContent, buildRoot])
+    }, [stableContent, buildRoot]) // Removed maxDepth from dependencies to prevent loop
 
     // Apply depth filter when slider changes (no fit reset, no re-inject delay)
     useEffect(() => {
@@ -674,10 +689,14 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                         <input
                             type="range"
                             min={1}
-                            max={treeMaxDepth}
-                            step={1}
+                            max={Math.max(1, treeMaxDepth)} // Prevent slider from breaking if treeMaxDepth is 0
                             value={maxDepth}
-                            onChange={e => { depthOnlyChangeRef.current = true; setMaxDepth(Number(e.target.value)) }}
+                            onChange={e => {
+                                const val = Number(e.target.value);
+                                depthOnlyChangeRef.current = true;
+                                setMaxDepth(val);
+                                localStorage.setItem('mindmap-saved-depth', val.toString());
+                            }}
                             className="note-toc-slider mindmap-depth-slider"
                             title={t('detail.aiNotes.mindmapDepthHint', `显示到第 ${maxDepth} 级`)}
                         />
