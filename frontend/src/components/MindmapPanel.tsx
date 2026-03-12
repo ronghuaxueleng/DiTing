@@ -231,8 +231,13 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
             }
 
             if (e.key === 'Enter') {
-                // Force center and zoom on current node instead of toggling
-                updateFocusRing(currentG, true)
+                if (e.ctrlKey || e.metaKey) {
+                    // Fit to screen and overview everything
+                    mmRef.current?.fit()
+                } else {
+                    // Force center and zoom on current node instead of toggling
+                    updateFocusRing(currentG, true)
+                }
                 return
             }
 
