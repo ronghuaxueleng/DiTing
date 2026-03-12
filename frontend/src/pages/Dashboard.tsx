@@ -52,7 +52,16 @@ export default function Dashboard() {
     const selectedTagId = searchParams.get('tag') ? Number(searchParams.get('tag')) : undefined
     const tagExclude = searchParams.get('tag_exclude') === '1'
     const sortBy = (searchParams.get('sort') || 'time') as 'time' | 'title' | 'segments'
-    const viewMode = (searchParams.get('view') || 'grid') as 'grid' | 'list' | 'notes'
+    const defaultView = localStorage.getItem('dashboard-view-mode') || 'grid'
+    const viewMode = (searchParams.get('view') || defaultView) as 'grid' | 'list' | 'notes'
+    
+    // Save view mode preference when user changes it
+    useEffect(() => {
+        const view = searchParams.get('view')
+        if (view) {
+            localStorage.setItem('dashboard-view-mode', view)
+        }
+    }, [searchParams])
     const [selectedNoteVideo, setSelectedNoteVideo] = useState<Video | null>(null)
 
     // Quick Filters
