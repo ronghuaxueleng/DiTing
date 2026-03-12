@@ -381,6 +381,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
     const [pendingReset, setPendingReset] = useState<boolean>(false)
     const [activeTocId, setActiveTocId] = useState<string | null>(null)
     const [hideScreenshots, setHideScreenshots] = useState<boolean>(() => localStorage.getItem('note-hide-screenshots') === 'true')
+    const [enableInlineScreenshots, setEnableInlineScreenshots] = useState<boolean>(() => localStorage.getItem('note-enable-inline-screenshots') !== 'false') // Default to true
     const [isCapturing, setIsCapturing] = useState(false)
     const [expandedVersionId, setExpandedVersionId] = useState<number | null>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -713,7 +714,9 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
     }, [editContent, activeNote])
 
     // ---- Manual Screenshot Capture ----
-    const handleCapture = useCallback(async () => {
+    const handleCapture = useCallback(async (eOrLine?: React.MouseEvent | number) => {
+        const targetLineNumber = typeof eOrLine === 'number' ? eOrLine : undefined
+
         const video = playerRef?.current
         if (!video || !(video instanceof HTMLVideoElement)) {
             showToast('error', t('detail.aiNotes.captureVideoOnly'))
@@ -762,7 +765,14 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                 const content = activeNote.content
                 let insertPos = content.length // fallback: append
 
-                if (activeTocId) {
+                if (targetLineNumber !== undefined) {
+                    const lines = content.split('\n')
+                    let charIndex = 0
+                    for (let i = 0; i < targetLineNumber; i++) {
+                        charIndex += (lines[i]?.length ?? 0) + 1 // +1 for the \n
+                    }
+                    insertPos = Math.min(charIndex, content.length)
+                } else if (activeTocId) {
                     // Find the active TOC item's line number
                     const activeTocItem = tocItems.find(item => item.id === activeTocId)
                     if (activeTocItem) {
@@ -842,8 +852,8 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
     }, [activeNote, queryClient, qkey, showToast, t])
 
     // Stable wrapper for callbacks used inside markdown components to prevent component remounting
-    const callbacksRef = useRef({ onSeek, tocLineMap, hideScreenshots, handleDeleteImage, t })
-    callbacksRef.current = { onSeek, tocLineMap, hideScreenshots, handleDeleteImage, t }
+    const callbacksRef = useRef({ onSeek, tocLineMap, hideScreenshots, handleDeleteImage, handleCapture, isCapturing, enableInlineScreenshots, t })
+    callbacksRef.current = { onSeek, tocLineMap, hideScreenshots, handleDeleteImage, handleCapture, isCapturing, enableInlineScreenshots, t }
 
     // Custom Markdown components — inject IDs on headings and clickable ⏱ timestamps
     const markdownComponents = useMemo(() => {
@@ -882,13 +892,64 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
             return children
         }
 
+        const withInsertHover = (Tag: any) => ({ children, node, ...props }: any) => {
+            const element = <Tag {...props}>{renderTimestamps(children)}</Tag>
+            const endLine = node?.position?.end?.line
+            if (!endLine || !callbacksRef.current.enableInlineScreenshots) return element
+
+            return (
+                <div className="group relative note-block-wrapper">
+                    {element}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-3 left-0 w-full flex justify-center z-10 pointer-events-none">
+                        <div className="absolute left-0 top-1/2 w-full h-[1px] bg-[var(--color-primary)] -z-10 opacity-30"></div>
+                        <button
+                            className="bg-[var(--color-primary)] text-white p-1 rounded-full shadow hover:scale-110 transition-transform pointer-events-auto"
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                callbacksRef.current.handleCapture(endLine)
+                            }}
+                            disabled={callbacksRef.current.isCapturing}
+                            title={callbacksRef.current.t('detail.aiNotes.insertScreenshotHere', '在此插入截图')}
+                        >
+                            <Icons.Camera className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+            )
+        }
+
         const makeHeading = (Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') =>
             ({ children, node, ...props }: any) => {
                 const { tocLineMap } = callbacksRef.current
                 // Use the AST node's line number to look up the deterministic TOC id
                 const line = node?.position?.start?.line
                 const id = (line && tocLineMap.get(line)) || `note-h-unknown-${line ?? 'x'}`
-                return <Tag id={id} {...props}>{renderTimestamps(children)}</Tag>
+                const element = <Tag id={id} {...props}>{renderTimestamps(children)}</Tag>
+
+                const endLine = node?.position?.end?.line
+                if (!endLine || !callbacksRef.current.enableInlineScreenshots) return element
+
+                return (
+                    <div className="group relative note-block-wrapper">
+                        {element}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-3 left-0 w-full flex justify-center z-10 pointer-events-none">
+                            <div className="absolute left-0 top-1/2 w-full h-[1px] bg-[var(--color-primary)] -z-10 opacity-30"></div>
+                            <button
+                                className="bg-[var(--color-primary)] text-white p-1 rounded-full shadow hover:scale-110 transition-transform pointer-events-auto"
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    callbacksRef.current.handleCapture(endLine)
+                                }}
+                                disabled={callbacksRef.current.isCapturing}
+                                title={callbacksRef.current.t('detail.aiNotes.insertScreenshotHere', '在此插入截图')}
+                            >
+                                <Icons.Camera className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                )
             }
 
         return {
@@ -898,8 +959,12 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
             h4: makeHeading('h4'),
             h5: makeHeading('h5'),
             h6: makeHeading('h6'),
-            p: ({ children, ...props }: any) => <p {...props}>{renderTimestamps(children)}</p>,
-            li: ({ children, ...props }: any) => <li {...props}>{renderTimestamps(children)}</li>,
+            p: withInsertHover('p'),
+            blockquote: withInsertHover('blockquote'),
+            pre: withInsertHover('pre'),
+            ul: withInsertHover('ul'),
+            ol: withInsertHover('ol'),
+            li: ({ children, props }: any) => <li {...props}>{renderTimestamps(children)}</li>,
             img: ({ src, alt, ...props }: any) => {
                 const { hideScreenshots, handleDeleteImage, t } = callbacksRef.current
                 const isScreenshot = src && src.includes('/api/note-screenshots/')
@@ -1065,6 +1130,20 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                             >
                                 <Icons.Image />
                             </button>
+                            {/* Toggle inline screenshots */}
+                            {playerRef?.current instanceof HTMLVideoElement && !hideScreenshots && !isEditing && (
+                                <button
+                                    className={`note-btn note-btn-icon ${enableInlineScreenshots ? 'active' : ''}`}
+                                    onClick={() => setEnableInlineScreenshots(v => {
+                                        const next = !v
+                                        localStorage.setItem('note-enable-inline-screenshots', String(next))
+                                        return next
+                                    })}
+                                    title={enableInlineScreenshots ? t('detail.aiNotes.disableInlineScreenshots', '关闭段落间截图按钮') : t('detail.aiNotes.enableInlineScreenshots', '开启段落间截图按钮')}
+                                >
+                                    <Icons.Layers />
+                                </button>
+                            )}
                             {/* Capture screenshot button — only for video (not audio) */}
                             {playerRef?.current instanceof HTMLVideoElement && (
                                 <button
@@ -1151,7 +1230,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                         const isExpanded = expandedVersionId === note.id
                         return (
                             <div key={note.id} className="flex flex-col mb-2 last:mb-0">
-                                <div 
+                                <div
                                     className={`note-version-item ${note.is_active ? 'active' : ''} cursor-pointer hover:bg-[var(--color-bg-muted)]`}
                                     onClick={() => setExpandedVersionId(isExpanded ? null : note.id)}
                                 >
