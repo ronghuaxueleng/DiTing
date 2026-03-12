@@ -211,7 +211,6 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
 
         const onMouseDownInside = (e: MouseEvent) => {
             isKbActiveRef.current = true
-            console.log('[Mindmap KB] activated via mousedown')
             // Also set focus ring on clicked node
             const target = e.target as HTMLElement
             const gNode = target.closest?.('g.markmap-node') as SVGGElement | null
@@ -221,7 +220,6 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                 }
                 focusedGRef.current = gNode
                 gNode.classList.add('mindmap-node-kb-focus')
-                console.log('[Mindmap KB] focused node:', gNode.querySelector('foreignObject div')?.textContent?.trim()?.substring(0, 30))
             }
         }
 
