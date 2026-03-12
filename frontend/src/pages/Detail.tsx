@@ -261,6 +261,44 @@ export default function Detail() {
         window.addEventListener('mouseup', onUp)
     }, [topPanelPct, applyVertDragPct])
 
+    const handleVertDividerTouchStart = useCallback((e: React.TouchEvent) => {
+        vertDraggingRef.current = true
+        const leftCol = leftColumnRef.current
+        if (!leftCol) return
+        const touch = e.touches[0]
+        if (!touch) return
+        
+        const startY = touch.clientY
+        const rect = leftCol.getBoundingClientRect()
+        const containerH = rect.height
+        const startPct = topPanelPct
+        
+        document.body.style.cursor = 'row-resize'
+        document.body.style.userSelect = 'none'
+        
+        const onTouchMove = (ev: TouchEvent) => {
+            if (!vertDraggingRef.current) return
+            const moveTouch = ev.touches[0]
+            if (!moveTouch) return
+            const delta = moveTouch.clientY - startY
+            const newPct = startPct + (delta / containerH) * 100
+            applyVertDragPct(Math.max(0, Math.min(100, newPct)))
+        }
+        
+        const onTouchEnd = () => {
+            vertDraggingRef.current = false
+            document.body.style.cursor = ''
+            document.body.style.userSelect = ''
+            window.removeEventListener('touchmove', onTouchMove)
+            window.removeEventListener('touchend', onTouchEnd)
+            window.removeEventListener('touchcancel', onTouchEnd)
+        }
+        
+        window.addEventListener('touchmove', onTouchMove, { passive: true })
+        window.addEventListener('touchend', onTouchEnd)
+        window.addEventListener('touchcancel', onTouchEnd)
+    }, [topPanelPct, applyVertDragPct])
+
 
     const { data: video, isLoading: isVideoLoading } = useQuery({
         queryKey: ['video', sourceId],
@@ -559,6 +597,7 @@ export default function Detail() {
                                     <div
                                         className="flex items-center justify-center h-4 my-0.5 cursor-row-resize group flex-shrink-0 select-none touch-none"
                                         onMouseDown={handleVertDividerMouseDown}
+                                        onTouchStart={handleVertDividerTouchStart}
                                     >
                                         <div className="h-1 w-12 rounded-full bg-[var(--color-border)] group-hover:bg-[var(--color-primary)] group-hover:w-20 group-active:bg-[var(--color-primary)] transition-all duration-200 opacity-50 group-hover:opacity-100" />
                                     </div>
