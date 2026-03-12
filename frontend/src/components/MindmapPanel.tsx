@@ -142,11 +142,11 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
             const currentNode = (currentG as any).__data__
             if (!currentNode) return
 
-            // Build parent lookup: for each <g>, check if its __data__.children contains currentNode
-            const findParentG = (): SVGGElement | null => {
+            // Build parent lookup: for each <g>, check if its __data__.children contains the target node
+            const findParentG = (targetNode: any): SVGGElement | null => {
                 for (const g of allG()) {
                     const nd = (g as any).__data__
-                    if (nd?.children && nd.children.includes(currentNode)) return g
+                    if (nd?.children && nd.children.includes(targetNode)) return g
                 }
                 return null
             }
@@ -180,22 +180,37 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
             }
             else if (e.key === 'ArrowLeft') {
                 // Go to parent
-                const parentG = findParentG()
+                const parentG = findParentG(currentNode)
                 if (parentG) updateFocusRing(parentG)
             }
             else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                // Navigate siblings
-                const parentG = findParentG()
-                if (!parentG) return
-                const parentNode = (parentG as any).__data__
-                if (!parentNode?.children) return
-                const siblings = parentNode.children as any[]
-                const idx = siblings.indexOf(currentNode)
-                if (idx === -1) return
-                const next = e.key === 'ArrowDown' ? idx + 1 : idx - 1
-                if (next >= 0 && next < siblings.length) {
-                    const sibG = findGForNode(siblings[next])
-                    if (sibG) updateFocusRing(sibG)
+                // Navigate to next/prev sibling, or parent's sibling if at the edge
+                const isDown = e.key === 'ArrowDown'
+                let targetData = currentNode
+
+                while (true) {
+                    const parentG = findParentG(targetData)
+                    if (!parentG) break // Reached root, nowhere else to go
+                    
+                    const parentNode = (parentG as any).__data__
+                    if (!parentNode?.children) break
+
+                    const siblings = parentNode.children as any[]
+                    const idx = siblings.indexOf(targetData)
+                    if (idx === -1) break
+
+                    const nextIdx = isDown ? idx + 1 : idx - 1
+                    
+                    if (nextIdx >= 0 && nextIdx < siblings.length) {
+                        // Found a valid sibling (or uncle)
+                        const nextG = findGForNode(siblings[nextIdx])
+                        if (nextG) updateFocusRing(nextG)
+                        break
+                    } else {
+                        // Reached the end of this sibling group. Move up to parent
+                        // and look for its next sibling in the next loop iteration.
+                        targetData = parentNode
+                    }
                 }
             }
         }
