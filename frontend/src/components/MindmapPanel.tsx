@@ -74,45 +74,95 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
     const focusedGRef = useRef<SVGGElement | null>(null)
     const isKbActiveRef = useRef(false)
 
-    const panToNode = useCallback((targetG: SVGGElement) => {
+    const panToNode = useCallback((targetG: SVGGElement, forceCenter = false) => {
         const svg = svgRef.current
         if (!svg) return
+
         const fo = targetG.querySelector('foreignObject') || targetG
         const foRect = fo.getBoundingClientRect()
         const svgRect = svg.getBoundingClientRect()
+
+        // Target center in screen pixels
         const cx = foRect.left + foRect.width / 2 - svgRect.left
         const cy = foRect.top + foRect.height / 2 - svgRect.top
-        const dx = svgRect.width / 2 - cx
-        const dy = svgRect.height / 2 - cy
+
+        // Exact center of svg in screen pixels
+        const centerX = svgRect.width / 2
+        const centerY = svgRect.height / 2
+
+        let dx_screen = 0
+        let dy_screen = 0
+
+        if (forceCenter) {
+            // Aggressively center the node
+            dx_screen = centerX - cx
+            dy_screen = centerY - cy
+        } else {
+            // Smart panning: only pan if node is outside the "safe zone" (middle 60% of viewport)
+            const marginX = svgRect.width * 0.2
+            const marginY = svgRect.height * 0.2
+
+            if (cx < marginX) dx_screen = marginX - cx
+            else if (cx > svgRect.width - marginX) dx_screen = (svgRect.width - marginX) - cx
+
+            if (cy < marginY) dy_screen = marginY - cy
+            else if (cy > svgRect.height - marginY) dy_screen = (svgRect.height - marginY) - cy
+
+            if (dx_screen === 0 && dy_screen === 0) return
+        }
+
         const g = svg.querySelector('g') as SVGGElement | null
         if (g) {
+            // Parse existing transform
             const currentTransform = g.getAttribute('transform') || ''
-            const m = currentTransform.match(/translate\(([^,]+),\s*([^)]+)\)\s*scale\(([^)]+)\)/)
+            // Markmap typically sets: translate(x, y) scale(k)
+            // Regex handles optional space between translate and scale, and optional scale.
+            const m = currentTransform.match(/translate\(([^,]+)[, ]+([^)]+)\)(?:\s*scale\(([^)]+)\))?/)
+
+            let tx = 0, ty = 0, currentScale = 1
             if (m) {
-                const tx = parseFloat(m[1]!) + dx
-                const ty = parseFloat(m[2]!) + dy
-                const scale = parseFloat(m[3]!)
-                g.style.transition = 'transform 0.2s ease'
-                g.setAttribute('transform', `translate(${tx}, ${ty}) scale(${scale})`)
-                setTimeout(() => { g.style.transition = '' }, 250)
-                const zoomState = (svg as any).__zoom
-                if (zoomState) {
-                    zoomState.x = tx
-                    zoomState.y = ty
-                    zoomState.k = scale
-                }
+                tx = parseFloat(m[1]!)
+                ty = parseFloat(m[2]!)
+                currentScale = m[3] ? parseFloat(m[3]!) : 1
+            }
+
+            let targetScale = currentScale
+            if (forceCenter && currentScale < 1.0) {
+                targetScale = 1.0
+            }
+
+            // 1. Find the internal SVG coordinates of the node's center
+            const sx = (cx - tx) / currentScale
+            const sy = (cy - ty) / currentScale
+
+            // 2. We want the node's center (sx, sy) to end up at (cx + dx_screen, cy + dy_screen) after applying targetScale
+            const targetScreenX = cx + dx_screen
+            const targetScreenY = cy + dy_screen
+
+            const new_tx = targetScreenX - sx * targetScale
+            const new_ty = targetScreenY - sy * targetScale
+
+            g.style.transition = 'transform 0.3s ease-out'
+            g.setAttribute('transform', `translate(${new_tx}, ${new_ty}) scale(${targetScale})`)
+            setTimeout(() => { g.style.transition = '' }, 300)
+
+            const zoomState = (svg as any).__zoom
+            if (zoomState) {
+                zoomState.x = new_tx
+                zoomState.y = new_ty
+                zoomState.k = targetScale
             }
         }
     }, [])
 
     // Helper to visually update focus
-    const updateFocusRing = useCallback((targetG: SVGGElement | null) => {
+    const updateFocusRing = useCallback((targetG: SVGGElement | null, forceCenter = false) => {
         if (!svgRef.current) return
         svgRef.current.querySelectorAll('.mindmap-node-kb-focus').forEach(el => el.classList.remove('mindmap-node-kb-focus'))
         focusedGRef.current = targetG
         if (targetG) {
             targetG.classList.add('mindmap-node-kb-focus')
-            panToNode(targetG)
+            panToNode(targetG, forceCenter)
         }
     }, [panToNode])
 
@@ -156,7 +206,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                 return allG().find(g => (g as any).__data__ === nodeData)
             }
 
-            if (e.key === ' ' || e.key === 'Enter') {
+            if (e.key === ' ') {
                 // Toggle expand/collapse
                 const circle = currentG.querySelector('circle') as SVGCircleElement | null
                 if (circle) circle.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
@@ -164,15 +214,21 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                 setTimeout(() => {
                     // Re-find by matching the same __data__ object reference
                     const newG = findGForNode(currentNode)
-                    if (newG) updateFocusRing(newG)
+                    if (newG) updateFocusRing(newG) // Default fast pan
                 }, 400)
                 return
             }
 
+            if (e.key === 'Enter') {
+                // Force center and zoom on current node instead of toggling
+                updateFocusRing(currentG, true)
+                return
+            }
+
             if (e.key === 'ArrowRight') {
-                const childList = (currentNode.children?.length > 0) ? currentNode.children : 
-                                  (currentNode._children?.length > 0) ? currentNode._children : null
-                
+                const childList = (currentNode.children?.length > 0) ? currentNode.children :
+                    (currentNode._children?.length > 0) ? currentNode._children : null
+
                 if (childList) {
                     const firstChild = childList[0]
                     const childG = findGForNode(firstChild)
@@ -183,7 +239,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                         // Has children, but not rendered -> collapsed. Expand it first.
                         const circle = currentG.querySelector('circle') as SVGCircleElement | null
                         if (circle) circle.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
-                        
+
                         // Wait for DOM to update, then navigate to the first child
                         setTimeout(() => {
                             const newChildG = findGForNode(firstChild)
@@ -205,7 +261,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                 while (true) {
                     const parentG = findParentG(targetData)
                     if (!parentG) break // Reached root, nowhere else to go
-                    
+
                     const parentNode = (parentG as any).__data__
                     if (!parentNode?.children) break
 
@@ -214,7 +270,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                     if (idx === -1) break
 
                     const nextIdx = isDown ? idx + 1 : idx - 1
-                    
+
                     if (nextIdx >= 0 && nextIdx < siblings.length) {
                         // Found a valid sibling (or uncle)
                         const nextG = findGForNode(siblings[nextIdx])
