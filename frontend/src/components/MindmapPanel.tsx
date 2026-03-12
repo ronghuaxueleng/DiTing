@@ -230,6 +230,7 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                     (currentNode._children?.length > 0) ? currentNode._children : null
 
                 if (childList) {
+                    // HAS CHILDREN: Go deeper
                     const firstChild = childList[0]
                     const childG = findGForNode(firstChild)
                     if (childG) {
@@ -245,6 +246,29 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
                             const newChildG = findGForNode(firstChild)
                             if (newChildG) updateFocusRing(newChildG)
                         }, 400)
+                    }
+                } else {
+                    // LEAF NODE: Simulate DFS by moving to the next sibling, or parent's next sibling, etc.
+                    let targetData = currentNode
+                    while (true) {
+                        const parentG = findParentG(targetData)
+                        if (!parentG) break // Reached root, nowhere else to go
+
+                        const parentNode = (parentG as any).__data__
+                        if (!parentNode?.children) break // Shouldn't happen if parent exists
+
+                        const siblings = parentNode.children as any[]
+                        const idx = siblings.indexOf(targetData)
+                        if (idx !== -1 && idx + 1 < siblings.length) {
+                            // Found next sibling
+                            const nextSibling = siblings[idx + 1]
+                            const nextG = findGForNode(nextSibling)
+                            if (nextG) updateFocusRing(nextG)
+                            break
+                        } else {
+                            // Current node was the last child, so move up and look for parent's next sibling
+                            targetData = parentNode
+                        }
                     }
                 }
             }
