@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         DiTing Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.12.0
+// @version      0.12.1
 // @description  Add a transcription button to media videos to invoke local DiTing server.
 // @author       [Yamico (Lix)](https://github.com/Yamico)
 // @match        https://www.bilibili.com/video/*
 // @match        https://www.douyin.com/*
+// @match        https://www.youtube.com/*
+// @match        https://m.youtube.com/*
 // @icon         https://simpleicons.org/icons/javascript.svg
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
@@ -20,13 +22,32 @@
 (function () {
     'use strict';
 
+    // --- Trusted Types Policy (YouTube CSP Bypass) ---
+    // YouTube enforces Trusted Types which blocks innerHTML assignments.
+    // Create a default policy to allow our script's HTML injection to work.
+    if (typeof trustedTypes !== 'undefined' && trustedTypes.createPolicy) {
+        try {
+            trustedTypes.createPolicy('default', {
+                createHTML: (string) => string,
+                createScriptURL: (string) => string,
+                createScript: (string) => string,
+            });
+        } catch (e) {
+            // Policy 'default' may already exist — that's fine
+            console.log('[DiTing] Trusted Types policy already exists or failed:', e.message);
+        }
+    }
+
     // --- Configuration ---
-    const SCRIPT_VERSION = "0.12.0";
+    const SCRIPT_VERSION = "0.12.1";
     const BASE_URL = "http://127.0.0.1:5023";
     // API routes are now strictly typed on backend
     const API_ANALYZE = `${BASE_URL}/api/analyze`;
     const API_HISTORY = `${BASE_URL}/api/videos/segments`; // List segments (by video)
     const API_SEGMENT = `${BASE_URL}/api/segments`;       // Single segment (by ID)
+    const API_TRANSCRIBE_YOUTUBE = `${BASE_URL}/api/transcribe/youtube`;
+    const API_TRANSCRIBE_DOUYIN = `${BASE_URL}/api/transcribe/douyin`;
+    const API_TRANSCRIBE_BILIBILI = `${BASE_URL}/api/transcribe/bilibili`;
 
     // --- Defaults ---
     const defaultPrompts = [
@@ -678,6 +699,11 @@
                     <button class="sv-header-tab active" data-tab="general">${ICONS.settings} 常规</button>
                     <button class="sv-header-tab" data-tab="lyrics">${ICONS.music} 沉浸</button>
                 </div>
+                <!-- Site Badge -->
+                <span class="sv-site-badge">${location.hostname.includes('youtube.com') ? '▶ YT' :
+                location.hostname.includes('bilibili.com') ? 'BLB' :
+                    location.hostname.includes('douyin.com') ? 'DY' : '?'
+            }</span>
 
                 <!-- Window Controls -->
                 <div class="sv-controls" style="margin-left: 0;">
@@ -841,6 +867,12 @@
                 return;
             }
 
+            // On YouTube, only embed when on a watch page
+            if (location.hostname.includes('youtube.com') && !location.pathname.startsWith('/watch')) {
+                alert("嵌入展示仅在 YouTube 视频播放页支持");
+                return;
+            }
+
             if (targetState === isEmbedded) return; // No change
 
             if (targetState) {
@@ -861,7 +893,8 @@
 
                 // Fallback
                 if (!parentContainer) {
-                    const rightCols = ['.player-auxiliary-area', '.right-container', '#danmukuBox' /*, '[data-e2e="related-video"]'*/]; // Douyin Disabled
+                    const rightCols = ['.player-auxiliary-area', '.right-container', '#danmukuBox',
+                        '#secondary', '#related']; // YouTube right column
                     for (const sel of rightCols) {
                         const el = document.querySelector(sel);
                         if (el && el.offsetParent !== null) { parentContainer = el; break; }
@@ -990,7 +1023,13 @@
             // Often #playerWrap or #bilibili-player element has the layout height.
             // The video tag itself might be object-fit: contain.
             // Let's try the player container first.
-            const playerContainer = document.getElementById('bilibili-player') || document.getElementById('playerWrap') || video.parentElement;
+            const playerContainer =
+                document.getElementById('bilibili-player') ||
+                document.getElementById('playerWrap') ||
+                document.getElementById('movie_player') ||         // YouTube
+                document.getElementById('player-container') ||     // YouTube alt
+                document.getElementById('player-container-outer') || // YouTube alt
+                video.parentElement;
             const targetHeight = playerContainer.offsetHeight;
 
             // 2. Precise Alignment using BoundingRect
@@ -1024,7 +1063,9 @@
 
         function startHeightSync() {
             // 1. ResizeObserver on Player
-            const player = document.getElementById('bilibili-player') || document.getElementById('playerWrap') || document.querySelector('video');
+            const player = document.getElementById('bilibili-player') || document.getElementById('playerWrap') ||
+                document.getElementById('movie_player') || document.getElementById('player-container') || // YouTube
+                document.querySelector('video');
             if (player) {
                 heightSyncParams.observer = new ResizeObserver(() => updateEmbedHeight());
                 heightSyncParams.observer.observe(player);
@@ -1253,6 +1294,7 @@
 
     function updateQualityOptions() {
         const isDouyin = location.hostname.includes('douyin.com');
+        const isYouTube = location.hostname.includes('youtube.com');
         const qSelect = document.getElementById('sv-quality');
         if (!qSelect) return;
 
@@ -1877,12 +1919,12 @@
 
         if (language && language !== 'auto') body.language = language;
 
-        // Scraping Metadata
+        // Scraping Metadata (Bilibili defaults — will be overridden by platform-specific blocks)
         const titleEl = document.querySelector('h1.video-title') || document.querySelector('.video-info-title');
         if (titleEl) body.title = titleEl.textContent.trim();
         else body.title = document.title.replace('_哔哩哔哩_bilibili', '').trim();
 
-        // 1. Try __INITIAL_STATE__ (Best Quality)
+        // 1. Try __INITIAL_STATE__ (Bilibili, Best Quality)
         let cover = '';
         if (window.__INITIAL_STATE__ && window.__INITIAL_STATE__.videoData && window.__INITIAL_STATE__.videoData.pic) {
             cover = window.__INITIAL_STATE__.videoData.pic;
@@ -1905,8 +1947,6 @@
 
         if (startVal) body.range_start = parseFloat(startVal);
         if (endVal) body.range_end = parseFloat(endVal);
-
-
 
         // --- Douyin Logic ---
         // --- Douyin Logic ---
@@ -1939,6 +1979,24 @@
             }
         }
 
+        // --- YouTube Logic ---
+        if (location.hostname.includes('youtube.com')) {
+            body.source_type = 'youtube';
+            // Title: prefer the dedicated watch-metadata element, fall back to document.title
+            const ytTitleEl =
+                document.querySelector('yt-formatted-string.style-scope.ytd-watch-metadata') ||
+                document.querySelector('h1.ytd-watch-metadata yt-formatted-string') ||
+                document.querySelector('h1.title.ytd-video-primary-info-renderer');
+            body.title = ytTitleEl
+                ? ytTitleEl.textContent.trim()
+                : document.title.replace(' - YouTube', '').trim();
+            // Cover: og:image meta is always present and high-res on YouTube
+            const ytCoverEl = document.querySelector('meta[property="og:image"]');
+            if (ytCoverEl) body.cover = ytCoverEl.content;
+            // The full URL is all the backend needs; yt-dlp handles the rest
+            body.url = window.location.href;
+        }
+
         body.force_refresh = true;
 
         const contentBox = document.getElementById('sv-content');
@@ -1949,13 +2007,16 @@
         contentBox.innerHTML = `<div class="sv-loading"><div class="spinner"></div><br>${loadingText}</div>`;
         document.getElementById('sv-ai-result').style.display = 'none';
 
-        // Dynamic Endpoint Selection and Payload Fixes
-        let endpointUrl = `${BASE_URL}/api/transcribe/bilibili`;
+        // Dynamic Endpoint Selection
+        let endpointUrl = API_TRANSCRIBE_BILIBILI;
 
         if (location.hostname.includes('douyin.com')) {
-            endpointUrl = `${BASE_URL}/api/transcribe/douyin`;
+            endpointUrl = API_TRANSCRIBE_DOUYIN;
             // Douyin backend API requires the page URL explicitly
             body.url = window.location.href;
+        } else if (location.hostname.includes('youtube.com')) {
+            endpointUrl = API_TRANSCRIBE_YOUTUBE;
+            // body.url already set in YouTube Logic block above
         }
 
         GM_xmlhttpRequest({
@@ -2086,6 +2147,9 @@
                     newID = meta.bvid;
                 }
             } catch (e) { console.error("Metadata extraction failed in checkURL", e); }
+        } else if (location.hostname.includes('youtube.com')) {
+            const params = new URLSearchParams(window.location.search);
+            newID = params.get('v') || null;
         }
 
         if (newID !== currentSourceID) {
@@ -2422,6 +2486,89 @@
             // Start local poll for this button
             setInterval(checkDouyinStatus, 1000);
         }
+        // YouTube Logic (Floating Draggable Button)
+        else if (location.hostname.includes('youtube.com')) {
+            // Only show on watch pages
+            if (!location.pathname.startsWith('/watch')) return;
+
+            const btn = document.createElement('button');
+            btn.id = 'sensevoice-btn';
+            btn.innerHTML = '🎙️ 转写';
+
+            // Floating style (YouTube Red accent)
+            Object.assign(btn.style, {
+                position: 'fixed',
+                top: '80px',
+                right: '20px',
+                zIndex: '999999',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                background: '#ff0000',
+                color: '#fff',
+                border: '2px solid rgba(255,255,255,0.8)',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '14px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                transition: 'transform 0.1s',
+                userSelect: 'none'
+            });
+
+            // --- Drag Logic (same pattern as Douyin floating ball) ---
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+            let hasMoved = false;
+
+            btn.onmousedown = (e) => {
+                isDragging = true;
+                hasMoved = false;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = btn.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+                // Switch to left/top positioning for free movement
+                btn.style.right = 'auto';
+                btn.style.left = `${initialLeft}px`;
+                btn.style.top = `${initialTop}px`;
+                btn.style.cursor = 'grabbing';
+                e.preventDefault();
+            };
+
+            const onMouseMove = (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMoved = true;
+                btn.style.left = `${initialLeft + dx}px`;
+                btn.style.top = `${initialTop + dy}px`;
+            };
+
+            const onMouseUp = () => {
+                isDragging = false;
+                btn.style.cursor = 'pointer';
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+
+            // Hover Effect (only when not dragging)
+            btn.onmouseenter = () => { if (!isDragging) btn.style.transform = 'scale(1.05)'; };
+            btn.onmouseleave = () => { btn.style.transform = 'scale(1)'; };
+
+            // Click Action (only if not dragged)
+            btn.onclick = () => {
+                if (hasMoved) return;
+                const modal = document.getElementById('sensevoice-modal') || createUI();
+                if (!modal.parentNode) document.body.appendChild(modal);
+                const wasHidden = !modal.classList.contains('show');
+                modal.classList.add('show');
+                if (wasHidden) { checkURL(); fetchAndRenderHistory(); }
+            };
+
+            document.body.appendChild(btn);
+            console.log('[DiTing] YouTube draggable button injected');
+        }
     }
 
     // --- Douyin Logic ---
@@ -2722,7 +2869,7 @@
 
             GM_xmlhttpRequest({
                 method: "POST",
-                url: API_TRANSCRIBE,
+                url: API_TRANSCRIBE_DOUYIN,
                 data: JSON.stringify(body),
                 headers: { "Content-Type": "application/json" },
                 onload: function (res) {
@@ -2764,6 +2911,32 @@
         } else if (location.hostname.includes('douyin.com')) {
             initDouyin();
             setInterval(checkURL, 1500); // Poll for URL changes on Douyin
+        } else if (location.hostname.includes('youtube.com')) {
+            // YouTube is a heavy SPA — yt-navigate-finish fires on each page transition
+            const onYouTubeNavigate = () => {
+                console.log('[DiTing] YouTube navigation detected:', location.pathname);
+                // Remove stale button if not on a watch page
+                const oldBtn = document.getElementById('sensevoice-btn');
+                if (!location.pathname.startsWith('/watch')) {
+                    if (oldBtn) oldBtn.remove();
+                    return;
+                }
+                // Re-inject if needed
+                checkURL();
+                if (!document.getElementById('sensevoice-btn')) addButton();
+            };
+
+            // Listen for YouTube's SPA navigation event
+            document.addEventListener('yt-navigate-finish', onYouTubeNavigate);
+
+            // Also poll as fallback (yt-navigate-finish may not fire on initial load)
+            setInterval(checkURL, 2000);
+            setTimeout(addButton, 2000);
+            setInterval(() => {
+                if (location.pathname.startsWith('/watch') && !document.getElementById('sensevoice-btn')) {
+                    addButton();
+                }
+            }, 3000);
         }
     }
 

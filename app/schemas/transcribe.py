@@ -58,6 +58,9 @@ class TranscribeYouTubeRequest(BaseModel):
     bookmark_only: bool = Field(False, description="Save metadata only, do not trigger transcription")
     only_get_subtitles: bool = Field(False, description="Fail if subtitles are not available")
     force_transcription: bool = Field(False, description="Ignore subtitles and force ASR")
+    # Metadata (client-provided fallback when yt-dlp cannot fetch)
+    title: Optional[str] = Field(None, description="Video title (scraped from page)")
+    cover: Optional[str] = Field(None, description="Cover image URL (scraped from page)")
 
 
 class TranscribeNetworkRequest(BaseModel):

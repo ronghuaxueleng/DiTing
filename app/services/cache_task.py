@@ -88,22 +88,17 @@ async def process_cache_task(
                 media_quality_tag = quality # Preserve tag (best/medium/worst)
 
         elif source_type == 'youtube':
-            # Fetch metadata
-            info = get_youtube_info(url)
+            # Get proxy FIRST (needed for both metadata and download)
+            from app.db import get_system_config
+            proxy = get_system_config('proxy_url')
+
+            # Fetch metadata (with proxy)
+            info = get_youtube_info(url, proxy=proxy)
             if info:
                 cover = info.get('cover')
                 if cover and (cover.startswith('http') or cover.startswith('//')):
                     cover = await run_in_threadpool(download_and_cache_cover, cover)
                 upsert_video_meta(source_id, video_title=info.get('title'), video_cover=cover)
-
-            proxy = settings.PROXY_URL if hasattr(settings, 'PROXY_URL') else None
-            # Or get_system_config('proxy_url')? 
-            # Usually settings.PROXY_URL isn't dynamic. 
-            # Let's use get_system_config('proxy_url') compatible way if available.
-            # But let's assume valid proxy arg for now or None.
-            # Wait, app/services/transcription.py uses get_system_config('proxy_url').
-            from app.db import get_system_config
-            proxy = get_system_config('proxy_url')
 
             if quality == 'audio' or quality == 'audio_only':
                 # download_youtube_video(url, output_dir, proxy, task_id, check_cancel_func, progress_callback)

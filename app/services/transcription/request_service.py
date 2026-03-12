@@ -157,11 +157,18 @@ def prepare_youtube_transcription(request) -> dict:
     proxy = get_system_config('proxy_url')
     info = get_youtube_info(url, proxy=proxy)
 
+    # Priority: yt-dlp info > client-provided > hardcoded default
     title = f"YouTube {video_id}"
     cover = ""
     if info:
         title = info['title']
         cover = info['cover']
+    else:
+        # Fallback to client-provided metadata (from userscript DOM scraping)
+        if item.get("title"):
+            title = item["title"]
+        if item.get("cover"):
+            cover = item["cover"]
 
     return dict(
         source_id=video_id,
