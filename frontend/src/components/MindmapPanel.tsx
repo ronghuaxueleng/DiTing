@@ -170,13 +170,27 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
             }
 
             if (e.key === 'ArrowRight') {
-                // Go to first visible child
-                if (currentNode.children && currentNode.children.length > 0) {
-                    const firstChild = currentNode.children[0]
+                const childList = (currentNode.children?.length > 0) ? currentNode.children : 
+                                  (currentNode._children?.length > 0) ? currentNode._children : null
+                
+                if (childList) {
+                    const firstChild = childList[0]
                     const childG = findGForNode(firstChild)
-                    if (childG) updateFocusRing(childG)
+                    if (childG) {
+                        // Already expanded, go to first child
+                        updateFocusRing(childG)
+                    } else {
+                        // Has children, but not rendered -> collapsed. Expand it first.
+                        const circle = currentG.querySelector('circle') as SVGCircleElement | null
+                        if (circle) circle.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+                        
+                        // Wait for DOM to update, then navigate to the first child
+                        setTimeout(() => {
+                            const newChildG = findGForNode(firstChild)
+                            if (newChildG) updateFocusRing(newChildG)
+                        }, 400)
+                    }
                 }
-                // If no visible children, do nothing (collapsed or leaf)
             }
             else if (e.key === 'ArrowLeft') {
                 // Go to parent
