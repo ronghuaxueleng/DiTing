@@ -742,7 +742,7 @@
             "fileNotFound": "文件不存在"
         },
         "policy": {
-            "label": "缓存策略:",
+            "label": "缓存策略",
             "notCached": "未缓存",
             "keepForever": "永久保留",
             "custom": "保留至 {{date}}",

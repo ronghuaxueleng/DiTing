@@ -728,7 +728,7 @@
             "fileNotFound": "File not found"
         },
         "policy": {
-            "label": "Cache Policy:",
+            "label": "Cache Policy",
             "notCached": "Not Cached",
             "keepForever": "Keep Forever",
             "custom": "Keep until {{date}}",

@@ -435,6 +435,10 @@ body {
   border-color: transparent;
 }
 
+.note-btn-icon.active:hover {
+  background: var(--color-primary-hover);
+}
+
 .note-btn-primary {
   background: var(--color-primary);
   color: white;
@@ -442,6 +446,7 @@ body {
 }
 
 .note-btn-primary:hover {
+  background: var(--color-primary-hover);
   opacity: 0.9;
 }
 
@@ -462,6 +467,7 @@ body {
 }
 
 .note-btn-danger:hover {
+  background: var(--color-destructive, #dc2626);
   opacity: 0.9;
 }
 
