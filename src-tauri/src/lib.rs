@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
 use tauri::{
     AppHandle, Manager, RunEvent, State, WindowEvent,
     menu::{Menu, MenuItem},
@@ -9,10 +9,12 @@ use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 
 const SERVER_PORT: u16 = 5023;
+const SERVER_URL: &str = "http://127.0.0.1:5023/app/";
 const HEALTH_URL: &str = "http://127.0.0.1:5023/api/system/version";
 
 struct SidecarState {
     child: Mutex<Option<CommandChild>>,
+    server_ready: AtomicBool,
 }
 
 /// Check if this is the first run (no DB and no setup marker).
@@ -20,17 +22,31 @@ fn is_first_run(app: &AppHandle) -> bool {
     let data_dir = get_data_dir(app);
     let setup_marker = data_dir.join(".setup_done");
     let db_file = data_dir.join("db").join("diting_prod.db");
-    !setup_marker.exists() && !db_file.exists()
+    let result = !setup_marker.exists() && !db_file.exists();
+    println!("[tauri] is_first_run={result}, data_dir={}", data_dir.display());
+    result
 }
 
-/// Resolve the `data/` directory relative to the sidecar / project root.
+/// Resolve the `data/` directory.
+/// The sidecar uses a relative `data/` dir from its working directory.
+/// In production, the sidecar runs from the resource dir (next to the exe).
+/// In dev, it's the project root.
 fn get_data_dir(app: &AppHandle) -> PathBuf {
-    // In dev, data/ is at project root. In production, next to the executable.
-    let resource_dir = app
+    // Try resource dir first (production), fall back to cwd (dev)
+    let base = app
         .path()
         .resource_dir()
         .unwrap_or_else(|_| std::env::current_dir().unwrap());
-    resource_dir.join("data")
+    base.join("data")
+}
+
+/// Navigate the main window to the sidecar server URL.
+fn navigate_to_server(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.navigate(SERVER_URL.parse().unwrap());
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
 }
 
 /// Start the Python sidecar server.
@@ -101,12 +117,7 @@ fn mark_setup_done(app: AppHandle) -> Result<(), String> {
     std::fs::write(marker, "1").map_err(|e| e.to_string())?;
 
     // Show main window pointing to sidecar
-    if let Some(w) = app.get_webview_window("main") {
-        let url = format!("http://127.0.0.1:{SERVER_PORT}/app/");
-        let _ = w.navigate(url.parse().unwrap());
-        let _ = w.show();
-        let _ = w.set_focus();
-    }
+    navigate_to_server(&app);
     Ok(())
 }
 
@@ -141,6 +152,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(SidecarState {
             child: Mutex::new(None),
+            server_ready: AtomicBool::new(false),
         })
         .invoke_handler(tauri::generate_handler![
             check_first_run,
@@ -164,10 +176,7 @@ pub fn run() {
                 .on_menu_event(move |app_handle, event| {
                     match event.id().as_ref() {
                         "open" => {
-                            if let Some(w) = app_handle.get_webview_window("main") {
-                                let _ = w.show();
-                                let _ = w.set_focus();
-                            }
+                            navigate_to_server(app_handle);
                         }
                         "restart" => {
                             let state: State<SidecarState> = app_handle.state();
@@ -194,48 +203,47 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
+                        navigate_to_server(app);
                     }
                 })
                 .build(app)?;
 
             // ── Spawn Sidecar ──
-            let sidecar_child = spawn_sidecar(&handle)
-                .map_err(|e| Box::<dyn std::error::Error>::from(e))?;
-            {
-                let state: State<SidecarState> = handle.state();
-                let mut guard = state.child.lock().unwrap();
-                *guard = Some(sidecar_child);
+            match spawn_sidecar(&handle) {
+                Ok(sidecar_child) => {
+                    let state: State<SidecarState> = handle.state();
+                    let mut guard = state.child.lock().unwrap();
+                    *guard = Some(sidecar_child);
+                    println!("[tauri] Sidecar started");
+                }
+                Err(e) => {
+                    eprintln!("[tauri] Sidecar not available: {e}");
+                    eprintln!("[tauri] Running in dev mode — make sure the Python server is started manually");
+                }
             }
 
             // ── Wait for server, then show appropriate window ──
             let setup_handle = handle.clone();
             tauri::async_runtime::spawn(async move {
                 let ready = wait_for_server_ready(30).await;
-                if !ready {
+                if ready {
+                    println!("[tauri] Server is ready");
+                    let state: State<SidecarState> = setup_handle.state();
+                    state.server_ready.store(true, Ordering::Relaxed);
+                } else {
                     eprintln!("[tauri] Server did not become ready in 30s");
                 }
 
                 let first_run = is_first_run(&setup_handle);
-                if first_run {
-                    // Show wizard window
+                if first_run && ready {
+                    // Show wizard window for first-time setup
                     if let Some(w) = setup_handle.get_webview_window("wizard") {
                         let _ = w.show();
                         let _ = w.set_focus();
                     }
                 } else {
-                    // Navigate main window to sidecar URL and show
-                    if let Some(w) = setup_handle.get_webview_window("main") {
-                        if ready {
-                            let url = format!("http://127.0.0.1:{SERVER_PORT}/app/");
-                            let _ = w.navigate(url.parse().unwrap());
-                        }
-                        let _ = w.show();
-                        let _ = w.set_focus();
-                    }
+                    // Navigate main window to sidecar and show
+                    navigate_to_server(&setup_handle);
                 }
             });
 

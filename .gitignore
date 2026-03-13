@@ -37,3 +37,4 @@ src-tauri/target/
 src-tauri/binaries/
 src-tauri/icons/*.ico
 src-tauri/icons/*.icns
+/package-lock.json

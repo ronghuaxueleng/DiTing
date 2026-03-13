@@ -2,7 +2,7 @@
 Build the DiTing server as a PyInstaller sidecar for Tauri.
 
 Usage:
-    python scripts/build_sidecar.py
+    uv run python scripts/build_sidecar.py
 
 Output:
     src-tauri/binaries/diting-server-{target-triple}[.exe]
@@ -17,6 +17,19 @@ import sys
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST_DIR = os.path.join(PROJECT_ROOT, "build", "sidecar")
 BINARIES_DIR = os.path.join(PROJECT_ROOT, "src-tauri", "binaries")
+
+
+def get_venv_python() -> str:
+    """Find the project venv Python. Prefer .venv in project root."""
+    if sys.prefix != sys.base_prefix:
+        # Already running inside a venv
+        return sys.executable
+    venv_python = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe") \
+        if platform.system() == "Windows" \
+        else os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
+    if os.path.exists(venv_python):
+        return venv_python
+    return sys.executable
 
 
 def get_target_triple() -> str:
@@ -50,10 +63,34 @@ def build():
     if not os.path.exists(frontend_dist):
         print("[build_sidecar] Warning: frontend/dist not found. Run 'npm run build' in frontend/ first.")
 
-    # PyInstaller command
+    # PyInstaller command — use project venv Python
     entry = os.path.join(PROJECT_ROOT, "app", "server.py")
+    python = get_venv_python()
+    print(f"[build_sidecar] Python: {python}")
+
+    # ML / ASR Worker packages — not needed by the web server sidecar
+    exclude_modules = [
+        # PyTorch ecosystem (~4GB)
+        "torch", "torchaudio", "torchvision",
+        # ASR engines
+        "funasr", "modelscope", "paraformer_onnx",
+        # Audio separation (UVR)
+        "audio_separator",
+        # Heavy scientific / ML libs
+        "numpy", "scipy", "pandas", "sklearn", "scikit_learn",
+        "onnx", "onnxruntime", "onnxconverter_common",
+        "librosa", "soundfile", "audioread",
+        # Plotting / notebook (pulled by transitive deps)
+        "matplotlib", "IPython", "notebook", "jupyter",
+        # Other large optional deps
+        "transformers", "huggingface_hub", "safetensors", "tokenizers",
+        "tensorflow", "tensorboard", "keras",
+        # Desktop tray (not needed in Tauri mode)
+        "pystray",
+    ]
+
     cmd = [
-        sys.executable, "-m", "PyInstaller",
+        python, "-m", "PyInstaller",
         "--onefile",
         "--name", "diting-server",
         "--distpath", DIST_DIR,
@@ -62,6 +99,9 @@ def build():
         "--noconfirm",
         "--clean",
     ]
+
+    for mod in exclude_modules:
+        cmd.extend(["--exclude-module", mod])
 
     # Add data files
     sep = ";" if platform.system() == "Windows" else ":"
