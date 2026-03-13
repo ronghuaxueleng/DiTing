@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocale } from './i18n'
 import WelcomeStep from './steps/WelcomeStep'
 import ASRWorkerStep from './steps/ASRWorkerStep'
 import LLMSetupStep from './steps/LLMSetupStep'
@@ -9,6 +10,7 @@ type Step = typeof STEPS[number]
 
 export default function WizardApp() {
     const [step, setStep] = useState<Step>('welcome')
+    const { locale, setLocale } = useLocale()
 
     const currentIndex = STEPS.indexOf(step)
     const goNext = () => {
@@ -22,19 +24,32 @@ export default function WizardApp() {
         }
     }
 
+    const toggleLocale = () => {
+        setLocale(locale === 'zh' ? 'en' : 'zh')
+    }
+
     return (
         <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg)', color: 'var(--color-text)' }}>
-            {/* Progress bar */}
-            <div className="flex gap-1 px-6 pt-5">
-                {STEPS.map((s, i) => (
-                    <div
-                        key={s}
-                        className="h-1 flex-1 rounded-full transition-colors duration-300"
-                        style={{
-                            background: i <= currentIndex ? 'var(--color-primary)' : 'var(--color-border)',
-                        }}
-                    />
-                ))}
+            {/* Top bar: progress + language toggle */}
+            <div className="flex items-center gap-3 px-6 pt-5">
+                <div className="flex gap-1 flex-1">
+                    {STEPS.map((s, i) => (
+                        <div
+                            key={s}
+                            className="h-1 flex-1 rounded-full transition-colors duration-300"
+                            style={{
+                                background: i <= currentIndex ? 'var(--color-primary)' : 'var(--color-border)',
+                            }}
+                        />
+                    ))}
+                </div>
+                <button
+                    onClick={toggleLocale}
+                    className="text-xs px-2 py-1 rounded border transition-colors shrink-0"
+                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
+                >
+                    {locale === 'zh' ? 'EN' : '中文'}
+                </button>
             </div>
 
             {/* Step content */}

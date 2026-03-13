@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocale } from '../i18n'
 
 interface Props {
     onNext: () => void
@@ -8,6 +9,7 @@ interface Props {
 const API_BASE = '/api'
 
 export default function LLMSetupStep({ onNext, onBack }: Props) {
+    const { t } = useLocale()
     const [name, setName] = useState('')
     const [baseUrl, setBaseUrl] = useState('')
     const [apiKey, setApiKey] = useState('')
@@ -27,10 +29,10 @@ export default function LLMSetupStep({ onNext, onBack }: Props) {
             })
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
             setSuccess(true)
-            setMessage('LLM provider saved!')
+            setMessage(t('llm.saved'))
         } catch (e) {
             setSuccess(false)
-            setMessage(`Failed: ${e instanceof Error ? e.message : 'Unknown error'}`)
+            setMessage(`${t('common.failed')}${e instanceof Error ? e.message : 'Unknown error'}`)
         } finally {
             setSaving(false)
         }
@@ -39,9 +41,9 @@ export default function LLMSetupStep({ onNext, onBack }: Props) {
     return (
         <div className="flex flex-col gap-5">
             <div>
-                <h2 className="text-lg font-bold">LLM Configuration (Optional)</h2>
+                <h2 className="text-lg font-bold">{t('llm.title')}</h2>
                 <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    Add an OpenAI-compatible LLM provider for AI analysis. You can skip this and configure it later.
+                    {t('llm.desc')}
                 </p>
             </div>
 
@@ -50,7 +52,7 @@ export default function LLMSetupStep({ onNext, onBack }: Props) {
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="Provider name (e.g. OpenAI)"
+                    placeholder={t('llm.name')}
                     className="px-3 py-2 rounded-lg text-sm border outline-none"
                     style={{ background: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
                 />
@@ -58,7 +60,7 @@ export default function LLMSetupStep({ onNext, onBack }: Props) {
                     type="text"
                     value={baseUrl}
                     onChange={e => setBaseUrl(e.target.value)}
-                    placeholder="Base URL (e.g. https://api.openai.com/v1)"
+                    placeholder={t('llm.baseUrl')}
                     className="px-3 py-2 rounded-lg text-sm border outline-none"
                     style={{ background: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
                 />
@@ -66,7 +68,7 @@ export default function LLMSetupStep({ onNext, onBack }: Props) {
                     type="password"
                     value={apiKey}
                     onChange={e => setApiKey(e.target.value)}
-                    placeholder="API Key"
+                    placeholder={t('llm.apiKey')}
                     className="px-3 py-2 rounded-lg text-sm border outline-none"
                     style={{ background: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
                 />
@@ -77,7 +79,7 @@ export default function LLMSetupStep({ onNext, onBack }: Props) {
                     className="self-start px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-colors"
                     style={{ background: 'var(--color-primary)' }}
                 >
-                    {saving ? 'Saving...' : 'Save Provider'}
+                    {saving ? t('llm.saving') : t('llm.save')}
                 </button>
 
                 {message && (
@@ -93,14 +95,14 @@ export default function LLMSetupStep({ onNext, onBack }: Props) {
                     className="px-4 py-2 rounded-lg text-sm border transition-colors"
                     style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
                 >
-                    Back
+                    {t('common.back')}
                 </button>
                 <button
                     onClick={onNext}
                     className="px-5 py-2 rounded-lg text-sm font-medium text-white transition-colors"
                     style={{ background: 'var(--color-primary)' }}
                 >
-                    {success ? 'Next' : 'Skip'}
+                    {success ? t('common.next') : t('common.skip')}
                 </button>
             </div>
         </div>
