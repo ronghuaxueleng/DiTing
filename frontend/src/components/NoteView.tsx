@@ -470,7 +470,7 @@ function GeneratePanel({
 }
 
 // ---- Main Component ----
-export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap, onOpenDetail, scrollToHeadingRef, onActiveHeadingChange }: NoteViewProps) {
+export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap: _onOpenMindmap, onOpenDetail, scrollToHeadingRef, onActiveHeadingChange }: NoteViewProps) {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
@@ -1218,16 +1218,6 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                                 title={t('detail.aiNotes.exportMd')}>
                                 <Icons.Download />
                             </button>
-                            {/* Mindmap quick-open */}
-                            {onOpenMindmap && (
-                                <button
-                                    className="note-btn note-btn-icon"
-                                    onClick={onOpenMindmap}
-                                    title={t('detail.aiNotes.mindmap', '思维导图')}
-                                >
-                                    <Icons.GitBranch />
-                                </button>
-                            )}
                             {/* Toggle screenshots visibility */}
                             <button
                                 className={`note-btn note-btn-icon ${hideScreenshots ? 'active' : ''}`}
