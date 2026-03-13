@@ -344,7 +344,12 @@ async def generate_note(request: NoteGenerateRequest, background_tasks: Backgrou
     task_id = -int(time.time() * 1000) % 1000000000
     task_manager.start_task(task_id, meta={
         "type": "ai",
-        "filename": f"Note: {source_id}"
+        "filename": f"Note: {source_id}",
+        "prompt": request.prompt,
+        "style": request.style,
+        "screenshot_density": request.screenshot_density,
+        "transcription_version": request.transcription_version,
+        "llm_model_id": request.llm_model_id,
     })
 
     trace_id = trace_id_ctx.get()

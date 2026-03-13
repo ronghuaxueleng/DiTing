@@ -228,99 +228,167 @@ function GeneratePanel({
     setShowGenStages: (v: boolean) => void
 }) {
     const { t } = useTranslation()
+    const [showGenConfig, setShowGenConfig] = useState(false)
+    const displayPrompt = activeTask?.meta?.prompt ?? customPrompt
+    const displayStyle = activeTask?.meta?.style ?? style
+    const displayDensity = activeTask?.meta?.screenshot_density ?? screenshotDensity
+    const displayModelId = activeTask?.meta?.llm_model_id ?? selectedModelId
+    const displayTransVersion = activeTask?.meta?.transcription_version ?? selectedTransVersion
+
+    const displayModelName = useMemo(() => {
+        if (!displayModelId) return ''
+        for (const p of providers) {
+            const m = p.models.find(mod => mod.id === displayModelId)
+            if (m) return m.model_name
+        }
+        return ''
+    }, [displayModelId, providers])
+
     return (
         <div className="note-gen-panel">
-            <div className="note-gen-panel-body">
-                {/* Style selector */}
-                <div className="note-gen-field">
-                    <label className="note-gen-label">{t('detail.aiNotes.style')}</label>
-                    <div className="note-gen-segmented">
-                        {(['concise', 'detailed', 'outline'] as const).map(s => (
-                            <button
-                                key={s}
-                                className={`note-gen-seg-btn ${style === s ? 'active' : ''}`}
-                                onClick={() => setStyle(s)}
-                            >
-                                {t(`detail.aiNotes.style${s.charAt(0).toUpperCase() + s.slice(1)}`)}
-                            </button>
-                        ))}
+            {!activeTask && (
+                <div className="note-gen-panel-body">
+                    {/* Style selector */}
+                    <div className="note-gen-field">
+                        <label className="note-gen-label">{t('detail.aiNotes.style')}</label>
+                        <div className="note-gen-segmented">
+                            {(['concise', 'detailed', 'outline'] as const).map(s => (
+                                <button
+                                    key={s}
+                                    className={`note-gen-seg-btn ${style === s ? 'active' : ''}`}
+                                    onClick={() => setStyle(s)}
+                                >
+                                    {t(`detail.aiNotes.style${s.charAt(0).toUpperCase() + s.slice(1)}`)}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
 
-                {/* Model selector */}
-                <div className="note-gen-field">
-                    <label className="note-gen-label">{t('detail.aiNotes.model')}</label>
-                    <select
-                        className="note-gen-select"
-                        value={selectedModelId}
-                        onChange={e => setSelectedModelId(e.target.value ? Number(e.target.value) : '')}
-                    >
-                        <option value="">{t('detail.aiNotes.defaultModel')}</option>
-                        {providers.map(p => (
-                            <optgroup key={p.id} label={p.name}>
-                                {p.models?.map(m => (
-                                    <option key={m.id} value={m.id}>{m.model_name}</option>
-                                ))}
+                    {/* Model selector */}
+                    <div className="note-gen-field">
+                        <label className="note-gen-label">{t('detail.aiNotes.model')}</label>
+                        <select
+                            className="note-gen-select"
+                            value={selectedModelId}
+                            onChange={e => setSelectedModelId(e.target.value ? Number(e.target.value) : '')}
+                        >
+                            <option value="">{t('detail.aiNotes.defaultModel')}</option>
+                            {providers.map(p => (
+                                <optgroup key={p.id} label={p.name}>
+                                    {p.models?.map(m => (
+                                        <option key={m.id} value={m.id}>{m.model_name}</option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Transcription source selector (Always visible) */}
+                    <div className="note-gen-field">
+                        <label className="note-gen-label">{t('detail.aiNotes.transSource')}</label>
+                        <select
+                            className="note-gen-select"
+                            value={selectedTransVersion}
+                            onChange={e => setSelectedTransVersion(e.target.value)}
+                        >
+                            <option value="__all__">{t('detail.aiNotes.transSourceAllConcat', { count: segments.length })}</option>
+                            <optgroup label={t('detail.aiNotes.transSourceSegments')}>
+                                {segments.map((seg, idx) => {
+                                    const timeStr = new Date(seg.timestamp).toLocaleString()
+                                    const badge = seg.asr_model ? `[${seg.asr_model}]` : ''
+                                    const pinnedStr = seg.is_pinned ? `(${t('detail.aiNotes.transSourcePinned')})` : ''
+                                    const label = `Segment ${idx + 1} - ${timeStr} ${badge} ${pinnedStr}`.trim()
+                                    return (
+                                        <option key={seg.id} value={seg.asr_model || String(seg.id)}>{label}</option>
+                                    )
+                                })}
                             </optgroup>
-                        ))}
-                    </select>
-                </div>
+                        </select>
+                    </div>
 
-                {/* Transcription source selector (Always visible) */}
-                <div className="note-gen-field">
-                    <label className="note-gen-label">{t('detail.aiNotes.transSource')}</label>
-                    <select
-                        className="note-gen-select"
-                        value={selectedTransVersion}
-                        onChange={e => setSelectedTransVersion(e.target.value)}
-                    >
-                        <option value="__all__">{t('detail.aiNotes.transSourceAllConcat', { count: segments.length })}</option>
-                        <optgroup label={t('detail.aiNotes.transSourceSegments')}>
-                            {segments.map((seg, idx) => {
-                                const timeStr = new Date(seg.timestamp).toLocaleString()
-                                const badge = seg.asr_model ? `[${seg.asr_model}]` : ''
-                                const pinnedStr = seg.is_pinned ? `(${t('detail.aiNotes.transSourcePinned')})` : ''
-                                const label = `Segment ${idx + 1} - ${timeStr} ${badge} ${pinnedStr}`.trim()
-                                return (
-                                    <option key={seg.id} value={seg.asr_model || String(seg.id)}>{label}</option>
-                                )
-                            })}
-                        </optgroup>
-                    </select>
-                </div>
+                    {/* Screenshot density */}
+                    <div className="note-gen-field">
+                        <label className="note-gen-label">{t('detail.aiNotes.screenshots')}</label>
+                        <div className="note-gen-segmented">
+                            {(['', 'few', 'moderate', 'dense'] as const).map(d => (
+                                <button
+                                    key={d}
+                                    className={`note-gen-seg-btn ${screenshotDensity === d ? 'active' : ''}`}
+                                    onClick={() => setScreenshotDensity(d)}
+                                >
+                                    {t(`detail.aiNotes.density${d ? d.charAt(0).toUpperCase() + d.slice(1) : 'Off'}`)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
-                {/* Screenshot density */}
-                <div className="note-gen-field">
-                    <label className="note-gen-label">{t('detail.aiNotes.screenshots')}</label>
-                    <div className="note-gen-segmented">
-                        {(['', 'few', 'moderate', 'dense'] as const).map(d => (
-                            <button
-                                key={d}
-                                className={`note-gen-seg-btn ${screenshotDensity === d ? 'active' : ''}`}
-                                onClick={() => setScreenshotDensity(d)}
-                            >
-                                {t(`detail.aiNotes.density${d ? d.charAt(0).toUpperCase() + d.slice(1) : 'Off'}`)}
-                            </button>
-                        ))}
+                    {/* Additional instructions */}
+                    <div className="note-gen-field" style={{ flexBasis: '100%' }}>
+                        <label className="note-gen-label">{t('detail.aiNotes.customPrompt')}</label>
+                        <textarea
+                            className="note-gen-textarea"
+                            value={customPrompt}
+                            onChange={e => setCustomPrompt(e.target.value)}
+                            placeholder={t('detail.aiNotes.customPromptPlaceholder')}
+                            rows={2}
+                        />
                     </div>
                 </div>
-
-                {/* Additional instructions */}
-                <div className="note-gen-field" style={{ flexBasis: '100%' }}>
-                    <label className="note-gen-label">{t('detail.aiNotes.customPrompt')}</label>
-                    <textarea
-                        className="note-gen-textarea"
-                        value={customPrompt}
-                        onChange={e => setCustomPrompt(e.target.value)}
-                        placeholder={t('detail.aiNotes.customPromptPlaceholder')}
-                        rows={2}
-                    />
-                </div>
-            </div>
-            <div className="note-gen-panel-footer">
+            )}
+            <div 
+                className={`note-gen-panel-footer`}
+                style={activeTask ? { marginTop: 0, paddingTop: 0, borderTop: 'none' } : undefined}
+            >
                 {activeTask ? (
                     /* ---- Progress view ---- */
-                    <div className="note-gen-progress">
+                    <div className="note-gen-progress w-full">
+                        {/* Config Summary View */}
+                        <div className="mb-4 bg-[var(--color-bg-subtle)] rounded-lg text-xs border border-[var(--color-border)] shadow-inner overflow-hidden">
+                            <button
+                                className="w-full flex items-center justify-between p-2.5 hover:bg-[var(--color-hover-bg)] transition-colors"
+                                onClick={() => setShowGenConfig(!showGenConfig)}
+                            >
+                                <span className="font-medium text-[var(--color-text-muted)] flex items-center gap-1.5">
+                                    <Icons.Settings className="w-3.5 h-3.5" />
+                                    {t('detail.aiNotes.genParams', '生成参数')}
+                                </span>
+                                <Icons.ChevronDown className={`w-3.5 h-3.5 text-[var(--color-text-muted)] transition-transform ${showGenConfig ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {showGenConfig && (
+                                <div className="p-3 pt-0 flex flex-col gap-2 border-t border-[var(--color-border)] mt-1">
+                                    {displayPrompt && (
+                                        <div className="flex gap-2 items-start text-opacity-80 pb-2 border-b border-[var(--color-border)]">
+                                            <Icons.MessageSquare className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--color-primary)]" />
+                                            <span className="break-all whitespace-pre-wrap">{displayPrompt}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex flex-wrap gap-x-4 gap-y-2 text-[11px] opacity-80 mt-1">
+                                        <span className="flex items-center gap-1.5">
+                                            <Icons.List className="w-3 h-3 text-[var(--color-primary)] opacity-70" />
+                                            {t(`detail.aiNotes.style${displayStyle.charAt(0).toUpperCase() + displayStyle.slice(1)}`)}
+                                        </span>
+                                        {displayDensity && (
+                                            <span className="flex items-center gap-1.5">
+                                                <Icons.Camera className="w-3 h-3 text-[var(--color-primary)] opacity-70" />
+                                                {t(`detail.aiNotes.density${displayDensity.charAt(0).toUpperCase() + displayDensity.slice(1)}`)}
+                                            </span>
+                                        )}
+                                        {displayTransVersion && (
+                                            <span className="flex items-center gap-1.5" title={displayTransVersion}>
+                                                <Icons.FileText className="w-3 h-3 text-[var(--color-primary)] opacity-70" />
+                                                {displayTransVersion === '__all__' ? t('detail.aiNotes.transSourceAllConcat', { count: segments.length }).split(' ')[0] : 'Segment'}
+                                            </span>
+                                        )}
+                                        <span className="flex items-center gap-1.5">
+                                            <Icons.Cpu className="w-3 h-3 text-[var(--color-primary)] opacity-70" />
+                                            {displayModelName || t('detail.aiNotes.defaultModel')}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div 
                             className="note-gen-progress-bar-wrap cursor-pointer group" 
                             onClick={() => setShowGenStages(!showGenStages)}
@@ -1198,14 +1266,28 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                                 </button>
                             )}
                             {/* Regenerate → opens config panel */}
-                            <button
-                                className={`note-btn note-btn-primary ${showGenPanel ? 'active' : ''}`}
-                                onClick={() => setShowGenPanel(v => !v)}
-                            >
-                                <Icons.Refresh />
-                                {t('detail.aiNotes.regenerate')}
-                            </button>
+                            {!activeTask && (
+                                <button
+                                    className={`note-btn note-btn-primary ${showGenPanel ? 'active' : ''}`}
+                                    onClick={() => setShowGenPanel(v => !v)}
+                                >
+                                    <Icons.Refresh />
+                                    {t('detail.aiNotes.regenerate')}
+                                </button>
+                            )}
                         </>
+                    )}
+
+                    {/* Active task toggle button (shows in all modes if generating) */}
+                    {activeTask && (
+                        <button
+                            className={`note-btn note-btn-primary ${showGenPanel ? 'active' : ''} animate-pulse`}
+                            onClick={() => setShowGenPanel(v => !v)}
+                        >
+                            <Icons.Loader className="animate-spin w-4 h-4" />
+                            <span className="max-w-[100px] truncate">{activeTask.message || t('detail.aiNotes.generating')}</span>
+                            <Icons.ChevronDown className={`w-3.5 h-3.5 transition-transform ${showGenPanel ? 'rotate-180' : ''}`} />
+                        </button>
                     )}
 
                     {activeNote && isEditing && (
@@ -1231,7 +1313,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                         </>
                     )}
 
-                    {!activeNote && (
+                    {!activeNote && !activeTask && (
                         /* Generate button → opens config panel */
                         <button
                             className={`note-btn note-btn-primary ${showGenPanel ? 'active' : ''}`}
@@ -1244,7 +1326,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
             </div>
 
             {/* ---- GENERATE CONFIG PANEL ---- */}
-            {(showGenPanel || pendingTaskId !== null) && (
+            {showGenPanel && (
                 <GeneratePanel
                     style={style}
                     setStyle={setStyle}
