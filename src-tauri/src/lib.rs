@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use tauri::{
     AppHandle, Manager, RunEvent, State, WindowEvent,
     menu::{Menu, MenuItem},
@@ -8,18 +10,19 @@ use tauri::{
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 
-const SERVER_PORT: u16 = 5023;
 const SERVER_URL: &str = "http://127.0.0.1:5023/app/";
+const WIZARD_URL: &str = "http://127.0.0.1:5023/app/wizard.html";
 const HEALTH_URL: &str = "http://127.0.0.1:5023/api/system/version";
 
 struct SidecarState {
     child: Mutex<Option<CommandChild>>,
+    child_pid: Mutex<Option<u32>>,
     server_ready: AtomicBool,
+    exiting: AtomicBool,
 }
 
 /// Check if this is the first run (no DB and no setup marker).
-fn is_first_run(app: &AppHandle) -> bool {
-    let data_dir = get_data_dir(app);
+fn is_first_run(data_dir: &PathBuf) -> bool {
     let setup_marker = data_dir.join(".setup_done");
     let db_file = data_dir.join("db").join("diting_prod.db");
     let result = !setup_marker.exists() && !db_file.exists();
@@ -28,11 +31,7 @@ fn is_first_run(app: &AppHandle) -> bool {
 }
 
 /// Resolve the `data/` directory.
-/// The sidecar uses a relative `data/` dir from its working directory.
-/// In production, the sidecar runs from the resource dir (next to the exe).
-/// In dev, it's the project root.
 fn get_data_dir(app: &AppHandle) -> PathBuf {
-    // Try resource dir first (production), fall back to cwd (dev)
     let base = app
         .path()
         .resource_dir()
@@ -49,36 +48,38 @@ fn navigate_to_server(app: &AppHandle) {
     }
 }
 
-/// Kill the sidecar process. Also sends shutdown request to the HTTP server.
+/// Kill the sidecar process tree.
 fn kill_sidecar(app: &AppHandle) {
-    // Try graceful shutdown via HTTP first
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(2))
-        .build();
-    if let Ok(c) = client {
-        let _ = c.post("http://127.0.0.1:5023/api/system/shutdown").send();
-    }
-    // Then kill the process handle
     let state: State<SidecarState> = app.state();
+    // First: kill the entire process tree via taskkill while parent-child relationship is intact
+    // Must run BEFORE child.kill() — otherwise the wrapper dies and orphans the Python process
+    #[cfg(windows)]
+    if let Ok(guard) = state.child_pid.lock() {
+        if let Some(pid) = *guard {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .status(); // blocks until taskkill finishes
+        }
+    };
+    // Fallback: also kill via Tauri handle in case taskkill missed it
     if let Ok(mut guard) = state.child.lock() {
         if let Some(child) = guard.take() {
             let _ = child.kill();
         }
     };
 }
-
 /// Start the Python sidecar server.
-fn spawn_sidecar(app: &AppHandle) -> Result<CommandChild, String> {
+fn spawn_sidecar(app: &AppHandle) -> Result<(CommandChild, u32), String> {
     let shell = app.shell();
     let cmd = shell
         .sidecar("diting-server")
         .map_err(|e| format!("Failed to create sidecar command: {e}"))?
-        .args(["--host", "127.0.0.1", "--port", &SERVER_PORT.to_string()]);
+        .args(["--host", "127.0.0.1", "--port", "5023"]);
 
     let (mut rx, child) = cmd.spawn().map_err(|e| format!("Failed to spawn sidecar: {e}"))?;
+    let pid = child.pid();
 
-    // Log sidecar stdout/stderr in background
-    let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
@@ -92,8 +93,6 @@ fn spawn_sidecar(app: &AppHandle) -> Result<CommandChild, String> {
                 }
                 CommandEvent::Terminated(payload) => {
                     eprintln!("[sidecar] terminated: code={:?}", payload.code);
-                    // TODO: auto-restart logic if needed
-                    let _ = app_handle;
                     break;
                 }
                 _ => {}
@@ -101,14 +100,13 @@ fn spawn_sidecar(app: &AppHandle) -> Result<CommandChild, String> {
         }
     });
 
-    Ok(child)
+    Ok((child, pid))
 }
 
 /// Poll the sidecar health endpoint until it responds.
 async fn wait_for_server_ready(timeout_secs: u64) -> bool {
     let client = reqwest::Client::new();
     let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(timeout_secs);
-
     while tokio::time::Instant::now() < deadline {
         if let Ok(resp) = client.get(HEALTH_URL).send().await {
             if resp.status().is_success() {
@@ -124,7 +122,8 @@ async fn wait_for_server_ready(timeout_secs: u64) -> bool {
 
 #[tauri::command]
 fn check_first_run(app: AppHandle) -> bool {
-    is_first_run(&app)
+    let data_dir = get_data_dir(&app);
+    is_first_run(&data_dir)
 }
 
 #[tauri::command]
@@ -133,9 +132,10 @@ fn mark_setup_done(app: AppHandle) -> Result<(), String> {
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
     let marker = data_dir.join(".setup_done");
     std::fs::write(marker, "1").map_err(|e| e.to_string())?;
-
-    // Show main window pointing to sidecar
     navigate_to_server(&app);
+    if let Some(w) = app.get_webview_window("wizard") {
+        let _ = w.hide();
+    }
     Ok(())
 }
 
@@ -152,17 +152,17 @@ async fn get_server_status() -> bool {
 
 #[tauri::command]
 fn restart_server(app: AppHandle, state: State<'_, SidecarState>) -> Result<(), String> {
-    // Kill existing
     let mut guard = state.child.lock().map_err(|e| e.to_string())?;
     if let Some(child) = guard.take() {
         let _ = child.kill();
     }
-    // Spawn new
-    let new_child = spawn_sidecar(&app)?;
+    let (new_child, new_pid) = spawn_sidecar(&app)?;
     *guard = Some(new_child);
+    if let Ok(mut pid_guard) = state.child_pid.lock() {
+        *pid_guard = Some(new_pid);
+    }
     Ok(())
 }
-
 // ─── App Entry ───
 
 pub fn run() {
@@ -170,7 +170,9 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(SidecarState {
             child: Mutex::new(None),
+            child_pid: Mutex::new(None),
             server_ready: AtomicBool::new(false),
+            exiting: AtomicBool::new(false),
         })
         .invoke_handler(tauri::generate_handler![
             check_first_run,
@@ -180,6 +182,10 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // ── Check first run BEFORE sidecar starts (sidecar creates the DB) ──
+            let data_dir = get_data_dir(&handle);
+            let first_run = is_first_run(&data_dir);
 
             // ── System Tray ──
             let open_i = MenuItem::with_id(app, "open", "Open Dashboard", true, None::<&str>)?;
@@ -201,6 +207,8 @@ pub fn run() {
                             let _ = restart_server(app_handle.clone(), state);
                         }
                         "quit" => {
+                            let state: State<SidecarState> = app_handle.state();
+                            state.exiting.store(true, Ordering::Relaxed);
                             kill_sidecar(app_handle);
                             app_handle.exit(0);
                         }
@@ -222,15 +230,15 @@ pub fn run() {
 
             // ── Spawn Sidecar ──
             match spawn_sidecar(&handle) {
-                Ok(sidecar_child) => {
+                Ok((sidecar_child, pid)) => {
                     let state: State<SidecarState> = handle.state();
-                    let mut guard = state.child.lock().unwrap();
-                    *guard = Some(sidecar_child);
-                    println!("[tauri] Sidecar started");
+                    *state.child.lock().unwrap() = Some(sidecar_child);
+                    *state.child_pid.lock().unwrap() = Some(pid);
+                    println!("[tauri] Sidecar started (pid={pid})");
                 }
                 Err(e) => {
                     eprintln!("[tauri] Sidecar not available: {e}");
-                    eprintln!("[tauri] Running in dev mode — make sure the Python server is started manually");
+                    eprintln!("[tauri] Running in dev mode");
                 }
             }
 
@@ -246,15 +254,15 @@ pub fn run() {
                     eprintln!("[tauri] Server did not become ready in 30s");
                 }
 
-                let first_run = is_first_run(&setup_handle);
                 if first_run && ready {
-                    // Show wizard window for first-time setup
+                    // Navigate wizard to sidecar URL (assets need /app/ prefix from FastAPI)
                     if let Some(w) = setup_handle.get_webview_window("wizard") {
+                        let _ = w.navigate(WIZARD_URL.parse().unwrap());
                         let _ = w.show();
                         let _ = w.set_focus();
                     }
                 } else {
-                    // Navigate main window to sidecar and show
+                    // Navigate main window to sidecar
                     navigate_to_server(&setup_handle);
                 }
             });
@@ -267,7 +275,6 @@ pub fn run() {
             match event {
                 RunEvent::WindowEvent { label, event: WindowEvent::CloseRequested { api, .. }, .. } => {
                     if label == "main" {
-                        // Minimize to tray instead of closing
                         api.prevent_close();
                         if let Some(w) = app_handle.get_webview_window("main") {
                             let _ = w.hide();
@@ -275,8 +282,10 @@ pub fn run() {
                     }
                 }
                 RunEvent::ExitRequested { api, .. } => {
-                    // Prevent exit when all windows are hidden (tray keeps running)
-                    api.prevent_exit();
+                    let state: State<SidecarState> = app_handle.state();
+                    if !state.exiting.load(Ordering::Relaxed) {
+                        api.prevent_exit();
+                    }
                 }
                 _ => {}
             }

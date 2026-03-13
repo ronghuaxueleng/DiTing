@@ -35,11 +35,7 @@
         "decorations": true
       }
     ],
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "tooltip": "DiTing"
-    },
+    "trayIcon": null,
     "security": {
       "csp": null
     }

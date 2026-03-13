@@ -153,6 +153,20 @@ if os.path.exists(REACT_BUILD_DIR):
         if os.path.exists(icon_path):
             return FileResponse(icon_path, media_type="image/png")
         return HTMLResponse(content="Not found", status_code=404)
+
+    # Serve wizard.html (Tauri first-run setup) — must be before the SPA catch-all
+    _wizard_html_path = os.path.join(REACT_BUILD_DIR, "wizard.html")
+    _wizard_html_content = None
+    if os.path.exists(_wizard_html_path):
+        with open(_wizard_html_path, "r", encoding="utf-8") as f:
+            _wizard_html_content = f.read()
+
+    @app.get("/app/wizard.html", response_class=HTMLResponse)
+    async def serve_wizard():
+        """Serve wizard page for Tauri first-run setup"""
+        if _wizard_html_content:
+            return HTMLResponse(content=_wizard_html_content)
+        return HTMLResponse(content="Not found", status_code=404)
     
     # Serve React app at /app/*
     @app.get("/app/{full_path:path}", response_class=HTMLResponse)
