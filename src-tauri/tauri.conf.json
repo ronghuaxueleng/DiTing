@@ -1,0 +1,79 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
+  "productName": "DiTing",
+  "version": "0.1.0",
+  "identifier": "com.diting.desktop",
+  "build": {
+    "beforeBuildCommand": "cd frontend && npm run build",
+    "beforeDevCommand": "cd frontend && npm run dev",
+    "devUrl": "http://localhost:5173/app/",
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "DiTing",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "center": true,
+        "visible": false,
+        "decorations": true
+      },
+      {
+        "label": "wizard",
+        "title": "DiTing Setup",
+        "url": "/wizard.html",
+        "width": 640,
+        "height": 520,
+        "center": true,
+        "visible": false,
+        "resizable": false,
+        "decorations": true
+      }
+    ],
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "tooltip": "DiTing"
+    },
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/diting-server"
+    ],
+    "windows": {
+      "wix": {
+        "language": "zh-CN"
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true,
+      "sidecar": true,
+      "scope": [
+        {
+          "name": "binaries/diting-server",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    }
+  }
+}

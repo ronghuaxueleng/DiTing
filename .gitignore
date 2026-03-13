@@ -28,5 +28,12 @@ asr_worker/worker_config.yaml
 tray_config.json
 scripts/worker_manager_config.json
 
-.c*
-.g*
+.claude
+.gemini
+CLAUDE.md
+
+# Tauri
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/icons/*.ico
+src-tauri/icons/*.icns

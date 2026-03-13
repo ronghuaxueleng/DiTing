@@ -29,6 +29,7 @@
         "baseUrl": "."
     },
     "include": [
-        "src"
+        "src",
+        "src-wizard"
     ]
 }
