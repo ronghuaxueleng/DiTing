@@ -21,7 +21,6 @@ export interface VideoPlayerProps {
     setShowAppendCacheMenu: (show: boolean) => void
     updatePolicyMutation: any // from React Query
     handleAppendCache: (quality: string) => void
-    compact?: boolean
 }
 
 export default function VideoPlayer({
@@ -41,11 +40,10 @@ export default function VideoPlayer({
     showAppendCacheMenu,
     setShowAppendCacheMenu,
     updatePolicyMutation,
-    handleAppendCache,
-    compact = false
+    handleAppendCache
 }: VideoPlayerProps) {
     const { t } = useTranslation()
-    const [showCacheBar, setShowCacheBar] = React.useState(!compact)
+    const [showCacheBar, setShowCacheBar] = React.useState(false)
 
     if (!video) return null
 
@@ -220,8 +218,8 @@ export default function VideoPlayer({
                     </button>
                 </div>
 
-                {/* Compact mode: cache toggle icon */}
-                {compact && hasCacheSection && (
+                {/* Cache toggle icon */}
+                {hasCacheSection && (
                     <button
                         onClick={() => setShowCacheBar(v => !v)}
                         className={`p-1.5 rounded-md transition-all ${showCacheBar
