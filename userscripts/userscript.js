@@ -2854,6 +2854,7 @@
         // Expose cache function globally
         window.cacheDouyinQuality = (url, tag) => {
             const body = {
+                url: window.location.href,
                 source_id: currentSourceID,
                 task_type: 'cache_only',
                 quality: tag,
