@@ -53,8 +53,10 @@ async def analyze_text(text: str, prompt: str, llm_model_id: int = None):
 
     if not api_key:
         return "❌ LLM API Key is missing. 请在系统设置中配置有效的 API Key。", model
-    
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    }
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url, default_headers=headers)
 
     sys_prompt = (
     "你是一个专业的内容精炼专家，擅长处理多方对话及单人演讲的语音转文字(ASR)材料。\n"
@@ -104,7 +106,10 @@ async def test_llm_connection(api_key: str, base_url: str, model: str, api_type:
     Test LLM provider connectivity with a minimal request.
     Returns { success: bool, message: str, latency_ms: int }
     """
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    }
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url, default_headers=headers)
     start = time.time()
     try:
         if api_type == 'responses':
@@ -132,7 +137,10 @@ async def fetch_available_models(api_key: str, base_url: str):
     Uses GET /models endpoint (no token cost).
     Returns { success: bool, models: list[{id, owned_by}], message: str }
     """
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    }
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url, default_headers=headers)
     try:
         response = await client.models.list()
         models = [
