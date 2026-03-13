@@ -251,6 +251,10 @@ async def _process_note_generation(
             if model_info:
                 provider_id = model_info.get("id")
 
+        # Extract finished stages from task status before saving
+        task_status = task_manager.get_task_status(task_id)
+        stages = task_status.get("stages", []) if task_status else []
+
         add_video_note(
             source_id=source_id,
             content=content,
@@ -265,6 +269,7 @@ async def _process_note_generation(
                     "user_prompt": user_prompt,
                     "screenshot_density": screenshot_density,
                     "transcription_version": transcription_version,
+                    "stages": stages if stages else None,
                 }.items() if v
             }, ensure_ascii=False) or None,
         )

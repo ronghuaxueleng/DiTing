@@ -204,6 +204,8 @@ function GeneratePanel({
     onCancelTask,
     customPrompt,
     setCustomPrompt,
+    showGenStages,
+    setShowGenStages,
 }: {
     style: string
     setStyle: (s: 'concise' | 'detailed' | 'outline') => void
@@ -222,6 +224,8 @@ function GeneratePanel({
     onCancelTask: () => void
     customPrompt: string
     setCustomPrompt: (v: string) => void
+    showGenStages: boolean
+    setShowGenStages: (v: boolean) => void
 }) {
     const { t } = useTranslation()
     return (
@@ -317,20 +321,57 @@ function GeneratePanel({
                 {activeTask ? (
                     /* ---- Progress view ---- */
                     <div className="note-gen-progress">
-                        <div className="note-gen-progress-bar-wrap">
+                        <div 
+                            className="note-gen-progress-bar-wrap cursor-pointer group" 
+                            onClick={() => setShowGenStages(!showGenStages)}
+                            title={t('detail.aiNotes.toggleStages', '点击查看/隐藏各阶段耗时')}
+                        >
                             <div
                                 className="note-gen-progress-bar"
                                 style={{ width: `${activeTask.progress ?? 0}%` }}
                             />
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 group-hover:text-white/80 transition-colors">
+                                <Icons.ChevronRight className={`w-3.5 h-3.5 transition-transform ${showGenStages ? 'rotate-90' : ''}`} />
+                            </div>
                         </div>
                         <div className="note-gen-progress-meta">
                             <span className="note-gen-progress-msg flex items-center gap-2">
                                 <Icons.Loader className="w-3.5 h-3.5 animate-spin text-[var(--color-primary)] opacity-80" />
                                 {activeTask.message || t('detail.aiNotes.genStageProcessing')}
                             </span>
-                            <span className="note-gen-progress-pct">{activeTask.progress ?? 0}%</span>
+                            <span className="note-gen-progress-pct">{Math.round(activeTask.progress ?? 0)}%</span>
                         </div>
-                        <div className="note-gen-progress-actions">
+                        
+                        {/* Expandable Stages View */}
+                        {showGenStages && activeTask.stages && activeTask.stages.length > 0 && (
+                            <div className="mt-3 bg-[var(--color-bg-subtle)] rounded-lg p-3 text-xs border border-[var(--color-border)] shadow-inner">
+                                <ul className="space-y-1.5">
+                                    {activeTask.stages.map((stage, i) => (
+                                        <li key={i} className="flex items-center justify-between text-[var(--color-text-muted)]">
+                                            <span className="flex items-center gap-2 truncate pr-4">
+                                                <Icons.Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                                                <span className="truncate">{stage.name}</span>
+                                            </span>
+                                            <span className="font-mono text-[10px] bg-[var(--color-border)] px-1.5 py-0.5 rounded shrink-0">
+                                                {stage.duration.toFixed(1)}s
+                                            </span>
+                                        </li>
+                                    ))}
+                                    {/* Current active stage indicator */}
+                                    {activeTask.status !== 'completed' && activeTask.status !== 'failed' && (
+                                        <li className="flex items-center justify-between text-[var(--color-primary)] font-medium pt-1 mt-1 border-t border-[var(--color-border)]">
+                                            <span className="flex items-center gap-2 truncate pr-4">
+                                                <Icons.Loader className="w-3.5 h-3.5 animate-spin shrink-0" />
+                                                <span className="truncate">{activeTask.message || t('detail.aiNotes.genStageProcessing')}</span>
+                                            </span>
+                                            <span className="font-mono text-[10px] animate-pulse">...</span>
+                                        </li>
+                                    )}
+                                </ul>
+                            </div>
+                        )}
+
+                        <div className="note-gen-progress-actions mt-3">
                             <button
                                 className="note-btn note-btn-secondary"
                                 onClick={onCancelTask}
@@ -377,6 +418,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
     const [screenshotDensity, setScreenshotDensity] = useState('')
     const [selectedTransVersion, setSelectedTransVersion] = useState('')
     const [customPrompt, setCustomPrompt] = useState('')
+    const [showGenStages, setShowGenStages] = useState(false)
     const [pendingDelete, setPendingDelete] = useState<number | null>(null)
     const [pendingReset, setPendingReset] = useState<boolean>(false)
     const [activeTocId, setActiveTocId] = useState<string | null>(null)
@@ -1221,6 +1263,8 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                     onCancelTask={() => pendingTaskId !== null && cancelTask(pendingTaskId).then(() => setPendingTaskId(null))}
                     customPrompt={customPrompt}
                     setCustomPrompt={setCustomPrompt}
+                    showGenStages={showGenStages}
+                    setShowGenStages={setShowGenStages}
                 />
             )}
             {/* ---- VERSION HISTORY PANEL ---- */}
@@ -1298,6 +1342,23 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                                                 {note.model ?? 'AI'}
                                             </span>
                                         </div>
+                                        {note.gen_params?.stages && note.gen_params.stages.length > 0 && (
+                                            <div className="mt-3 pt-2 border-t border-[var(--color-border)]">
+                                                <ul className="space-y-1">
+                                                    {note.gen_params.stages.map((stage, i) => (
+                                                        <li key={i} className="flex items-center justify-between text-opacity-80">
+                                                            <span className="flex items-center gap-1.5 truncate pr-2 text-[11px]">
+                                                                <Icons.Check className="w-3 h-3 text-green-500/70 shrink-0" />
+                                                                <span className="truncate">{stage.name}</span>
+                                                            </span>
+                                                            <span className="font-mono text-[9px] bg-[var(--color-bg-muted)] px-1 py-0.5 rounded shrink-0 opacity-70">
+                                                                {stage.duration.toFixed(1)}s
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

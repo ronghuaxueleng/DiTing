@@ -22,23 +22,36 @@ class TaskManager:
     def start_task(self, task_id: int, meta: Dict[str, Any] = None):
         """Register a new task"""
         with self._lock:
+            now = time.time()
             self.tasks[task_id] = {
                 "status": "processing",
                 "progress": 0,
                 "message": "Starting...",
                 "cancel_event": threading.Event(),
-                "start_time": time.time(),
-                "meta": meta or {}
+                "start_time": now,
+                "meta": meta or {},
+                "stages": [],
+                "current_stage_start": now
             }
             logger.info(f"✅ TASK STARTED: ID {task_id} | Meta: {meta}")
 
     def update_progress(self, task_id: int, progress: float, msg: str = None):
-        """Update progress (0-100) and message"""
+        """Update progress (0-100) and message, tracking stage durations."""
         with self._lock:
             if task_id in self.tasks:
-                self.tasks[task_id]["progress"] = progress
-                if msg:
-                    self.tasks[task_id]["message"] = msg
+                task = self.tasks[task_id]
+                task["progress"] = progress
+                if msg and msg != task["message"]:
+                    # Record duration of previous stage
+                    now = time.time()
+                    duration = round(now - task["current_stage_start"], 2)
+                    task["stages"].append({
+                        "name": task["message"],
+                        "duration": duration
+                    })
+                    # Start new stage
+                    task["message"] = msg
+                    task["current_stage_start"] = now
 
     def get_task_status(self, task_id: int) -> Optional[Dict[str, Any]]:
         with self._lock:
@@ -79,10 +92,20 @@ class TaskManager:
         """Mark finished and add to history queue, evicting oldest if over limit."""
         with self._lock:
             if task_id in self.tasks:
-                if self.tasks[task_id]["status"] not in ["cancelled", "failed"]:
-                    self.tasks[task_id]["status"] = "completed"
-                    self.tasks[task_id]["progress"] = 100
-                self.tasks[task_id]["end_time"] = time.time()
+                task = self.tasks[task_id]
+                
+                # Finalize the last stage
+                now = time.time()
+                duration = round(now - task["current_stage_start"], 2)
+                task["stages"].append({
+                    "name": task["message"],
+                    "duration": duration
+                })
+
+                if task["status"] not in ["cancelled", "failed"]:
+                    task["status"] = "completed"
+                    task["progress"] = 100
+                task["end_time"] = now
                 
                 # Add to finished queue and evict oldest if needed
                 self._finished_ids.append(task_id)

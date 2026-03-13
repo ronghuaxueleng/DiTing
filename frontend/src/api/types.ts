@@ -92,6 +92,7 @@ export interface VideoNote {
         user_prompt?: string
         screenshot_density?: string
         transcription_version?: string
+        stages?: { name: string, duration: number }[]
     } | null
     created_at: string
     updated_at: string
@@ -111,6 +112,7 @@ export interface Task {
     status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'cancelling'
     progress: number
     message: string
+    stages?: { name: string, duration: number }[]
 }
 
 // LLM Config types
