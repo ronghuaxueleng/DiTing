@@ -49,11 +49,29 @@ fn navigate_to_server(app: &AppHandle) {
     }
 }
 
+/// Kill the sidecar process. Also sends shutdown request to the HTTP server.
+fn kill_sidecar(app: &AppHandle) {
+    // Try graceful shutdown via HTTP first
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build();
+    if let Ok(c) = client {
+        let _ = c.post("http://127.0.0.1:5023/api/system/shutdown").send();
+    }
+    // Then kill the process handle
+    let state: State<SidecarState> = app.state();
+    if let Ok(mut guard) = state.child.lock() {
+        if let Some(child) = guard.take() {
+            let _ = child.kill();
+        }
+    };
+}
+
 /// Start the Python sidecar server.
 fn spawn_sidecar(app: &AppHandle) -> Result<CommandChild, String> {
     let shell = app.shell();
     let cmd = shell
-        .sidecar("binaries/diting-server")
+        .sidecar("diting-server")
         .map_err(|e| format!("Failed to create sidecar command: {e}"))?
         .args(["--host", "127.0.0.1", "--port", &SERVER_PORT.to_string()]);
 
@@ -183,13 +201,7 @@ pub fn run() {
                             let _ = restart_server(app_handle.clone(), state);
                         }
                         "quit" => {
-                            // Kill sidecar then exit
-                            let state: State<SidecarState> = app_handle.state();
-                            if let Ok(mut guard) = state.child.lock() {
-                                if let Some(child) = guard.take() {
-                                    let _ = child.kill();
-                                }
-                            }
+                            kill_sidecar(app_handle);
                             app_handle.exit(0);
                         }
                         _ => {}

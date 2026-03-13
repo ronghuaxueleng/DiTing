@@ -125,7 +125,9 @@ app.include_router(api_router, prefix="/api")
 # =============================================================================
 
 # Path to React build directory
-REACT_BUILD_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+# PyInstaller bundles data into sys._MEIPASS; normal dev uses relative path
+_base_dir = getattr(sys, '_MEIPASS', os.path.join(os.path.dirname(__file__), ".."))
+REACT_BUILD_DIR = os.path.join(_base_dir, "frontend", "dist")
 
 # Mount React assets if build exists
 if os.path.exists(REACT_BUILD_DIR):

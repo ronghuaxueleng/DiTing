@@ -16,7 +16,7 @@ import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST_DIR = os.path.join(PROJECT_ROOT, "build", "sidecar")
-BINARIES_DIR = os.path.join(PROJECT_ROOT, "src-tauri", "binaries")
+BINARIES_DIR = os.path.join(PROJECT_ROOT, "src-tauri")
 
 
 def get_venv_python() -> str:
@@ -92,6 +92,7 @@ def build():
     cmd = [
         python, "-m", "PyInstaller",
         "--onefile",
+        "--noconsole",
         "--name", "diting-server",
         "--distpath", DIST_DIR,
         "--workpath", os.path.join(PROJECT_ROOT, "build", "pyinstaller_work"),

@@ -55,7 +55,7 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "binaries/diting-server"
+      "diting-server"
     ],
     "windows": {
       "wix": {
