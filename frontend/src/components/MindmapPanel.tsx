@@ -438,13 +438,19 @@ export default function MindmapPanel({ noteContent, onSeek, onNodeClick, activeH
         divs.forEach((div) => {
             const html = div.innerHTML
             if (!TIMESTAMP_RE.test(html)) return
+            
+            // If already processed, don't process again to avoid accumulating wrapper gaps
+            if (html.includes('mindmap-ts-link')) return
+
             TIMESTAMP_RE.lastIndex = 0
             const newHtml = html.replace(TIMESTAMP_RE, (fullMatch, bracketTime?: string, emojiTime?: string) => {
                 const timeStr = bracketTime ?? emojiTime
                 if (!timeStr) return fullMatch
                 const seconds = parseTimestamp(timeStr)
                 if (seconds === null) return fullMatch
-                return `<span class="mindmap-ts-link" data-seek-seconds="${seconds}" style="color:var(--color-primary,#6366f1);font-weight:600;cursor:pointer;text-decoration:underline;border-radius:2px;padding:0 2px;">${fullMatch}</span>`
+                // Extract just the core match (e.g., "[06:14]" or "⏱ 06:14") and wrap it purely without adding outer whitespace
+                const cleanMatch = fullMatch.trim() 
+                return `<span class="mindmap-ts-link" data-seek-seconds="${seconds}" style="color:var(--color-primary,#6366f1);font-weight:600;cursor:pointer;text-decoration:underline;border-radius:2px;padding:0 2px;margin-left:4px;">${cleanMatch}</span>`
             })
             if (newHtml !== html) div.innerHTML = newHtml
         })
