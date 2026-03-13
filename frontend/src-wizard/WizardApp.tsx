@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useLocale } from './i18n'
 import WelcomeStep from './steps/WelcomeStep'
 import ASRWorkerStep from './steps/ASRWorkerStep'
+import BilibiliStep from './steps/BilibiliStep'
 import LLMSetupStep from './steps/LLMSetupStep'
 import DoneStep from './steps/DoneStep'
 
-const STEPS = ['welcome', 'asr', 'llm', 'done'] as const
+const STEPS = ['welcome', 'asr', 'bilibili', 'llm', 'done'] as const
 type Step = typeof STEPS[number]
 
 export default function WizardApp() {
@@ -56,6 +57,7 @@ export default function WizardApp() {
             <div className="flex-1 px-6 py-5 overflow-y-auto">
                 {step === 'welcome' && <WelcomeStep onNext={goNext} />}
                 {step === 'asr' && <ASRWorkerStep onNext={goNext} onBack={goBack} />}
+                {step === 'bilibili' && <BilibiliStep onNext={goNext} onBack={goBack} />}
                 {step === 'llm' && <LLMSetupStep onNext={goNext} onBack={goBack} />}
                 {step === 'done' && <DoneStep />}
             </div>
