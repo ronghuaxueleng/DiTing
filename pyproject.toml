@@ -32,6 +32,8 @@ qwen = ["qwen-asr>=0.0.6"]
 uvr = ["audio-separator[gpu]>=0.41.1"]
 # 一键全装 (PC 桌面用户的默认选择)
 all = ["diting[desktop,worker,sensevoice,whisper,qwen,uvr]"]
+# Tauri 桌面端打包
+tauri = ["pyinstaller>=6.19.0"]
 
 [[tool.uv.index]]
 name = "aliyun"

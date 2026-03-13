@@ -238,6 +238,15 @@ wheels = [
 ]
 
 [[package]]
+name = "altgraph"
+version = "0.17.5"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/7e/f8/97fdf103f38fed6792a1601dbc16cc8aac56e7459a9fff08c812d8ae177a/altgraph-0.17.5.tar.gz", hash = "sha256:c87b395dd12fabde9c99573a9749d67da8d29ef9de0125c7f536699b4a9bc9e7" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/a9/ba/000a1996d4308bc65120167c21241a3b205464a2e0b58deda26ae8ac21d1/altgraph-0.17.5-py2.py3-none-any.whl", hash = "sha256:f3a22400bce1b0c701683820ac4f3b159cd301acab067c51c653e06961600597" },
+]
+
+[[package]]
 name = "annotated-doc"
 version = "0.0.4"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
@@ -869,10 +878,10 @@ name = "diffq"
 version = "0.2.4"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
-    { name = "cython" },
+    { name = "cython", marker = "python_full_version < '3.11' or sys_platform != 'win32'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.4.3", source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }, marker = "python_full_version >= '3.11'" },
-    { name = "torch" },
+    { name = "numpy", version = "2.4.3", source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }, marker = "python_full_version >= '3.11' and sys_platform != 'win32'" },
+    { name = "torch", marker = "python_full_version < '3.11' or sys_platform != 'win32'" },
 ]
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/5a/fd/4c58807bf855c5929ffa6da55f26dd6b9ae462a4193f5e09cc49fbbfd451/diffq-0.2.4.tar.gz", hash = "sha256:049064861e974ebf00d0badab8b324c775037371419eda3150985b9d477b5bd2" }
 wheels = [
@@ -888,10 +897,10 @@ name = "diffq-fixed"
 version = "0.2.4"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
-    { name = "cython" },
+    { name = "cython", marker = "python_full_version < '3.11' or sys_platform == 'win32'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.4.3", source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }, marker = "python_full_version >= '3.11'" },
-    { name = "torch" },
+    { name = "numpy", version = "2.4.3", source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }, marker = "python_full_version >= '3.11' and sys_platform == 'win32'" },
+    { name = "torch", marker = "python_full_version < '3.11' or sys_platform == 'win32'" },
 ]
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/be/96/8ca5acf5ecfd4108aa6f345cef171f2fda0c081cf0e7430671712586f172/diffq_fixed-0.2.4.tar.gz", hash = "sha256:cbc906b76fa23d1cf3c0ae517fbab744d9624980a068fe7fbb00dede1d83208d" }
 wheels = [
@@ -955,6 +964,9 @@ sensevoice = [
     { name = "huggingface-hub" },
     { name = "modelscope" },
 ]
+tauri = [
+    { name = "pyinstaller" },
+]
 uvr = [
     { name = "audio-separator", extra = ["gpu"] },
 ]
@@ -986,6 +998,7 @@ requires-dist = [
     { name = "packaging", specifier = ">=24.0" },
     { name = "pillow", specifier = ">=12.0.0" },
     { name = "pydantic-settings", specifier = ">=2.12.0" },
+    { name = "pyinstaller", marker = "extra == 'tauri'", specifier = ">=6.19.0" },
     { name = "pystray", marker = "extra == 'desktop'", specifier = ">=0.19.5" },
     { name = "python-multipart", specifier = ">=0.0.21" },
     { name = "pyyaml", marker = "extra == 'worker'" },
@@ -997,7 +1010,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.40.0" },
     { name = "yt-dlp", specifier = ">=2025.12.8" },
 ]
-provides-extras = ["desktop", "worker", "sensevoice", "whisper", "qwen", "uvr", "all"]
+provides-extras = ["desktop", "worker", "sensevoice", "whisper", "qwen", "uvr", "all", "tauri"]
 
 [[package]]
 name = "dynet38"
@@ -1777,6 +1790,18 @@ wheels = [
 ]
 
 [[package]]
+name = "macholib"
+version = "1.16.4"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+dependencies = [
+    { name = "altgraph", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'emscripten' and sys_platform != 'win32')" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/10/2f/97589876ea967487978071c9042518d28b958d87b17dceb7cdc1d881f963/macholib-1.16.4.tar.gz", hash = "sha256:f408c93ab2e995cd2c46e34fe328b130404be143469e41bc366c807448979362" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/c7/d1/a9f36f8ecdf0fb7c9b1e78c8d7af12b8c8754e74851ac7b94a8305540fc7/macholib-1.16.4-py2.py3-none-any.whl", hash = "sha256:da1a3fa8266e30f0ce7e97c6a54eefaae8edd1e5f86f3eb8b95457cae90265ea" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
@@ -2534,7 +2559,7 @@ name = "nvidia-cudnn-cu12"
 version = "9.1.0.70"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
-    { name = "nvidia-cublas-cu12" },
+    { name = "nvidia-cublas-cu12", marker = "(python_full_version < '3.11' and platform_machine != 's390x' and sys_platform == 'emscripten') or (python_full_version < '3.11' and platform_machine != 's390x' and sys_platform == 'win32') or (platform_machine != 's390x' and sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/9f/fd/713452cd72343f682b1c7b9321e23829f00b842ceaedcda96e742ea0b0b3/nvidia_cudnn_cu12-9.1.0.70-py3-none-manylinux2014_x86_64.whl", hash = "sha256:165764f44ef8c61fcdfdfdbe769d687e06374059fbb388b6c89ecb0e28793a6f" },
@@ -2561,9 +2586,9 @@ name = "nvidia-cusolver-cu12"
 version = "11.4.5.107"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
-    { name = "nvidia-cublas-cu12" },
-    { name = "nvidia-cusparse-cu12" },
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-cublas-cu12", marker = "(python_full_version < '3.11' and platform_machine != 's390x' and sys_platform == 'emscripten') or (python_full_version < '3.11' and platform_machine != 's390x' and sys_platform == 'win32') or (platform_machine != 's390x' and sys_platform != 'emscripten' and sys_platform != 'win32')" },
+    { name = "nvidia-cusparse-cu12", marker = "(python_full_version < '3.11' and platform_machine != 's390x' and sys_platform == 'emscripten') or (python_full_version < '3.11' and platform_machine != 's390x' and sys_platform == 'win32') or (platform_machine != 's390x' and sys_platform != 'emscripten' and sys_platform != 'win32')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "(python_full_version < '3.11' and platform_machine != 's390x' and sys_platform == 'emscripten') or (python_full_version < '3.11' and platform_machine != 's390x' and sys_platform == 'win32') or (platform_machine != 's390x' and sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/bc/1d/8de1e5c67099015c834315e333911273a8c6aaba78923dd1d1e25fc5f217/nvidia_cusolver_cu12-11.4.5.107-py3-none-manylinux1_x86_64.whl", hash = "sha256:8a7ec542f0412294b15072fa7dab71d31334014a69f953004ea7a118206fe0dd" },
@@ -2574,7 +2599,7 @@ name = "nvidia-cusparse-cu12"
 version = "12.1.0.106"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-nvjitlink-cu12", marker = "(python_full_version < '3.11' and platform_machine != 's390x' and sys_platform == 'emscripten') or (python_full_version < '3.11' and platform_machine != 's390x' and sys_platform == 'win32') or (platform_machine != 's390x' and sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/65/5b/cfaeebf25cd9fdec14338ccb16f6b2c4c7fa9163aefcf057d86b9cc248bb/nvidia_cusparse_cu12-12.1.0.106-py3-none-manylinux1_x86_64.whl", hash = "sha256:f3b50f42cf363f86ab21f720998517a659a48131e8d538dc02f8768237bd884c" },
@@ -2995,6 +3020,15 @@ wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/6d/02/c6e04b694ffd68568297abd03588b6d30295265176a5c01b7459d3bc35a3/pandas-3.0.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:15860b1fdb1973fffade772fdb931ccf9b2f400a3f5665aef94a00445d7d8dd5" },
     { url = "https://mirrors.aliyun.com/pypi/packages/89/41/d7dfb63d2407f12055215070c42fc6ac41b66e90a2946cdc5e759058398b/pandas-3.0.1-cp314-cp314t-win_amd64.whl", hash = "sha256:44f1364411d5670efa692b146c748f4ed013df91ee91e9bec5677fb1fd58b937" },
     { url = "https://mirrors.aliyun.com/pypi/packages/68/b0/34937815889fa982613775e4b97fddd13250f11012d769949c5465af2150/pandas-3.0.1-cp314-cp314t-win_arm64.whl", hash = "sha256:108dd1790337a494aa80e38def654ca3f0968cf4f362c85f44c15e471667102d" },
+]
+
+[[package]]
+name = "pefile"
+version = "2024.8.26"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/03/4f/2750f7f6f025a1507cd3b7218691671eecfd0bbebebe8b39aa0fe1d360b8/pefile-2024.8.26.tar.gz", hash = "sha256:3ff6c5d8b43e8c37bb6e6dd5085658d658a7a0bdcd20b6a07b1fcfc1c4e9d632" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/54/16/12b82f791c7f50ddec566873d5bdd245baa1491bac11d15ffb98aecc8f8b/pefile-2024.8.26-py3-none-any.whl", hash = "sha256:76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f" },
 ]
 
 [[package]]
@@ -3485,6 +3519,47 @@ wheels = [
 ]
 
 [[package]]
+name = "pyinstaller"
+version = "6.19.0"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+dependencies = [
+    { name = "altgraph" },
+    { name = "macholib", marker = "sys_platform == 'darwin'" },
+    { name = "packaging" },
+    { name = "pefile", marker = "sys_platform == 'win32'" },
+    { name = "pyinstaller-hooks-contrib" },
+    { name = "pywin32-ctypes", marker = "sys_platform == 'win32'" },
+    { name = "setuptools" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/c8/63/fd62472b6371d89dc138d40c36d87a50dc2de18a035803bbdc376b4ffac4/pyinstaller-6.19.0.tar.gz", hash = "sha256:ec73aeb8bd9b7f2f1240d328a4542e90b3c6e6fbc106014778431c616592a865" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/e3/eb/23374721fecfa72677e79800921cb6aceefa6ba48574dc404f3f6c6c3be7/pyinstaller-6.19.0-py3-none-macosx_10_13_universal2.whl", hash = "sha256:4190e76b74f0c4b5c5f11ac360928cd2e36ec8e3194d437bf6b8648c7bc0c134" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/cd/7e/dfd724b0b533f5aaec0ee5df406fe2319987ed6964480a706f85478b12ea/pyinstaller-6.19.0-py3-none-manylinux2014_aarch64.whl", hash = "sha256:8bd68abd812d8a6ba33b9f1810e91fee0f325969733721b78151f0065319ca11" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/88/c9/ee3a4101c31f26344e66896c73c1fd6ed8282bf871473365b7f8674af406/pyinstaller-6.19.0-py3-none-manylinux2014_i686.whl", hash = "sha256:1ec54ef967996ca61dacba676227e2b23219878ccce5ee9d6f3aada7b8ed8abf" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/da/0a/fc77e9f861be8cf300ac37155f59cc92aff99b29f2ddd78546f563a5b5a6/pyinstaller-6.19.0-py3-none-manylinux2014_ppc64le.whl", hash = "sha256:4ab2bb52e58448e14ddf9450601bdedd66800465043501c1d8f1cab87b60b122" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/6d/e3/6872e020ee758afe0b821663858492c10745608b07150e5e2c824a5b3e1c/pyinstaller-6.19.0-py3-none-manylinux2014_s390x.whl", hash = "sha256:da6d5c6391ccefe73554b9fa29b86001c8e378e0f20c2a4004f836ba537eff63" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/53/60/b8db5f1a4b0fb228175f2ea0aa33f949adcc097fbe981cc524f9faf85777/pyinstaller-6.19.0-py3-none-manylinux2014_x86_64.whl", hash = "sha256:a0fc5f6b3c55aa54353f0c74ffa59b1115433c1850c6f655d62b461a2ed6cbbe" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/6f/4d/63b0600f2694e9141b83129fbc1c488ec84d5a0770b1448ec154dcd0fee9/pyinstaller-6.19.0-py3-none-musllinux_1_1_aarch64.whl", hash = "sha256:e649ba6bd1b0b89b210ad92adb5fbdc8a42dd2c5ca4f72ef3a0bfec83a424b83" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/01/d4/e812ad36178093a0e9fd4b8127577748dd85b0cb71de912229dca21fd741/pyinstaller-6.19.0-py3-none-musllinux_1_1_x86_64.whl", hash = "sha256:481a909c8e60c8692fc60fcb1344d984b44b943f8bc9682f2fcdae305ad297e6" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/52/03/b2c2ee41fb8e10fd2a45d21f5ec2ef25852cfb978dbf762972eed59e3d63/pyinstaller-6.19.0-py3-none-win32.whl", hash = "sha256:3c5c251054fe4cfaa04c34a363dcfbf811545438cb7198304cd444756bc2edd2" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/9c/d3/6d5e62b8270e2b53a6065e281b3a7785079b00e9019c8019952828dd1669/pyinstaller-6.19.0-py3-none-win_amd64.whl", hash = "sha256:b5bb6536c6560330d364d91522250f254b107cf69129d9cbcd0e6727c570be33" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/81/65/458cd523308a101a22fd2742893405030cc24994cc74b1b767cecf137160/pyinstaller-6.19.0-py3-none-win_arm64.whl", hash = "sha256:c2d5a539b0bfe6159d5522c8c70e1c0e487f22c2badae0f97d45246223b798ea" },
+]
+
+[[package]]
+name = "pyinstaller-hooks-contrib"
+version = "2026.3"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+dependencies = [
+    { name = "packaging" },
+    { name = "setuptools" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/80/17/716326f6ba18d0663f7995ae369c23e50efebc22fbb054e9710a45688f61/pyinstaller_hooks_contrib-2026.3.tar.gz", hash = "sha256:800d3a198a49a6cd0de2d7fb795005fdca7a0222ed9cb47c0691abd1c27b9310" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/ed/19/781352446af28755f16ce52b2d97f7a6f2d7974ac34c00ca5cd8c40c9098/pyinstaller_hooks_contrib-2026.3-py3-none-any.whl", hash = "sha256:5ecd1068ad262afecadf07556279d2be52ca93a88b049fae17f1a2eb2969254a" },
+]
+
+[[package]]
 name = "pynndescent"
 version = "0.6.0"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
@@ -3522,7 +3597,7 @@ name = "pyobjc-framework-cocoa"
 version = "12.1"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
-    { name = "pyobjc-core" },
+    { name = "pyobjc-core", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/02/a3/16ca9a15e77c061a9250afbae2eae26f2e1579eb8ca9462ae2d2c71e1169/pyobjc_framework_cocoa-12.1.tar.gz", hash = "sha256:5556c87db95711b985d5efdaaf01c917ddd41d148b1e52a0c66b1a2e2c5c1640" }
 wheels = [
@@ -3540,8 +3615,8 @@ name = "pyobjc-framework-quartz"
 version = "12.1"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
-    { name = "pyobjc-core" },
-    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-core", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'emscripten' and sys_platform != 'win32')" },
+    { name = "pyobjc-framework-cocoa", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/94/18/cc59f3d4355c9456fc945eae7fe8797003c4da99212dd531ad1b0de8a0c6/pyobjc_framework_quartz-12.1.tar.gz", hash = "sha256:27f782f3513ac88ec9b6c82d9767eef95a5cf4175ce88a1e5a65875fee799608" }
 wheels = [
@@ -3603,7 +3678,7 @@ name = "python-xlib"
 version = "0.33"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
-    { name = "six" },
+    { name = "six", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/86/f5/8c0653e5bb54e0cbdfe27bf32d41f27bc4e12faa8742778c17f2a71be2c0/python-xlib-0.33.tar.gz", hash = "sha256:55af7906a2c75ce6cb280a584776080602444f75815a7aff4d287bb2d7018b32" }
 wheels = [
@@ -3630,6 +3705,15 @@ source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/56/db/b8721d71d945e6a8ac63c0fc900b2067181dbb50805958d4d4661cf7d277/pytz-2026.1.post1.tar.gz", hash = "sha256:3378dde6a0c3d26719182142c56e60c7f9af7e968076f31aae569d72a0358ee1" }
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/10/99/781fe0c827be2742bcc775efefccb3b048a3a9c6ce9aec0cbf4a101677e5/pytz-2026.1.post1-py2.py3-none-any.whl", hash = "sha256:f2fd16142fda348286a75e1a524be810bb05d444e5a081f37f7affc635035f7a" },
+]
+
+[[package]]
+name = "pywin32-ctypes"
+version = "0.2.3"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/85/9f/01a1a99704853cb63f253eea009390c88e7131c67e66a0a02099a8c917cb/pywin32-ctypes-0.2.3.tar.gz", hash = "sha256:d162dc04946d704503b2edc4d55f3dba5c1d539ead017afa00142c38b9885755" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/de/3d/8161f7711c017e01ac9f008dfddd9410dff3674334c233bde66e7ba65bbf/pywin32_ctypes-0.2.3-py3-none-any.whl", hash = "sha256:8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8" },
 ]
 
 [[package]]
@@ -4686,12 +4770,12 @@ dependencies = [
     { name = "torch" },
 ]
 wheels = [
-    { url = "https://download.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp310-cp310-linux_x86_64.whl", hash = "sha256:cf38267b5946b4dc3ff80ece5a1c165aa6b2a6fe8dca37bac192fcf47f658db1" },
-    { url = "https://download.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp310-cp310-win_amd64.whl", hash = "sha256:68c08cf69f7f39608f4c8d6b87fa054d7c801a19060e89d66003efbceef15641" },
-    { url = "https://download.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp311-cp311-linux_x86_64.whl", hash = "sha256:9e6f03e6410cb3557978dea25fb30ce3e7c165e8377fcc8e0e1ddc700503d38b" },
-    { url = "https://download.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp311-cp311-win_amd64.whl", hash = "sha256:f9397ff9c6e8fa1b4fdc94939411ac65fe43f66d66367ee80603bc7ce10e18e2" },
-    { url = "https://download.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp312-cp312-linux_x86_64.whl", hash = "sha256:5648a01f23033f15d60dc638f91c2d4c66c0a01621162471e806064acda63b70" },
-    { url = "https://download.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp312-cp312-win_amd64.whl", hash = "sha256:80400d75da5852bb5491f6259d47a163a00c2d1479ed57d3d95fde205e1b2815" },
+    { url = "https://download-r2.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp310-cp310-linux_x86_64.whl", hash = "sha256:cf38267b5946b4dc3ff80ece5a1c165aa6b2a6fe8dca37bac192fcf47f658db1" },
+    { url = "https://download-r2.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp310-cp310-win_amd64.whl", hash = "sha256:68c08cf69f7f39608f4c8d6b87fa054d7c801a19060e89d66003efbceef15641" },
+    { url = "https://download-r2.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp311-cp311-linux_x86_64.whl", hash = "sha256:9e6f03e6410cb3557978dea25fb30ce3e7c165e8377fcc8e0e1ddc700503d38b" },
+    { url = "https://download-r2.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp311-cp311-win_amd64.whl", hash = "sha256:f9397ff9c6e8fa1b4fdc94939411ac65fe43f66d66367ee80603bc7ce10e18e2" },
+    { url = "https://download-r2.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp312-cp312-linux_x86_64.whl", hash = "sha256:5648a01f23033f15d60dc638f91c2d4c66c0a01621162471e806064acda63b70" },
+    { url = "https://download-r2.pytorch.org/whl/cu121/torchaudio-2.5.1%2Bcu121-cp312-cp312-win_amd64.whl", hash = "sha256:80400d75da5852bb5491f6259d47a163a00c2d1479ed57d3d95fde205e1b2815" },
 ]
 
 [[package]]
@@ -4762,7 +4846,7 @@ resolution-markers = [
     "python_full_version < '3.11' and platform_machine == 's390x'",
 ]
 dependencies = [
-    { name = "filelock", marker = "python_full_version < '3.13' or python_full_version >= '4'" },
+    { name = "filelock", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform != 'emscripten' and sys_platform != 'win32') or (python_full_version >= '4' and sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/98/29/69aa56dc0b2eb2602b553881e34243475ea2afd9699be042316842788ff5/triton-3.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6b0dd10a925263abbe9fa37dcde67a5e9b2383fc269fdf59f5657cac38c5d1d8" },
@@ -5041,9 +5125,9 @@ wheels = [
 
 [[package]]
 name = "yt-dlp"
-version = "2026.3.3"
+version = "2026.3.13"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
-sdist = { url = "https://mirrors.aliyun.com/pypi/packages/66/6f/7427d23609353e5ef3470ff43ef551b8bd7b166dd4fef48957f0d0e040fe/yt_dlp-2026.3.3.tar.gz", hash = "sha256:3db7969e3a8964dc786bdebcffa2653f31123bf2a630f04a17bdafb7bbd39952" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/34/69/59253e5627f583939e742a592f56dc7d7f30d164473e58f055e1fccdc02b/yt_dlp-2026.3.13.tar.gz", hash = "sha256:fb43659db684a3db6ff2f5c92e0f1641262f6ecc71dbb64fefe84177aaba9e36" }
 wheels = [
-    { url = "https://mirrors.aliyun.com/pypi/packages/7e/a4/8b5cd28ab87aef48ef15e74241befec3445496327db028f34147a9e0f14f/yt_dlp-2026.3.3-py3-none-any.whl", hash = "sha256:166c6e68c49ba526474bd400e0129f58aa522c2896204aa73be669c3d2f15e63" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/f0/ef/52ed7ed10d2e1a22badf74b520b617c48b0a725a981620393245ac842bf9/yt_dlp-2026.3.13-py3-none-any.whl", hash = "sha256:e22e7716f94c08e76b29c0172a3fe0c01d8cabab9bce7f528ad440d70a0d213c" },
 ]
