@@ -9,13 +9,19 @@ Output:
 """
 
 import os
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from pathlib import Path
 import platform
 import shutil
 import subprocess
 import sys
 
+# ---------------------------------------------------------------------
+# Project paths
+# ---------------------------------------------------------------------
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST_DIR = os.path.join(PROJECT_ROOT, "build", "sidecar")
 BINARIES_DIR = os.path.join(PROJECT_ROOT, "src-tauri")
@@ -23,29 +29,19 @@ BINARIES_DIR = os.path.join(PROJECT_ROOT, "src-tauri")
 
 def get_venv_python() -> str:
     """Find the project venv Python. Prefer .venv in project root."""
-    # (unchanged)\n    if sys.prefix != sys.base_prefix:
-        # Already running inside a venv
-        return sys.executable
-    venv_python = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe") \
-    if platform.system() == "Windows" \
-    else os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
-    if os.path.exists(venv_python):
-        return venv_python
-    return sys.executable
-    """Find the project venv Python. Prefer .venv in project root."""
+    # If already inside a virtual environment, use it directly
     if sys.prefix != sys.base_prefix:
-        # Already running inside a venv
         return sys.executable
-    venv_python = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe") \
-        if platform.system() == "Windows" \
-        else os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
+    # Otherwise prefer the .venv directory created by uv
+    venv_python = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe") if platform.system() == "Windows" else os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
     if os.path.exists(venv_python):
         return venv_python
+    # Fallback to the Python interpreter running this script
     return sys.executable
 
 
 def get_target_triple() -> str:
-    """Return the Rust-style target triple for the current platform."""
+    """Return the Rust‑style target triple for the current platform."""
     machine = platform.machine().lower()
     system = platform.system().lower()
 
@@ -63,10 +59,9 @@ def get_target_triple() -> str:
 
 
 def build():
-    # ---------------------------------------------------------------------
+    # -----------------------------------------------------------------
     # Inject project version into the sidecar binary
-    # ---------------------------------------------------------------------
-    # Read version from pyproject.toml (already bumped to 0.13.0)
+    # -----------------------------------------------------------------
     try:
         pyproject_path = os.path.join(PROJECT_ROOT, "pyproject.toml")
         with open(pyproject_path, "rb") as f:
@@ -75,12 +70,12 @@ def build():
     except Exception as e:
         print(f"[build_sidecar] Failed to read version from pyproject.toml: {e}")
         proj_version = "0.0.0"
-    # Write a small version file that will be bundled with the exe
+    # Write a tiny version file that will be bundled with the exe
     version_txt_path = os.path.join(PROJECT_ROOT, "src-tauri", "version.txt")
     with open(version_txt_path, "w", encoding="utf-8") as vf:
         vf.write(f"__version__ = '{proj_version}'\n")
-    # ---------------------------------------------------------------------
 
+    # -----------------------------------------------------------------
     target_triple = get_target_triple()
     ext = ".exe" if platform.system() == "Windows" else ""
     output_name = f"diting-server-{target_triple}{ext}"
@@ -88,34 +83,30 @@ def build():
     print(f"[build_sidecar] Target: {target_triple}")
     print(f"[build_sidecar] Output: {output_name}")
 
-    # Ensure frontend is built
+    # Ensure frontend is built (optional warning)
     frontend_dist = os.path.join(PROJECT_ROOT, "frontend", "dist")
     if not os.path.exists(frontend_dist):
         print("[build_sidecar] Warning: frontend/dist not found. Run 'npm run build' in frontend/ first.")
 
-    # PyInstaller command — use project venv Python
+    # PyInstaller command – use the project's venv Python
     entry = os.path.join(PROJECT_ROOT, "app", "server.py")
     python = get_venv_python()
     print(f"[build_sidecar] Python: {python}")
 
-    # ML / ASR Worker packages — not needed by the web server sidecar
+    # Exclude heavy optional dependencies to keep the binary small
     exclude_modules = [
-        # PyTorch ecosystem (~4GB)
         "torch", "torchaudio", "torchvision",
-        # ASR engines
         "funasr", "modelscope", "paraformer_onnx",
-        # Heavy scientific / ML libs
         "numpy", "scipy", "pandas", "sklearn", "scikit_learn",
         "onnx", "onnxruntime", "onnxconverter_common",
         "librosa", "soundfile", "audioread",
-        # Plotting / notebook (pulled by transitive deps)
         "matplotlib", "IPython", "notebook", "jupyter",
-        # Other large optional deps
         "transformers", "huggingface_hub", "safetensors", "tokenizers",
         "tensorflow", "tensorboard", "keras",
-        # Desktop tray (not needed in Tauri mode)
         "pystray",
     ]
+
+    sep = ";" if platform.system() == "Windows" else ":"
 
     cmd = [
         python, "-m", "PyInstaller",
@@ -132,24 +123,23 @@ def build():
     for mod in exclude_modules:
         cmd.extend(["--exclude-module", mod])
 
-    # Add version file
+    # Bundle the version file
     if os.path.exists(version_txt_path):
         cmd.extend(["--add-data", f"{version_txt_path}{sep}src-tauri"])
 
-    sep = ";" if platform.system() == "Windows" else ":"
+    # Bundle the built frontend (if present)
     if os.path.exists(frontend_dist):
         cmd.extend(["--add-data", f"{frontend_dist}{sep}frontend/dist"])
 
     cmd.append(entry)
 
-    print(f"[build_sidecar] Running PyInstaller...")
+    print("[build_sidecar] Running PyInstaller...")
     subprocess.run(cmd, check=True, cwd=PROJECT_ROOT)
 
-    # Move to src-tauri/binaries/ with target-triple name
+    # Move the resulting binary into the Tauri binaries directory
     os.makedirs(BINARIES_DIR, exist_ok=True)
     src = os.path.join(DIST_DIR, f"diting-server{ext}")
     dst = os.path.join(BINARIES_DIR, output_name)
-
     if os.path.exists(dst):
         os.remove(dst)
     shutil.move(src, dst)
