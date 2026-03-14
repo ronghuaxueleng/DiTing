@@ -324,9 +324,7 @@
             "ytCookieHint": "Required for accessing age-restricted, region-locked, or member-only videos. Export YouTube cookies using a browser extension (e.g. Get cookies.txt LOCALLY) and paste the full content here. Leave blank to skip.",
             "ytCookieSaved": "YouTube cookie saved",
             "ytCookieSaveFailed": "Failed to save",
-            "featureToggleTitle": "Feature Toggles",
-            "showUvr5": "Show UVR5 Vocal Separation Option",
-            "showUvr5Hint": "UVR5 is resource-intensive. When enabled, this option will be visible in Add Video, Retranscribe, and Upload Modal dialogs."
+            "featureToggleTitle": "Feature Toggles"
         },
         "about": {
             "title": "About",
@@ -384,7 +382,6 @@
             "srt": "Subtitles (SRT)",
             "srt_char": "Verbatim Subtitles (Char)"
         },
-        "enableUVR": "Enable Vocal Separation (UVR)",
         "startTranscribe": "Start Transcription",
         "cacheOnly": "Cache Only",
         "cacheOnlyTooltip": "Download media only, skip transcription",
@@ -472,7 +469,6 @@
         "supportHint": "Supports audio/video files, drag or click to select",
         "dropHint": "Click or drag file here",
         "languageLabel": "Language",
-        "enableUVR": "🔮 UVR5 Vocal Separation",
         "promptLabel": "Initial Prompt (Optional, Whisper)",
         "promptPlaceholder": "e.g. This is a technical meeting...",
         "generateSubtitle": "📝 Generate Subtitles",

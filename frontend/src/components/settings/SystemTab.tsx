@@ -14,7 +14,6 @@ export default function SystemTab({ onClose }: { onClose: () => void }) {
     const [proxyUrl, setProxyUrl] = useState('')
     const [biliSessdata, setBiliSessdata] = useState('')
     const [ytCookies, setYtCookies] = useState('')
-    const [showUvr5, setShowUvr5] = useState(() => localStorage.getItem('diting_show_uvr5') === 'true')
 
     // Fetch initial data
     useEffect(() => {
@@ -125,41 +124,6 @@ export default function SystemTab({ onClose }: { onClose: () => void }) {
                 <p className="text-xs text-[var(--color-text-muted)]">
                     {t('settings.system.ytCookieHint')}
                 </p>
-            </div>
-
-            <hr className="border-[var(--color-border)]" />
-
-            {/* Feature Toggles */}
-            <div className="space-y-4">
-                <h3 className="font-medium flex items-center gap-2">
-                    <Icons.Settings className="w-5 h-5" />
-                    {t('settings.system.featureToggleTitle')}
-                </h3>
-
-                <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                        <label htmlFor="uvr5-toggle" className="text-sm font-medium cursor-pointer block">
-                            {t('settings.system.showUvr5')}
-                        </label>
-                        <p className="text-xs text-[var(--color-text-muted)] max-w-xl">
-                            {t('settings.system.showUvr5Hint')}
-                        </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                            type="checkbox"
-                            id="uvr5-toggle"
-                            className="sr-only peer"
-                            checked={showUvr5}
-                            onChange={(e) => {
-                                const newValue = e.target.checked
-                                localStorage.setItem('diting_show_uvr5', newValue ? 'true' : 'false')
-                                setShowUvr5(newValue)
-                            }}
-                        />
-                        <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--color-primary)]"></div>
-                    </label>
-                </div>
             </div>
 
             <hr className="border-[var(--color-border)]" />

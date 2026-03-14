@@ -16,7 +16,6 @@ interface RetranscribeModalProps {
 export default function RetranscribeModal({ video, onClose, onSuccess }: RetranscribeModalProps) {
     useEscapeKey(onClose)
     const { t } = useTranslation()
-    const [useUvr, setUseUvr] = useState(false)
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [prompt, setPrompt] = useState('')
     const [loading, setLoading] = useState(false)
@@ -43,7 +42,6 @@ export default function RetranscribeModal({ video, onClose, onSuccess }: Retrans
             await retranscribe({
                 source_id: video.source_id,
                 language,
-                use_uvr: useUvr,
                 prompt: prompt.trim() || undefined,
                 output_format: outputFormat,
                 only_get_subtitles: subtitleMode === 'only_sub',
@@ -183,19 +181,6 @@ export default function RetranscribeModal({ video, onClose, onSuccess }: Retrans
                                             ))}
                                         </div>
                                     </div>
-                                )}
-
-                                {/* UVR */}
-                                {localStorage.getItem('diting_show_uvr5') === 'true' && (
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={useUvr}
-                                            onChange={(e) => setUseUvr(e.target.checked)}
-                                            className="w-4 h-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                                        />
-                                        <span className="text-sm">{t('addVideo.enableUVR')}</span>
-                                    </label>
                                 )}
 
                                 {/* Prompt */}

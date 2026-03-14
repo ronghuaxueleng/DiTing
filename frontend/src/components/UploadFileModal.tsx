@@ -20,14 +20,13 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
     const typeMenuRef = useRef<HTMLDivElement>(null)
 
     const { language, setLanguage, saveAll } = useTranscriptionPrefs()
-    const [useUvr, setUseUvr] = useState(false)
     const [prompt, setPrompt] = useState('')
 
     const [loading, setLoading] = useState(false) // for single file upload
     const [dragActive, setDragActive] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
 
-    const uploadOptions = { taskType, useUvr, language, prompt }
+    const uploadOptions = { taskType, language, prompt }
     const { state: chunkState, start: startChunkUpload, cancel: cancelChunkUpload } = useChunkedUpload()
     const isChunkUploading = chunkState.phase === 'initializing' || chunkState.phase === 'uploading' || chunkState.phase === 'finalizing'
 
@@ -101,7 +100,6 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
             formData.append('file', file)
             formData.append('source', file.name)
             formData.append('task_type', taskType)
-            formData.append('use_uvr', String(useUvr))
             formData.append('language', language)
             if (prompt) formData.append('prompt', prompt)
 
@@ -265,20 +263,6 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
                                 </select>
                             </div>
                             <div className="flex items-center gap-2 pt-5">
-                                {localStorage.getItem('diting_show_uvr5') === 'true' && (
-                                    <>
-                                        <input
-                                            type="checkbox"
-                                            id="use-uvr"
-                                            checked={useUvr}
-                                            onChange={(e) => setUseUvr(e.target.checked)}
-                                            className="rounded"
-                                        />
-                                        <label htmlFor="use-uvr" className="text-sm cursor-pointer">
-                                            {t('upload.enableUVR')}
-                                        </label>
-                                    </>
-                                )}
                             </div>
                         </div>
 

@@ -61,7 +61,6 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
     const { t } = useTranslation()
     const [mode, setMode] = useState<'transcribe' | 'cache' | 'bookmark'>('transcribe')
     const [url, setUrl] = useState('')
-    const [useUvr, setUseUvr] = useState(false)
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [showHintDetails, setShowHintDetails] = useState(false)
     const [quality, setQuality] = useState('best')
@@ -186,7 +185,6 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
 
             const request = {
                 url: url.trim(),
-                use_uvr: useUvr,
                 language,
                 task_type: task_type as 'transcribe' | 'subtitle' | 'cache_only',
                 quality,
@@ -495,18 +493,6 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                                                 </div>
                                             )}
 
-                                            {/* UVR Checkbox */}
-                                            {localStorage.getItem('diting_show_uvr5') === 'true' && (
-                                                <label className="flex items-center gap-2 cursor-pointer mt-4">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={useUvr}
-                                                        onChange={(e) => setUseUvr(e.target.checked)}
-                                                        className="w-4 h-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                                                    />
-                                                    <span className="text-sm">{t('addVideo.enableUVR')}</span>
-                                                </label>
-                                            )}
                                         </div>
                                     )}
                                 </div>

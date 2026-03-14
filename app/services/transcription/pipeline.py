@@ -1,6 +1,6 @@
 """
 Transcription Service Pipeline
-Unified workflow for Check Cache -> Download -> UVR -> ASR -> Cleanup.
+Unified workflow for Check Cache -> Download -> ASR -> Cleanup.
 """
 import os
 import asyncio
@@ -11,7 +11,6 @@ from app.asr.client import asr_client
 from app.db import update_transcription_text, update_task_status, update_transcription_asr_model, update_transcription_is_subtitle
 from app.core.task_manager import task_manager, TaskCancelledException
 from app.utils.process_utils import run_cancellable_process
-from app.utils.preprocessing import separate_vocals
 from app.core.logger import logger
 from app.services.media_cache import MediaCacheService
 from app.utils.progress import ProgressHelper
@@ -24,7 +23,6 @@ async def run_transcription_pipeline(
     source_key: str,
     source_label: str,
     task_type: str = "transcribe",
-    use_uvr: bool = False,
     language: str = "zh",
     prompt: str = None,
     output_format: str = None,
@@ -43,7 +41,6 @@ async def run_transcription_pipeline(
         source_key: Key for cache lookup (URL or source_id)
         source_label: Label for logging (e.g., "Bilibili", "YouTube")
         task_type: "transcribe" or "subtitle"
-        use_uvr: Whether to use Vocal Remover
         language: Language code
         prompt: ASR prompt
         output_format: "text", "srt", etc.
@@ -52,7 +49,6 @@ async def run_transcription_pipeline(
     
     audio_path = None
     using_cache = False
-    is_temp_derived = False
     
     try:
         # 0. Start Task
@@ -117,43 +113,7 @@ async def run_transcription_pipeline(
             
         task_manager.check_cancel(transcription_id)
 
-        # 3. UVR
-        if use_uvr:
-            logger.info(f"🎤 UVR5 Enabled for {source_label}: Separating Vocals...")
-            task_manager.update_progress(transcription_id, 30, "Separating Vocals (UVR5)...")
-            
-            if task_manager.is_cancelled(transcription_id):
-                raise TaskCancelledException()
-            
-            vocal_path = await run_cancellable_process(transcription_id, separate_vocals, audio_path)
-            
-            if vocal_path and os.path.exists(vocal_path):
-                logger.info(f"🎤 Vocals separated: {vocal_path}")
-                
-                # Careful not to delete shared cache
-                if not using_cache:
-                    try:
-                        # If we downloaded a temp file, we delete it now that we have vocals
-                        # BUT `cleanup_or_delete` below expects `audio_path` to be the "original" to cache?
-                        # If we delete `audio_path` now, we can't cache it.
-                        # Logic from transcription.py:
-                        # "if not using_cache: remove(audio_path)"
-                        if audio_path and os.path.exists(audio_path):
-                            os.remove(audio_path)
-                    except OSError:
-                        pass
-                
-                audio_path = vocal_path
-                is_temp_derived = True 
-                # We are now working with a temp derived file, so we are NOT "using cache" for the purpose of cleanup
-                using_cache = False 
-            else:
-                logger.warning("⚠️ UVR5 failed to produce output.")
-
-        task_manager.check_cancel(transcription_id)
-        val = 50 if use_uvr else 30
-        
-        # 4. ASR — Check worker queue status for better progress message
+        # 3. ASR — Check worker queue status for better progress message
         asr_msg = "Transcribing..."
         try:
             engine_key = asr_client.select_worker()
@@ -168,7 +128,7 @@ async def run_transcription_pipeline(
                 asr_msg = f"Transcribing ({engine_key})..."
         except Exception:
             pass
-        task_manager.update_progress(transcription_id, val, asr_msg)
+        task_manager.update_progress(transcription_id, 30, asr_msg)
         
         final_format = output_format
         if not final_format:
@@ -211,15 +171,7 @@ async def run_transcription_pipeline(
         
     finally:
         # 6. Cleanup
-        if is_temp_derived:
-            # Always delete derived temp files (UVR output)
-            if audio_path and os.path.exists(audio_path):
-                try:
-                    os.remove(audio_path)
-                    logger.debug(f"🗑️ Deleted temp UVR file: {audio_path}")
-                except Exception as e:
-                    pass
-        elif not using_cache:
+        if not using_cache:
             # If we downloaded a fresh file, cache it or delete it based on policy
             MediaCacheService.cleanup_or_delete(audio_path, transcription_id, source=source_key, quality='audio_only')
 

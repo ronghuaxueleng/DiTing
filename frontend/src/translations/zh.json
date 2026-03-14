@@ -329,9 +329,7 @@
             "ytCookieHint": "用于访问年龄限制、地区限制或会员视频。使用浏览器插件（如 Get cookies.txt LOCALLY）导出 youtube.com 的 Cookie，粘贴完整内容到此处。留空则不使用 Cookie。",
             "ytCookieSaved": "YouTube Cookie 已保存",
             "ytCookieSaveFailed": "保存失败",
-            "featureToggleTitle": "功能开关",
-            "showUvr5": "显示 UVR5 人声分离选项",
-            "showUvr5Hint": "UVR5消耗较多资源，启用后会在添加视频、重新转写等界面中显示该选项"
+            "featureToggleTitle": "功能开关"
         },
         "about": {
             "title": "关于",
@@ -388,7 +386,6 @@
             "srt": "标准字幕 (SRT)",
             "srt_char": "逐字字幕 (Character)"
         },
-        "enableUVR": "启用人声分离 (UVR)",
         "startTranscribe": "开始转录",
         "cacheOnly": "仅缓存",
         "cacheOnlyTooltip": "仅下载媒体文件，不进行转录",
@@ -476,7 +473,6 @@
         "supportHint": "支持音频/视频文件，拖拽或点击选择",
         "dropHint": "点击或拖拽文件到这里",
         "languageLabel": "语言",
-        "enableUVR": "🔮 UVR5 人声分离",
         "promptLabel": "Initial Prompt (可选, Whisper)",
         "promptPlaceholder": "例如: 这是一个技术会议...",
         "generateSubtitle": "📝 生成字幕",

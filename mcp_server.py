@@ -196,7 +196,6 @@ class CreateSourceFromUrlInput(BaseModel):
     url: str = Field(..., description="Video URL (Bilibili/YouTube/Douyin/other)", min_length=1)
     task_type: Optional[str] = Field(None, description="Task type (e.g., transcribe, subtitle, cache_only)")
     language: Optional[str] = Field(None, description="Target language code (zh, en, ja, ko)")
-    use_uvr: Optional[bool] = Field(None, description="Enable vocal removal preprocessing")
     quality: Optional[str] = Field(None, description="Download quality (best, medium, worst, audio)")
     prompt: Optional[str] = Field(None, description="Custom prompt for transcription")
 
@@ -212,7 +211,6 @@ class RetranscribeInput(BaseModel):
 
     source_id: str = Field(..., description="Source ID of the video to re-transcribe", min_length=1)
     language: Optional[str] = Field(None, description="Target language code")
-    use_uvr: Optional[bool] = Field(None, description="Enable vocal removal preprocessing")
     prompt: Optional[str] = Field(None, description="Custom prompt for transcription")
 
     output_format: Optional[str] = Field(None, description="Output format: text, srt, srt_char")

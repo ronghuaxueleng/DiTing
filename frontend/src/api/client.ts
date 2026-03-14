@@ -172,7 +172,6 @@ export async function toggleSegmentPin(segmentId: number, isPinned: boolean): Pr
 export interface TranscribeUrlRequest {
     url: string
     source_id?: string
-    use_uvr?: boolean
     language?: string
     prompt?: string
     task_type?: 'transcribe' | 'subtitle' | 'cache_only'
@@ -208,7 +207,6 @@ export async function transcribeDouyin(request: TranscribeUrlRequest): Promise<{
 export interface TranscribeNetworkRequest {
     url: string
     title?: string
-    use_uvr?: boolean
     language?: string
     prompt?: string
     task_type?: 'transcribe' | 'subtitle' | 'cache_only'
@@ -230,7 +228,6 @@ export async function transcribeNetwork(request: TranscribeNetworkRequest): Prom
 export interface RetranscribeRequest {
     source_id: string
     language?: string
-    use_uvr?: boolean
     prompt?: string
     output_format?: string
     auto_analyze_prompt?: string

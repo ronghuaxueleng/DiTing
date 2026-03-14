@@ -28,7 +28,6 @@ async def init_upload(
     file_size: int = Form(...),
     total_chunks: int = Form(...),
     task_type: str = Form("transcribe"),
-    use_uvr: bool = Form(False),
     language: str = Form("zh"),
     prompt: str = Form(""),
     output_format: str = Form(None)
@@ -54,7 +53,6 @@ async def init_upload(
         "updated_at": datetime.now(),
         "metadata": {
             "task_type": task_type,
-            "use_uvr": use_uvr,
             "language": language,
             "prompt": prompt,
             "output_format": output_format
@@ -189,7 +187,6 @@ async def finalize_upload(
             title=filename,
             cover=cover,
             task_type=meta["task_type"],
-            use_uvr=meta["use_uvr"],
             language=meta["language"],
             prompt=meta["prompt"],
             output_format=meta["output_format"],

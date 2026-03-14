@@ -74,8 +74,6 @@ def build():
         "torch", "torchaudio", "torchvision",
         # ASR engines
         "funasr", "modelscope", "paraformer_onnx",
-        # Audio separation (UVR)
-        "audio_separator",
         # Heavy scientific / ML libs
         "numpy", "scipy", "pandas", "sklearn", "scikit_learn",
         "onnx", "onnxruntime", "onnxconverter_common",

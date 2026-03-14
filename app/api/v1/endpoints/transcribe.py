@@ -34,7 +34,6 @@ async def transcribe_file(
     file: UploadFile = File(...),
     source: str = Form("未知来源"),
     task_type: str = Form("transcribe"),
-    use_uvr: bool = Form(False),
     language: str = Form("zh"),
     prompt: str = Form(None),
     auto_analyze_prompt: str = Form(None),
@@ -46,7 +45,7 @@ async def transcribe_file(
     file_path = None
     try:
         params = await prepare_file_transcription(
-            file, source, task_type, use_uvr, language, prompt, auto_analyze_prompt, auto_analyze_prompt_id, auto_analyze_strip_subtitle, output_format
+            file, source, task_type, language, prompt, auto_analyze_prompt, auto_analyze_prompt_id, auto_analyze_strip_subtitle, output_format
         )
         file_path = params.get('file_path')
         return await create_and_dispatch(background_tasks, **params)

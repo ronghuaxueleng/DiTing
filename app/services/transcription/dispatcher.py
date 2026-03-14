@@ -66,7 +66,6 @@ async def create_and_dispatch(
     task_type: str = "transcribe",
     bookmark_only: bool = False,
     # ASR params
-    use_uvr: bool = False,
     language: str = "zh",
     prompt: str = None,
     auto_analyze_prompt: str = None,
@@ -201,7 +200,6 @@ async def create_and_dispatch(
             segment_start or 0.0,
             segment_end, # range_end
             task_type,
-            use_uvr,
             language,
             prompt,
             output_format,
@@ -218,7 +216,6 @@ async def create_and_dispatch(
             transcription_id,
             original_source, # url
             task_type,
-            use_uvr,
             language,
             prompt,
             output_format,
@@ -236,7 +233,6 @@ async def create_and_dispatch(
             transcription_id,
             direct_url,
             task_type,
-            use_uvr,
             output_format,
             source_id=normalized_source,
             local_file_path=local_file_path,
@@ -254,7 +250,6 @@ async def create_and_dispatch(
             original_source, # url
             file_path,
             task_type,
-            use_uvr,
             language,
             prompt,
             output_format,
@@ -275,7 +270,6 @@ async def create_and_dispatch(
             source_type,
             cover,
             covers_dir,
-            use_uvr,
             language,
             prompt,
             output_format,

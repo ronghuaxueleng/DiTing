@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 
 export interface UploadOptions {
     taskType: 'transcribe' | 'subtitle'
-    useUvr: boolean
     language: string
     prompt?: string
     outputFormat?: string
@@ -106,7 +105,6 @@ export function useChunkedUpload() {
                 initData.append('file_size', file.size.toString())
                 initData.append('total_chunks', totalChunks.toString())
                 initData.append('task_type', options.taskType)
-                initData.append('use_uvr', String(options.useUvr))
                 initData.append('language', options.language)
                 if (options.prompt) initData.append('prompt', options.prompt)
                 if (options.outputFormat) initData.append('output_format', options.outputFormat)
