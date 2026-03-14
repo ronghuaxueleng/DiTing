@@ -30,7 +30,12 @@ async def get_system_settings():
     """Get system configurations"""
     proxy_url = get_system_config('proxy_url')
     bilibili_sessdata = get_system_config('bilibili_sessdata')
-    return {"proxy_url": proxy_url, "bilibili_sessdata": bilibili_sessdata}
+    youtube_cookies = get_system_config('youtube_cookies')
+    return {
+        "proxy_url": proxy_url, 
+        "bilibili_sessdata": bilibili_sessdata,
+        "youtube_cookies": youtube_cookies
+    }
 
 
 @router.post("/settings")

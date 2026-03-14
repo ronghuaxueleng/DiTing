@@ -437,7 +437,7 @@ export async function deleteCategory(id: number, deletePrompts: boolean = false)
 // ============ System API ============
 
 export async function getSystemConfig(key: string): Promise<string | null> {
-    const response = await fetchJson<{ proxy_url?: string; bilibili_sessdata?: string }>(`${API_BASE}/system/settings`)
+    const response = await fetchJson<{ proxy_url?: string; bilibili_sessdata?: string; youtube_cookies?: string }>(`${API_BASE}/system/settings`)
     return response[key as keyof typeof response] ?? null
 }
 
