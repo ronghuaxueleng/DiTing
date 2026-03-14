@@ -128,11 +128,16 @@ export default function Dashboard() {
 
     useEffect(() => {
         if (tasksData && prevTasksRef.current) {
+            // Detect tasks that transitioned to a finished status
             const hasNewlyFinished = Object.entries(tasksData).some(([id, task]) => {
                 const prev = prevTasksRef.current?.[id]
                 return prev && ['processing', 'pending'].includes(prev.status) && ['completed', 'failed', 'cancelled'].includes(task.status)
             })
-            if (hasNewlyFinished) {
+            // Detect tasks that disappeared entirely (evicted from TaskManager before we saw them complete)
+            const hasDisappeared = Object.entries(prevTasksRef.current).some(([id, prev]) => {
+                return ['processing', 'pending'].includes(prev.status) && !(id in tasksData)
+            })
+            if (hasNewlyFinished || hasDisappeared) {
                 queryClient.refetchQueries({ queryKey: ['videos'] })
                 // Keep fast polling for a cooldown period after tasks finish
                 setRecentlyFinished(true)
@@ -170,7 +175,14 @@ export default function Dashboard() {
             includeArchived: includeArchived || undefined,
             search: searchQuery || undefined
         }),
-        refetchInterval: (hasActiveTasks || recentlyFinished) ? 5000 : 30000,
+        refetchInterval: (query) => {
+            // Also keep fast polling when videos themselves show processing/analyzing overlays
+            const videoData = query.state.data as { items?: Video[] } | undefined
+            const hasActiveVideos = videoData?.items?.some(v =>
+                v.latest_status === 'processing' || v.latest_status === 'pending' || v.is_analyzing_ai
+            ) ?? false
+            return (hasActiveTasks || hasActiveVideos || recentlyFinished) ? 5000 : 30000
+        },
         refetchIntervalInBackground: false,
     })
 
