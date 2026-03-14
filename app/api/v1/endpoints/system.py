@@ -81,6 +81,29 @@ async def update_launcher_config(config: LauncherConfig):
     return {"status": "ok", "config": current}
 
 
+# --- FFmpeg Check ---
+
+@router.get("/ffmpeg-check")
+async def check_ffmpeg():
+    """Check if FFmpeg is available in PATH"""
+    import shutil
+    import subprocess
+
+    ffmpeg_path = shutil.which("ffmpeg")
+    if not ffmpeg_path:
+        return {"available": False, "version": None, "path": None}
+
+    try:
+        result = subprocess.run(
+            [ffmpeg_path, "-version"],
+            capture_output=True, text=True, timeout=5,
+        )
+        first_line = result.stdout.split("\n")[0] if result.stdout else ""
+        return {"available": True, "version": first_line, "path": ffmpeg_path}
+    except Exception:
+        return {"available": False, "version": None, "path": ffmpeg_path}
+
+
 # --- Version & Update ---
 
 @router.get("/version")
