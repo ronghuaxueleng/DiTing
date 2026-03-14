@@ -151,10 +151,18 @@ function NoteTOC({ items, activeId, onItemClick }: {
                 />
             )}
             <div className="note-toc-header-container">
-                <div className="note-toc-header" onClick={() => setCollapsed(v => !v)}>
-                    <Icons.List className="w-3 h-3" />
-                    <span>{t('detail.aiNotes.toc')}</span>
-                    <Icons.ChevronRight className={`w-3 h-3 ml-auto transition-transform ${collapsed ? '' : 'rotate-90'}`} />
+                <div
+                    className="note-toc-header flex items-center"
+                    onClick={() => setCollapsed(v => !v)}
+                    title={collapsed ? t('detail.aiNotes.tocExpand', '展开目录') : undefined}
+                >
+                    <Icons.List className={collapsed ? "w-4 h-4 mx-auto" : "w-3 h-3"} />
+                    {!collapsed && (
+                        <>
+                            <span className="ml-1.5">{t('detail.aiNotes.toc')}</span>
+                            <Icons.ChevronRight className="w-3 h-3 ml-auto transition-transform rotate-90" />
+                        </>
+                    )}
                 </div>
                 {!collapsed && availableMaxLevel > 1 && (
                     <div className="note-toc-filter px-[10px] pb-2 flex items-center gap-2">
@@ -335,7 +343,7 @@ function GeneratePanel({
                     </div>
                 </div>
             )}
-            <div 
+            <div
                 className={`note-gen-panel-footer`}
                 style={activeTask ? { marginTop: 0, paddingTop: 0, borderTop: 'none' } : undefined}
             >
@@ -354,7 +362,7 @@ function GeneratePanel({
                                 </span>
                                 <Icons.ChevronDown className={`w-3.5 h-3.5 text-[var(--color-text-muted)] transition-transform ${showGenConfig ? 'rotate-180' : ''}`} />
                             </button>
-                            
+
                             {showGenConfig && (
                                 <div className="p-3 pt-0 flex flex-col gap-2 border-t border-[var(--color-border)] mt-1">
                                     {displayPrompt && (
@@ -389,8 +397,8 @@ function GeneratePanel({
                             )}
                         </div>
 
-                        <div 
-                            className="note-gen-progress-bar-wrap cursor-pointer group" 
+                        <div
+                            className="note-gen-progress-bar-wrap cursor-pointer group"
                             onClick={() => setShowGenStages(!showGenStages)}
                             title={t('detail.aiNotes.toggleStages', '点击查看/隐藏各阶段耗时')}
                         >
@@ -409,7 +417,7 @@ function GeneratePanel({
                             </span>
                             <span className="note-gen-progress-pct">{Math.round(activeTask.progress ?? 0)}%</span>
                         </div>
-                        
+
                         {/* Expandable Stages View */}
                         {showGenStages && activeTask.stages && activeTask.stages.length > 0 && (
                             <div className="mt-3 bg-[var(--color-bg-subtle)] rounded-lg p-3 text-xs border border-[var(--color-border)] shadow-inner">

@@ -1137,7 +1137,18 @@ body {
 }
 
 .note-toc--collapsed {
-  width: auto;
+  width: 44px !important;
+  overflow: hidden;
+}
+
+.note-toc--collapsed .note-toc-header-container {
+  border-bottom: none;
+}
+
+.note-toc--collapsed .note-toc-header {
+  justify-content: center;
+  padding: 12px 0;
+  border-bottom: none;
 }
 
 .note-toc-header {
@@ -1476,7 +1487,7 @@ body {
  * Mindmap Keyboard Focus styles
  * ============================================================ */
 
-.mindmap-node-kb-focus > foreignObject {
+.mindmap-node-kb-focus>foreignObject {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
   border-radius: 4px;
@@ -1484,7 +1495,7 @@ body {
   transition: all 0.2s ease;
 }
 
-[data-theme="dark"] .mindmap-node-kb-focus > foreignObject {
+[data-theme="dark"] .mindmap-node-kb-focus>foreignObject {
   box-shadow: 0 0 0 4px rgba(var(--color-primary-rgb, 99, 102, 241), 0.35);
 }
 
