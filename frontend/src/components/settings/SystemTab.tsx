@@ -14,6 +14,8 @@ export default function SystemTab({ onClose }: { onClose: () => void }) {
     const [proxyUrl, setProxyUrl] = useState('')
     const [biliSessdata, setBiliSessdata] = useState('')
     const [ytCookies, setYtCookies] = useState('')
+    const [showBiliCookie, setShowBiliCookie] = useState(false)
+    const [showYtCookie, setShowYtCookie] = useState(false)
 
     // Fetch initial data
     useEffect(() => {
@@ -77,13 +79,23 @@ export default function SystemTab({ onClose }: { onClose: () => void }) {
                     {t('settings.system.biliCookieTitle')}
                 </h3>
                 <div className="flex gap-2">
-                    <input
-                        type="password"
-                        placeholder={t('settings.system.biliCookiePlaceholder')}
-                        value={biliSessdata}
-                        onChange={(e) => setBiliSessdata(e.target.value)}
-                        className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono"
-                    />
+                    <div className="relative flex-1">
+                        <input
+                            type={showBiliCookie ? "text" : "password"}
+                            placeholder={t('settings.system.biliCookiePlaceholder')}
+                            value={biliSessdata}
+                            onChange={(e) => setBiliSessdata(e.target.value)}
+                            className="w-full px-3 py-2 pr-10 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowBiliCookie(!showBiliCookie)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors rounded-md hover:bg-[var(--color-bg-muted)]"
+                            title={showBiliCookie ? t('common.hide', '隐藏') : t('common.show', '显示')}
+                        >
+                            {showBiliCookie ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
+                        </button>
+                    </div>
                     <button
                         onClick={() => saveBiliCookieMutation.mutate(biliSessdata)}
                         className="px-4 py-2 bg-[var(--color-primary)] text-white text-sm rounded-lg hover:opacity-90"
@@ -105,13 +117,33 @@ export default function SystemTab({ onClose }: { onClose: () => void }) {
                     {t('settings.system.ytCookieTitle')}
                 </h3>
                 <div className="space-y-2">
-                    <textarea
-                        rows={4}
-                        placeholder={t('settings.system.ytCookiePlaceholder')}
-                        value={ytCookies}
-                        onChange={(e) => setYtCookies(e.target.value)}
-                        className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono resize-y"
-                    />
+                    <div className="relative">
+                        {showYtCookie ? (
+                            <textarea
+                                rows={4}
+                                placeholder={t('settings.system.ytCookiePlaceholder')}
+                                value={ytCookies}
+                                onChange={(e) => setYtCookies(e.target.value)}
+                                className="w-full px-3 py-2 pr-10 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono resize-y flex-1"
+                            />
+                        ) : (
+                            <input
+                                type="password"
+                                placeholder={t('settings.system.ytCookiePlaceholder')}
+                                value={ytCookies}
+                                onChange={(e) => setYtCookies(e.target.value)}
+                                className="w-full px-3 py-2 pr-10 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono flex-1"
+                            />
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setShowYtCookie(!showYtCookie)}
+                            className="absolute right-2 top-2 p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors rounded-md hover:bg-[var(--color-bg-muted)]"
+                            title={showYtCookie ? t('common.hide', '隐藏') : t('common.show', '显示')}
+                        >
+                            {showYtCookie ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
+                        </button>
+                    </div>
                     <div className="flex justify-end">
                         <button
                             onClick={() => saveYtCookieMutation.mutate(ytCookies)}

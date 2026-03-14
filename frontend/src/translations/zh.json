@@ -194,7 +194,9 @@
             "discoverModels": "发现模型",
             "selectedCount": "已选 {{selected}} / {{total}} 个",
             "testAll": "全部测试",
-            "batchTestResult": "测试完成: {{passed}}/{{total}} 通过"
+            "batchTestResult": "测试完成: {{passed}}/{{total}} 通过",
+            "selectProvider": "选择左侧服务商查看详情",
+            "noProviders": "暂无服务商，点击上方添加"
         },
         "asr": {
             "title": "ASR 模型配置",

@@ -189,7 +189,9 @@
             "discoverModels": "Discover Models",
             "selectedCount": "{{selected}} / {{total}} selected",
             "testAll": "Test All",
-            "batchTestResult": "Test complete: {{passed}}/{{total}} passed"
+            "batchTestResult": "Test complete: {{passed}}/{{total}} passed",
+            "selectProvider": "Select a provider to view details",
+            "noProviders": "No providers yet. Click above to add one."
         },
         "asr": {
             "title": "ASR Model Configuration",
