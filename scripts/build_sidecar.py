@@ -9,6 +9,8 @@ Output:
 """
 
 import os
+import tomllib
+from pathlib import Path
 import platform
 import shutil
 import subprocess
@@ -20,6 +22,16 @@ BINARIES_DIR = os.path.join(PROJECT_ROOT, "src-tauri")
 
 
 def get_venv_python() -> str:
+    """Find the project venv Python. Prefer .venv in project root."""
+    # (unchanged)\n    if sys.prefix != sys.base_prefix:
+        # Already running inside a venv
+        return sys.executable
+    venv_python = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe") \
+    if platform.system() == "Windows" \
+    else os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
+    if os.path.exists(venv_python):
+        return venv_python
+    return sys.executable
     """Find the project venv Python. Prefer .venv in project root."""
     if sys.prefix != sys.base_prefix:
         # Already running inside a venv
@@ -51,6 +63,24 @@ def get_target_triple() -> str:
 
 
 def build():
+    # ---------------------------------------------------------------------
+    # Inject project version into the sidecar binary
+    # ---------------------------------------------------------------------
+    # Read version from pyproject.toml (already bumped to 0.13.0)
+    try:
+        pyproject_path = os.path.join(PROJECT_ROOT, "pyproject.toml")
+        with open(pyproject_path, "rb") as f:
+            pyproj = tomllib.load(f)
+        proj_version = pyproj["project"]["version"]
+    except Exception as e:
+        print(f"[build_sidecar] Failed to read version from pyproject.toml: {e}")
+        proj_version = "0.0.0"
+    # Write a small version file that will be bundled with the exe
+    version_txt_path = os.path.join(PROJECT_ROOT, "src-tauri", "version.txt")
+    with open(version_txt_path, "w", encoding="utf-8") as vf:
+        vf.write(f"__version__ = '{proj_version}'\n")
+    # ---------------------------------------------------------------------
+
     target_triple = get_target_triple()
     ext = ".exe" if platform.system() == "Windows" else ""
     output_name = f"diting-server-{target_triple}{ext}"
@@ -102,7 +132,10 @@ def build():
     for mod in exclude_modules:
         cmd.extend(["--exclude-module", mod])
 
-    # Add data files
+    # Add version file
+    if os.path.exists(version_txt_path):
+        cmd.extend(["--add-data", f"{version_txt_path}{sep}src-tauri"])
+
     sep = ";" if platform.system() == "Windows" else ":"
     if os.path.exists(frontend_dist):
         cmd.extend(["--add-data", f"{frontend_dist}{sep}frontend/dist"])
