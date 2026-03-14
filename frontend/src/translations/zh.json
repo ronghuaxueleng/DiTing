@@ -185,7 +185,16 @@
             "fetchModelsFailed": "获取模型失败",
             "noModelsFound": "未发现可用模型",
             "addSelected": "添加所选",
-            "alreadyAdded": "已添加"
+            "alreadyAdded": "已添加",
+            "baseUrlHint": "大多数 OpenAI 兼容 API 需要以 /v1 结尾",
+            "endpointPreview": "请求地址预览",
+            "selectAll": "全选",
+            "deselectAll": "取消全选",
+            "searchModelsPlaceholder": "搜索模型...",
+            "discoverModels": "发现模型",
+            "selectedCount": "已选 {{selected}} / {{total}} 个",
+            "testAll": "全部测试",
+            "batchTestResult": "测试完成: {{passed}}/{{total}} 通过"
         },
         "asr": {
             "title": "ASR 模型配置",

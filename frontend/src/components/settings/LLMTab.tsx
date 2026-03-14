@@ -3,31 +3,27 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
     getLLMProviders,
-    addLLMProvider,
-    updateLLMProvider,
     deleteLLMProvider,
     deleteLLMModel,
     setActiveModel,
     addLLMModel,
     updateLLMModel,
     testLLMModel,
-    fetchAvailableModels,
-    batchAddModels,
 } from '../../api'
+import type { LLMProvider } from '../../api/types'
 import { useToast } from '../../contexts/ToastContext'
 import Icons from '../ui/Icons'
 import ConfirmModal from '../ConfirmModal'
+import ProviderFormModal from './ProviderFormModal'
+import ModelDiscoveryModal from './ModelDiscoveryModal'
 
 export default function LLMTab() {
     const { t } = useTranslation()
     const queryClient = useQueryClient()
     const { showUndoableDelete, showToast } = useToast()
-    const [showForm, setShowForm] = useState(false)
-    const [editingId, setEditingId] = useState<number | null>(null)
-    const [formData, setFormData] = useState({ name: '', base_url: '', api_key: '', api_type: 'chat_completions' })
+
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null)
     const [hiddenModels, setHiddenModels] = useState<Set<number>>(new Set())
-    const [showApiKey, setShowApiKey] = useState(false)
 
     const [addingModelProviderId, setAddingModelProviderId] = useState<number | null>(null)
     const [newModelName, setNewModelName] = useState('')
@@ -36,39 +32,13 @@ export default function LLMTab() {
     const [editModelName, setEditModelName] = useState('')
     const [testResults, setTestResults] = useState<Record<number, { loading: boolean; success?: boolean; message?: string; latency_ms?: number }>>({})
 
-    // Model discovery state
-    const [fetchingModelsProviderId, setFetchingModelsProviderId] = useState<number | null>(null)
-    const [availableModels, setAvailableModels] = useState<{ id: string; owned_by: string; already_added: boolean }[]>([])
-    const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set())
-    const [fetchError, setFetchError] = useState<string | null>(null)
-    const [isImporting, setIsImporting] = useState(false)
+    // Modal state
+    const [providerModal, setProviderModal] = useState<{ isOpen: boolean; provider: LLMProvider | null }>({ isOpen: false, provider: null })
+    const [discoveryModal, setDiscoveryModal] = useState<{ isOpen: boolean; provider: LLMProvider | null }>({ isOpen: false, provider: null })
 
     const { data: providers, isLoading } = useQuery({
         queryKey: ['llm-providers'],
         queryFn: getLLMProviders,
-    })
-
-    const addProviderMutation = useMutation({
-        mutationFn: addLLMProvider,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['llm-providers'] })
-            setShowForm(false)
-            setFormData({ name: '', base_url: '', api_key: '', api_type: 'chat_completions' })
-            showToast('success', t('settings.llm.addSuccess'))
-        },
-        onError: (e) => showToast('error', t('settings.llm.addFailed') + ': ' + e.message),
-    })
-
-    const updateProviderMutation = useMutation({
-        mutationFn: ({ id, data }: { id: number; data: { name: string; base_url: string; api_key: string; api_type: string } }) =>
-            updateLLMProvider(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['llm-providers'] })
-            setEditingId(null)
-            setFormData({ name: '', base_url: '', api_key: '', api_type: 'chat_completions' })
-            showToast('success', t('settings.llm.updateSuccess'))
-        },
-        onError: (e) => showToast('error', t('settings.llm.updateFailed') + ': ' + e.message),
     })
 
     const deleteProviderMutation = useMutation({
@@ -112,30 +82,7 @@ export default function LLMTab() {
         onError: (e) => showToast('error', t('common.error') + ': ' + e.message),
     })
 
-    const handleEdit = (provider: { id: number; name: string; base_url: string; api_key?: string; api_type?: string }) => {
-        setEditingId(provider.id)
-        setFormData({ name: provider.name, base_url: provider.base_url, api_key: provider.api_key || '', api_type: provider.api_type || 'chat_completions' })
-        setShowForm(false)
-        setShowApiKey(false)
-    }
-
-    const handleSave = () => {
-        if (editingId) {
-            updateProviderMutation.mutate({ id: editingId, data: formData })
-        } else {
-            addProviderMutation.mutate(formData)
-        }
-    }
-
-    const handleCancelEdit = () => {
-        setEditingId(null)
-        setShowForm(false)
-        setFormData({ name: '', base_url: '', api_key: '', api_type: 'chat_completions' })
-        setShowApiKey(false)
-    }
-
     const handleDeleteModel = (modelId: number) => {
-        // Optimistic delete
         setHiddenModels(prev => new Set(prev).add(modelId))
         showUndoableDelete(
             t('settings.llm.deletingModel'),
@@ -184,145 +131,66 @@ export default function LLMTab() {
         }
     }
 
-    const handleFetchModels = async (providerId: number) => {
-        setFetchingModelsProviderId(providerId)
-        setAvailableModels([])
-        setSelectedModels(new Set())
-        setFetchError(null)
-        try {
-            const result = await fetchAvailableModels(providerId)
-            if (result.success) {
-                setAvailableModels(result.models)
-                // Pre-select models not yet added
-                const preSelected = new Set(result.models.filter(m => !m.already_added).map(m => m.id))
-                setSelectedModels(preSelected)
-            } else {
-                setFetchError(result.message)
-                showToast('error', t('settings.llm.fetchModelsFailed') + ': ' + result.message)
-            }
-        } catch (e: any) {
-            setFetchError(e.message)
-            showToast('error', t('settings.llm.fetchModelsFailed') + ': ' + e.message)
-        }
-    }
+    const handleTestAll = async (provider: LLMProvider) => {
+        const models = provider.models.filter(m => !hiddenModels.has(m.id))
+        if (models.length === 0) return
 
-    const handleImportSelected = async (providerId: number) => {
-        if (selectedModels.size === 0) return
-        setIsImporting(true)
-        try {
-            const result = await batchAddModels(providerId, Array.from(selectedModels))
-            queryClient.invalidateQueries({ queryKey: ['llm-providers'] })
-            showToast('success', t('settings.llm.fetchModelsSuccess', { count: result.added }))
-            setFetchingModelsProviderId(null)
-        } catch (e: any) {
-            showToast('error', e.message)
-        } finally {
-            setIsImporting(false)
-        }
-    }
+        // Mark all as loading
+        const loadingState: Record<number, { loading: boolean }> = {}
+        models.forEach(m => { loadingState[m.id] = { loading: true } })
+        setTestResults(prev => ({ ...prev, ...loadingState }))
 
-    const toggleModelSelection = (modelId: string) => {
-        setSelectedModels(prev => {
-            const next = new Set(prev)
-            if (next.has(modelId)) next.delete(modelId)
-            else next.add(modelId)
-            return next
-        })
-    }
+        const results = await Promise.allSettled(
+            models.map(async m => {
+                try {
+                    const result = await testLLMModel(provider.id, m.id)
+                    setTestResults(prev => ({ ...prev, [m.id]: { loading: false, ...result } }))
+                    return result.success
+                } catch (e: any) {
+                    setTestResults(prev => ({ ...prev, [m.id]: { loading: false, success: false, message: e.message } }))
+                    return false
+                }
+            })
+        )
 
-    const isEditing = editingId !== null
-    const showingForm = showForm || isEditing
+        const passed = results.filter(r => r.status === 'fulfilled' && r.value).length
+        showToast(passed === models.length ? 'success' : 'error',
+            t('settings.llm.batchTestResult', { passed, total: models.length })
+        )
+    }
 
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h3 className="font-medium">{t('settings.llm.providers')}</h3>
-                {!showingForm && (
-                    <button
-                        onClick={() => setShowForm(true)}
-                        className="flex items-center gap-1.5 text-sm text-[var(--color-primary)] hover:underline"
-                    >
-                        <Icons.Plus className="w-4 h-4" />
-                        {t('settings.llm.addProvider')}
-                    </button>
-                )}
+                <button
+                    onClick={() => setProviderModal({ isOpen: true, provider: null })}
+                    className="flex items-center gap-1.5 text-sm text-[var(--color-primary)] hover:underline"
+                >
+                    <Icons.Plus className="w-4 h-4" />
+                    {t('settings.llm.addProvider')}
+                </button>
             </div>
-
-            {showingForm && (
-                <div className="bg-[var(--color-bg)] p-4 rounded-lg space-y-3 border border-[var(--color-border)]">
-                    <div className="text-sm font-medium mb-2">
-                        {isEditing ? t('settings.llm.editProvider') : t('settings.llm.addProviderTitle')}
-                    </div>
-                    <input
-                        type="text"
-                        placeholder={t('settings.llm.namePlaceholder')}
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg text-sm"
-                    />
-                    <input
-                        type="text"
-                        placeholder={t('settings.llm.urlPlaceholder')}
-                        value={formData.base_url}
-                        onChange={(e) => setFormData({ ...formData, base_url: e.target.value })}
-                        className="w-full px-3 py-2 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg text-sm"
-                    />
-                    <div className="relative">
-                        <input
-                            type={showApiKey ? "text" : "password"}
-                            placeholder={t('settings.llm.apiKeyPlaceholder')}
-                            value={formData.api_key}
-                            onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
-                            className="w-full px-3 py-2 pr-10 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg text-sm"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowApiKey(!showApiKey)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
-                        >
-                            {showApiKey ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
-                        </button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <label className="text-xs text-[var(--color-text-muted)] whitespace-nowrap">{t('settings.llm.apiType')}</label>
-                        <select
-                            value={formData.api_type}
-                            onChange={(e) => setFormData({ ...formData, api_type: e.target.value })}
-                            className="flex-1 px-3 py-2 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg text-sm"
-                        >
-                            <option value="chat_completions">{t('settings.llm.apiTypeChatCompletions')}</option>
-                            <option value="responses">{t('settings.llm.apiTypeResponses')}</option>
-                        </select>
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                        <button
-                            onClick={handleCancelEdit}
-                            className="px-3 py-1.5 text-sm bg-[var(--color-border)] rounded-lg hover:opacity-80"
-                        >
-                            {t('common.cancel')}
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={addProviderMutation.isPending || updateProviderMutation.isPending}
-                            className="px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white rounded-lg disabled:opacity-50"
-                        >
-                            {isEditing ? t('settings.llm.update') : t('common.save')}
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {isLoading ? (
                 <div className="text-center py-10 text-[var(--color-text-muted)]">{t('common.loading')}</div>
             ) : (
                 <div className="space-y-4">
-                    {providers?.map((provider: any) => (
+                    {providers?.map((provider: LLMProvider) => (
                         <div key={provider.id} className="bg-[var(--color-bg)] p-4 rounded-lg">
                             <div className="flex justify-between items-center mb-3">
                                 <span className="font-medium">{provider.name}</span>
                                 <div className="flex items-center gap-1">
+                                    {/* Test All */}
                                     <button
-                                        onClick={() => handleEdit(provider)}
+                                        onClick={() => handleTestAll(provider)}
+                                        className="p-1.5 rounded-full text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors"
+                                        title={t('settings.llm.testAll')}
+                                    >
+                                        <Icons.Zap className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setProviderModal({ isOpen: true, provider })}
                                         className="p-1.5 rounded-full text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors"
                                         title={t('settings.llm.edit')}
                                     >
@@ -344,7 +212,7 @@ export default function LLMTab() {
                                 </span>
                             </div>
                             <div className="flex flex-wrap gap-2 items-center">
-                                {provider.models.filter((m: any) => !hiddenModels.has(m.id)).map((model: any) => (
+                                {provider.models.filter(m => !hiddenModels.has(m.id)).map(model => (
                                     <div key={model.id} className="group relative">
                                         {editingModelId === model.id ? (
                                             <input
@@ -360,63 +228,63 @@ export default function LLMTab() {
                                                 className="px-3 py-1 text-xs rounded-full border border-[var(--color-primary)] bg-[var(--color-bg)] outline-none min-w-[120px]"
                                             />
                                         ) : (
-                                            <>
-                                                <div className={`flex items-center rounded-full transition-colors ${model.is_active
-                                                    ? 'bg-[var(--color-primary)] text-white'
-                                                    : 'bg-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-primary)]/20'
-                                                    }`}>
-                                                    <button
-                                                        onClick={() => activateModelMutation.mutate(model.id)}
-                                                        className={`px-3 py-1 text-xs rounded-full transition-colors flex items-center justify-center gap-1`}
-                                                    >
-                                                        {model.model_name || model.name} {Boolean(model.is_active) && '✓'}
-                                                        {!model.is_active && testResults[model.id] && !testResults[model.id]?.loading && (
-                                                            testResults[model.id]?.success
-                                                                ? <Icons.Check className="w-3 h-3 text-green-400" />
-                                                                : <Icons.XCircle className="w-3 h-3 text-red-400" />
-                                                        )}
-                                                    </button>
-                                                    {!model.is_active && (
-                                                        <div className="flex items-center pr-1 max-w-0 overflow-hidden opacity-0 group-hover:max-w-[100px] group-hover:opacity-100 transition-all duration-200">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    setEditModelName(model.model_name || model.name)
-                                                                    setEditingModelId(model.id)
-                                                                }}
-                                                                className="p-1 rounded-full text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors"
-                                                                title={t('settings.llm.editModel')}
-                                                            >
-                                                                <Icons.Edit className="w-3 h-3" />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    handleDeleteModel(model.id)
-                                                                }}
-                                                                className="p-1 rounded-full text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                                                                title={t('settings.llm.deleteModel')}
-                                                            >
-                                                                <Icons.X className="w-3 h-3" />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    handleTestModel(provider.id, model.id)
-                                                                }}
-                                                                disabled={testResults[model.id]?.loading}
-                                                                className="p-1 rounded-full text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors"
-                                                                title={t('settings.llm.testConnection')}
-                                                            >
-                                                                {testResults[model.id]?.loading
-                                                                    ? <Icons.Loader className="w-3 h-3 animate-spin" />
-                                                                    : <Icons.Zap className="w-3 h-3" />
-                                                                }
-                                                            </button>
-                                                        </div>
+                                            <div className={`flex items-center rounded-full transition-colors ${model.is_active
+                                                ? 'bg-[var(--color-primary)] text-white'
+                                                : 'bg-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-primary)]/20'
+                                                }`}>
+                                                <button
+                                                    onClick={() => activateModelMutation.mutate(model.id)}
+                                                    className="px-3 py-1 text-xs rounded-full transition-colors flex items-center justify-center gap-1"
+                                                >
+                                                    {model.model_name}
+                                                    {Boolean(model.is_active) && ' ✓'}
+                                                    {/* Latency badge after test */}
+                                                    {testResults[model.id] && !testResults[model.id]?.loading && (
+                                                        testResults[model.id]?.success
+                                                            ? <span className="text-[10px] text-green-400 ml-0.5">{testResults[model.id]?.latency_ms}ms</span>
+                                                            : <Icons.XCircle className="w-3 h-3 text-red-400" />
                                                     )}
-                                                </div>
-                                            </>
+                                                </button>
+                                                {!model.is_active && (
+                                                    <div className="flex items-center pr-1 gap-0.5">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                setEditModelName(model.model_name)
+                                                                setEditingModelId(model.id)
+                                                            }}
+                                                            className="p-0.5 rounded-full text-[var(--color-text-muted)]/50 hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors"
+                                                            title={t('settings.llm.editModel')}
+                                                        >
+                                                            <Icons.Edit className="w-3 h-3" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleDeleteModel(model.id)
+                                                            }}
+                                                            className="p-0.5 rounded-full text-[var(--color-text-muted)]/50 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                            title={t('settings.llm.deleteModel')}
+                                                        >
+                                                            <Icons.X className="w-3 h-3" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleTestModel(provider.id, model.id)
+                                                            }}
+                                                            disabled={testResults[model.id]?.loading}
+                                                            className="p-0.5 rounded-full text-[var(--color-text-muted)]/50 hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors"
+                                                            title={t('settings.llm.testConnection')}
+                                                        >
+                                                            {testResults[model.id]?.loading
+                                                                ? <Icons.Loader className="w-3 h-3 animate-spin" />
+                                                                : <Icons.Zap className="w-3 h-3" />
+                                                            }
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 ))}
@@ -448,86 +316,34 @@ export default function LLMTab() {
                                             <span>{t('settings.llm.addModel')}</span>
                                         </button>
                                         <button
-                                            onClick={() => handleFetchModels(provider.id)}
-                                            disabled={fetchingModelsProviderId === provider.id && availableModels.length === 0 && !fetchError}
+                                            onClick={() => setDiscoveryModal({ isOpen: true, provider })}
                                             className="px-3 py-1.5 text-xs rounded-full border border-dashed border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:border-[var(--color-primary)] transition-colors flex items-center gap-1"
-                                            title={t('settings.llm.fetchModels')}
+                                            title={t('settings.llm.discoverModels')}
                                         >
-                                            {fetchingModelsProviderId === provider.id && availableModels.length === 0 && !fetchError
-                                                ? <Icons.Loader className="w-3 h-3 animate-spin" />
-                                                : <Icons.Refresh className="w-3 h-3" />
-                                            }
-                                            <span>{fetchingModelsProviderId === provider.id && availableModels.length === 0 && !fetchError
-                                                ? t('settings.llm.fetchingModels')
-                                                : t('settings.llm.fetchModels')
-                                            }</span>
+                                            <Icons.Refresh className="w-3 h-3" />
+                                            <span>{t('settings.llm.discoverModels')}</span>
                                         </button>
                                     </>
                                 )}
                             </div>
-
-                            {/* Model Discovery Dropdown */}
-                            {fetchingModelsProviderId === provider.id && (availableModels.length > 0 || fetchError) && (
-                                <div className="mt-3 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-3">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-xs font-medium">{t('settings.llm.fetchModels')}</span>
-                                        <button
-                                            onClick={() => setFetchingModelsProviderId(null)}
-                                            className="p-1 rounded-full text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors"
-                                        >
-                                            <Icons.X className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                    {fetchError ? (
-                                        <div className="text-xs text-red-400 py-2">{fetchError}</div>
-                                    ) : availableModels.length === 0 ? (
-                                        <div className="text-xs text-[var(--color-text-muted)] py-2">{t('settings.llm.noModelsFound')}</div>
-                                    ) : (
-                                        <>
-                                            <div className="max-h-48 overflow-y-auto space-y-1">
-                                                {availableModels.map(model => (
-                                                    <label
-                                                        key={model.id}
-                                                        className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors ${model.already_added
-                                                            ? 'opacity-50 cursor-not-allowed'
-                                                            : 'hover:bg-[var(--color-bg-hover)]'
-                                                            }`}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={model.already_added || selectedModels.has(model.id)}
-                                                            disabled={model.already_added}
-                                                            onChange={() => toggleModelSelection(model.id)}
-                                                            className="rounded"
-                                                        />
-                                                        <span className="flex-1 font-mono">{model.id}</span>
-                                                        {model.already_added && (
-                                                            <span className="text-[10px] text-[var(--color-text-muted)]">{t('settings.llm.alreadyAdded')}</span>
-                                                        )}
-                                                    </label>
-                                                ))}
-                                            </div>
-                                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-[var(--color-border)]">
-                                                <span className="text-[10px] text-[var(--color-text-muted)]">
-                                                    {selectedModels.size} / {availableModels.filter(m => !m.already_added).length}
-                                                </span>
-                                                <button
-                                                    onClick={() => handleImportSelected(provider.id)}
-                                                    disabled={selectedModels.size === 0 || isImporting}
-                                                    className="px-3 py-1 text-xs bg-[var(--color-primary)] text-white rounded-lg disabled:opacity-50 flex items-center gap-1"
-                                                >
-                                                    {isImporting && <Icons.Loader className="w-3 h-3 animate-spin" />}
-                                                    {t('settings.llm.addSelected')}
-                                                </button>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     ))}
                 </div>
             )}
+
+            {/* Provider Add/Edit Modal */}
+            <ProviderFormModal
+                isOpen={providerModal.isOpen}
+                onClose={() => setProviderModal({ isOpen: false, provider: null })}
+                provider={providerModal.provider}
+            />
+
+            {/* Model Discovery Modal */}
+            <ModelDiscoveryModal
+                isOpen={discoveryModal.isOpen}
+                onClose={() => setDiscoveryModal({ isOpen: false, provider: null })}
+                provider={discoveryModal.provider}
+            />
 
             {/* Delete Confirmation Modal */}
             <ConfirmModal

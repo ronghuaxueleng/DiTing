@@ -180,7 +180,16 @@
             "fetchModelsFailed": "Failed to fetch models",
             "noModelsFound": "No available models found",
             "addSelected": "Add Selected",
-            "alreadyAdded": "Already added"
+            "alreadyAdded": "Already added",
+            "baseUrlHint": "Most OpenAI-compatible APIs require a /v1 suffix",
+            "endpointPreview": "Endpoint Preview",
+            "selectAll": "Select All",
+            "deselectAll": "Deselect All",
+            "searchModelsPlaceholder": "Search models...",
+            "discoverModels": "Discover Models",
+            "selectedCount": "{{selected}} / {{total}} selected",
+            "testAll": "Test All",
+            "batchTestResult": "Test complete: {{passed}}/{{total}} passed"
         },
         "asr": {
             "title": "ASR Model Configuration",

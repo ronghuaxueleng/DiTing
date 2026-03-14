@@ -3,7 +3,7 @@ Settings schemas for LLM, ASR, and Prompt configuration.
 Consolidated from inline models in api/v1/endpoints/settings.py
 """
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ============ LLM Provider & Model ============
@@ -14,6 +14,11 @@ class LLMProviderCreate(BaseModel):
     base_url: str = Field(..., min_length=1)
     api_key: str = Field(..., min_length=1)
     api_type: str = Field('chat_completions', description="API protocol type: chat_completions or responses")
+
+    @field_validator('base_url')
+    @classmethod
+    def normalize_base_url(cls, v: str) -> str:
+        return v.rstrip('/')
 
 
 class LLMModelCreate(BaseModel):

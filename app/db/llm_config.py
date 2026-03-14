@@ -27,6 +27,7 @@ def get_all_providers(include_models=False):
 
 def add_provider(name, base_url, api_key, api_type='chat_completions'):
     """Add a new LLM provider."""
+    base_url = base_url.rstrip('/')
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("INSERT INTO llm_providers (name, base_url, api_key, api_type) VALUES (?, ?, ?, ?)", (name, base_url, api_key, api_type))
@@ -38,6 +39,7 @@ def add_provider(name, base_url, api_key, api_type='chat_completions'):
 
 def update_provider(pid, name, base_url, api_key, api_type='chat_completions'):
     """Update an LLM provider."""
+    base_url = base_url.rstrip('/')
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE llm_providers SET name=?, base_url=?, api_key=?, api_type=? WHERE id=?", (name, base_url, api_key, api_type, pid))
