@@ -116,17 +116,6 @@ export default function VideoCard({ video, onRefresh, onOpenPanel, selectionMode
 
     // Status overlay for processing/analyzing
     const renderStatusOverlay = () => {
-        if ((video.count === 0 || video.count === undefined) && !video.media_available) {
-            return (
-                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-10 transition-opacity opacity-0 group-hover:opacity-100 backdrop-blur-sm">
-                    <span className="px-4 py-2 bg-zinc-700/80 text-zinc-300 rounded-full font-medium text-sm flex items-center gap-2 border border-zinc-600">
-                        <Icons.FileText className="w-4 h-4" />
-                        {t('videoCard.noTranscription')}
-                    </span>
-                    <span className="text-zinc-400 text-xs mt-2">{t('videoCard.noTranscriptionDesc')}</span>
-                </div>
-            )
-        }
 
         if (video.latest_status === 'processing' || video.latest_status === 'pending') {
             return (
