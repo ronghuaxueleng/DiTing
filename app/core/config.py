@@ -1,10 +1,24 @@
 import os
 import re
+import sys
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # --- App-wide constants (read once at import time) ---
 def _read_version() -> str:
-    """Read version. Checks VERSION file first (Docker), then pyproject.toml (local dev)."""
+    """Read version. Checks bundled version.txt (PyInstaller), VERSION (Docker), then pyproject.toml (dev)."""
+    # PyInstaller bundle: version.txt is bundled into _MEIPASS/src-tauri/
+    meipass = getattr(sys, '_MEIPASS', None)
+    if meipass:
+        bundled = os.path.join(meipass, "src-tauri", "version.txt")
+        try:
+            with open(bundled, "r", encoding="utf-8") as f:
+                content = f.read()
+                match = re.search(r"__version__\s*=\s*'([^']+)'", content)
+                if match:
+                    return match.group(1)
+        except OSError:
+            pass
+
     base_dir = os.path.join(os.path.dirname(__file__), "..", "..")
     # Docker: a plain VERSION file is generated during build
     version_file = os.path.join(base_dir, "VERSION")

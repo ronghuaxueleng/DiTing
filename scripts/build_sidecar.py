@@ -8,6 +8,7 @@ Output:
     src-tauri/binaries/diting-server-{target-triple}[.exe]
 """
 
+import json
 import os
 try:
     import tomllib
@@ -60,7 +61,7 @@ def get_target_triple() -> str:
 
 def build():
     # -----------------------------------------------------------------
-    # Inject project version into the sidecar binary
+    # Inject project version into the sidecar binary AND sync to Tauri
     # -----------------------------------------------------------------
     try:
         pyproject_path = os.path.join(PROJECT_ROOT, "pyproject.toml")
@@ -70,10 +71,24 @@ def build():
     except Exception as e:
         print(f"[build_sidecar] Failed to read version from pyproject.toml: {e}")
         proj_version = "0.0.0"
+
     # Write a tiny version file that will be bundled with the exe
     version_txt_path = os.path.join(PROJECT_ROOT, "src-tauri", "version.txt")
     with open(version_txt_path, "w", encoding="utf-8") as vf:
         vf.write(f"__version__ = '{proj_version}'\n")
+
+    # Sync version to tauri.conf.json
+    tauri_conf_path = os.path.join(PROJECT_ROOT, "src-tauri", "tauri.conf.json")
+    try:
+        with open(tauri_conf_path, "r", encoding="utf-8") as f:
+            tauri_conf = json.load(f)
+        if tauri_conf.get("version") != proj_version:
+            tauri_conf["version"] = proj_version
+            with open(tauri_conf_path, "w", encoding="utf-8") as f:
+                json.dump(tauri_conf, f, indent=2, ensure_ascii=False)
+            print(f"[build_sidecar] Synced version to tauri.conf.json: {proj_version}")
+    except Exception as e:
+        print(f"[build_sidecar] Warning: Failed to sync version to tauri.conf.json: {e}")
 
     # -----------------------------------------------------------------
     target_triple = get_target_triple()
@@ -118,6 +133,10 @@ def build():
         "--specpath", os.path.join(PROJECT_ROOT, "build"),
         "--noconfirm",
         "--clean",
+        # yt-dlp uses dynamic extractor loading — collect all submodules
+        "--collect-all", "yt_dlp",
+        # Ensure SSL certificates are bundled
+        "--collect-data", "certifi",
     ]
 
     for mod in exclude_modules:
