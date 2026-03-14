@@ -56,6 +56,7 @@ def get_youtube_info(url, proxy=None):
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
+        'ignore_no_formats_error': True,
         'proxy': proxy,
     }
     if cookie_file:
@@ -76,7 +77,7 @@ def get_youtube_info(url, proxy=None):
     except Exception as e:
         # If cookies caused format error, retry without cookies
         if cookie_file and _is_format_error(e):
-            logger.warning(f"⚠️ yt-dlp format error with cookies, retrying without cookies...")
+            logger.warning(f"⚠️ yt-dlp format error with cookies (original error: {e}), retrying without cookies...")
             _cleanup_cookie_file(cookie_file)
             cookie_file = None
             try:
