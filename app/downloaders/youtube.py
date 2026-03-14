@@ -142,22 +142,20 @@ def download_youtube_video(url, output_dir=None, proxy=None, task_id=None, check
         return _do_download()
     except Exception as e:
         check_and_reraise_cancel(e)
-        # Retry without cookies on format error
-        if cookie_file and _is_format_error(e):
-            logger.warning(f"⚠️ yt-dlp format error with cookies, retrying without cookies...")
-            _cleanup_cookie_file(cookie_file)
-            cookie_file = None
-            ydl_opts.pop('cookiefile', None)
-            # Need new filename since old attempt may have partial files
+        # Retry with simpler format on format error (keep cookies for auth)
+        if _is_format_error(e):
+            logger.warning(f"⚠️ yt-dlp format error (original: {e}), retrying with fallback format...")
             filename_base2 = str(uuid.uuid4())
             ydl_opts['outtmpl'] = os.path.join(output_dir, f"{filename_base2}.%(ext)s")
+            ydl_opts['format'] = 'bestaudio/best'
+            ydl_opts.pop('postprocessors', None)
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.extract_info(url, download=True)
-                return find_downloaded_file(output_dir, filename_base2, '.m4a')
+                return find_downloaded_file(output_dir, filename_base2)
             except Exception as e2:
                 check_and_reraise_cancel(e2)
-                logger.error(f"❌ yt-dlp Download Error (no cookies): {e2}")
+                logger.error(f"❌ yt-dlp Download Error (fallback format): {e2}")
                 return None
         logger.error(f"❌ yt-dlp Download Error: {e}")
         return None
@@ -202,21 +200,19 @@ def download_youtube_media(url, quality='best', output_dir=None, proxy=None, tas
         return _do_download()
     except Exception as e:
         check_and_reraise_cancel(e)
-        # Retry without cookies on format error
-        if cookie_file and _is_format_error(e):
-            logger.warning(f"⚠️ yt-dlp format error with cookies, retrying without cookies...")
-            _cleanup_cookie_file(cookie_file)
-            cookie_file = None
-            ydl_opts.pop('cookiefile', None)
+        # Retry with simpler format on format error (keep cookies for auth)
+        if _is_format_error(e):
+            logger.warning(f"⚠️ yt-dlp video format error (original: {e}), retrying with fallback format...")
             filename_base2 = str(uuid.uuid4())
             ydl_opts['outtmpl'] = os.path.join(output_dir, f"{filename_base2}.%(ext)s")
+            ydl_opts['format'] = 'worst' if quality == 'worst' else 'best'
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.extract_info(url, download=True)
                 return find_downloaded_file(output_dir, filename_base2, '.mp4')
             except Exception as e2:
                 check_and_reraise_cancel(e2)
-                logger.error(f"❌ yt-dlp Video Download Error (no cookies): {e2}")
+                logger.error(f"❌ yt-dlp Video Download Error (fallback format): {e2}")
                 return None
         logger.error(f"❌ yt-dlp Video Download Error: {e}")
         return None
@@ -276,6 +272,7 @@ def _download_subtitles_inner(url, output_dir, proxy, cookie_file, filename_base
             'quiet': True,
             'no_warnings': True,
             'skip_download': True,
+            'ignore_no_formats_error': True,
             'proxy': proxy,
         }
         if cookie_file:
@@ -326,6 +323,7 @@ def _download_subtitles_inner(url, output_dir, proxy, cookie_file, filename_base
         # Step 2: Download specific subtitle
         ydl_opts_down = {
             'skip_download': True,
+            'ignore_no_formats_error': True,
             'writesubtitles': not is_auto,
             'writeautomaticsub': is_auto,
             'subtitleslangs': [target_lang],
