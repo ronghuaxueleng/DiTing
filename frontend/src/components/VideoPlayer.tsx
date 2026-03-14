@@ -21,6 +21,7 @@ export interface VideoPlayerProps {
     setShowAppendCacheMenu: (show: boolean) => void
     updatePolicyMutation: any // from React Query
     handleAppendCache: (quality: string) => void
+    isZenMode?: boolean
 }
 
 export default function VideoPlayer({
@@ -40,7 +41,8 @@ export default function VideoPlayer({
     showAppendCacheMenu,
     setShowAppendCacheMenu,
     updatePolicyMutation,
-    handleAppendCache
+    handleAppendCache,
+    isZenMode
 }: VideoPlayerProps) {
     const { t } = useTranslation()
     const [showCacheBar, setShowCacheBar] = React.useState(false)
@@ -177,8 +179,9 @@ export default function VideoPlayer({
     return (
         <div className={`space-y-3 ${mobileLayout === 'split' ? 'mb-2 lg:mb-6' : 'mb-6'}`}>
             {/* 1. Tab Switcher + compact cache toggle */}
-            <div className="flex items-center gap-2">
-                <div className="flex flex-wrap bg-[var(--color-card-muted)] p-1 rounded-lg w-fit gap-1">
+            {!isZenMode && (
+                <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap bg-[var(--color-card-muted)] p-1 rounded-lg w-fit gap-1">
                     <button
                         onClick={() => setActiveTab('local')}
                         disabled={!video.media_available}
@@ -232,6 +235,7 @@ export default function VideoPlayer({
                     </button>
                 )}
             </div>
+            )}
 
             {/* 2. Player Container */}
             <div className={`rounded-xl overflow-hidden bg-black relative group border border-[var(--color-border)] shadow-lg transition-all duration-300 ${isDouyinEmbedActive
@@ -242,7 +246,7 @@ export default function VideoPlayer({
             </div>
 
             {/* 3. Cache Info Bar */}
-            {showCacheBar && hasCacheSection && (
+            {!isZenMode && showCacheBar && hasCacheSection && (
                 <div className={`bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm space-y-2 ${mobileLayout === 'split' ? 'hidden lg:block' : ''}`}>
                     {/* Row 1: Cache Policy + Modify */}
                     <div className="flex flex-wrap items-center justify-between gap-3">

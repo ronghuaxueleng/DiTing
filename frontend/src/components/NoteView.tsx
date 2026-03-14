@@ -27,6 +27,7 @@ interface NoteViewProps {
     scrollToHeadingRef?: React.MutableRefObject<((headingText: string) => void) | null>
     /** Fired when the user scrolls to a different heading */
     onActiveHeadingChange?: (headingText: string | null) => void
+    isZenMode?: boolean
 }
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath]
@@ -73,10 +74,11 @@ const TOC_MIN_WIDTH = 120
 const TOC_MAX_WIDTH = 480
 const TOC_DEFAULT_WIDTH = 180
 
-function NoteTOC({ items, activeId, onItemClick }: {
+function NoteTOC({ items, activeId, onItemClick, isZenMode }: {
     items: TocItem[]
     activeId: string | null
     onItemClick: (id: string) => void
+    isZenMode?: boolean
 }) {
     const { t } = useTranslation()
     const [collapsed, setCollapsed] = useState(false)
@@ -132,17 +134,29 @@ function NoteTOC({ items, activeId, onItemClick }: {
         e.preventDefault()
         e.stopPropagation()
         setTocWidth(TOC_DEFAULT_WIDTH)
-        localStorage.setItem('note-toc-width', String(TOC_DEFAULT_WIDTH))
     }, [])
 
     if (items.length < 2) return null
+
+    if (isZenMode && collapsed) {
+        return (
+            <button 
+                onClick={() => setCollapsed(false)}
+                className="fixed right-6 top-1/2 -translate-y-1/2 z-[100] w-10 h-10 rounded-full bg-[var(--color-card)]/90 backdrop-blur shadow-lg border border-[var(--color-border)] flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:scale-110 transition-all duration-300 opacity-50 hover:opacity-100"
+                title={t('detail.aiNotes.tocExpand', '展开目录')}
+            >
+                <Icons.List className="w-5 h-5" />
+            </button>
+        )
+    }
+
     return (
         <div
-            className={`note-toc ${collapsed ? 'note-toc--collapsed' : ''}`}
+            className={`note-toc ${collapsed ? 'note-toc--collapsed' : ''} ${isZenMode ? 'fixed right-6 top-1/2 -translate-y-1/2 z-[100] bg-[var(--color-card)]/90 backdrop-blur-md shadow-2xl rounded-xl border border-[var(--color-border)] opacity-30 hover:opacity-100 transition-all duration-300 max-h-[60vh] overflow-y-auto' : ''}`}
             style={collapsed ? undefined : { width: tocWidth }}
         >
             {/* Drag handle on left edge */}
-            {!collapsed && (
+            {!collapsed && !isZenMode && (
                 <div
                     className="note-toc-resize-handle"
                     onMouseDown={handleDragStart}
@@ -478,7 +492,7 @@ function GeneratePanel({
 }
 
 // ---- Main Component ----
-export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap: _onOpenMindmap, onOpenDetail, scrollToHeadingRef, onActiveHeadingChange }: NoteViewProps) {
+export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap: _onOpenMindmap, onOpenDetail, scrollToHeadingRef, onActiveHeadingChange, isZenMode }: NoteViewProps) {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
@@ -1178,9 +1192,9 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
     }
 
     return (
-        <div className={`note-view${isEditing ? ' note-view--editing' : ''}`}>
+        <div className={`note-view${isEditing ? ' note-view--editing' : ''} ${isZenMode ? 'relative' : ''}`}>
             {/* ---- TOOLBAR ---- */}
-            <div className="note-toolbar">
+            <div className={`note-toolbar ${isZenMode ? 'absolute top-2 right-4 z-50 opacity-20 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 bg-[var(--color-bg)]/90 backdrop-blur-md border border-[var(--color-border)] rounded-xl shadow-lg shadow-black/10 p-1 min-h-[40px]' : ''}`}>
                 <div className="note-toolbar-left">
                     {/* Version history toggle */}
                     {notes.length > 0 && (
@@ -1485,7 +1499,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
 
             {/* ---- READ MODE (with TOC) ---- */}
             {activeNote && !isEditing && (
-                <div className="note-read-layout">
+                <div className={`note-read-layout ${isZenMode ? 'w-full' : ''}`}>
                     <div className="note-content" ref={contentRef}>
                         <Markdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
                             {preprocessLaTeX(activeNote.content)}
@@ -1495,6 +1509,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                         items={tocItems}
                         activeId={activeTocId}
                         onItemClick={handleTocClick}
+                        isZenMode={isZenMode}
                     />
                 </div>
             )}

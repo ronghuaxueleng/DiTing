@@ -42,6 +42,31 @@ export default function Detail() {
   const highlightQuery = searchParams.get("highlight") || "";
   const queryClient = useQueryClient();
 
+  // Zen Mode State
+  const [isZenMode, setIsZenMode] = useState(() => {
+    return localStorage.getItem("detail-zen-mode") === "true";
+  });
+
+  const toggleZenMode = useCallback(() => {
+    setIsZenMode((prev) => {
+      const next = !prev;
+      localStorage.setItem("detail-zen-mode", String(next));
+      return next;
+    });
+  }, []);
+
+  // Exit Zen Mode on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isZenMode) {
+        setIsZenMode(false);
+        localStorage.setItem("detail-zen-mode", "false");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isZenMode]);
+
   // Player State
   const [activeTab, setActiveTab] = useState<"local" | "stream" | "embed">(
     "local",
@@ -559,6 +584,7 @@ export default function Detail() {
         setShowAppendCacheMenu={setShowAppendCacheMenu}
         updatePolicyMutation={updatePolicyMutation}
         handleAppendCache={handleAppendCache}
+        isZenMode={isZenMode}
       />
     );
   };
@@ -568,11 +594,15 @@ export default function Detail() {
 
   return (
     <div className="h-screen flex flex-col bg-[var(--color-bg)] overflow-hidden">
-      {/* Header - Aligned with Dashboard style */}
+      {/* Header - Aligned with Dashboard style, supports Zen Mode auto-hide */}
       <header
-        className={`sticky top-0 z-40 w-full transition-all duration-200 border-b ${
-          scrolled
-            ? "bg-[var(--color-bg)]/80 backdrop-blur-md border-[var(--color-border)] shadow-sm"
+        className={`w-full transition-all duration-300 border-b group ${
+          isZenMode
+            ? "fixed top-0 left-0 right-0 z-40 -translate-y-[calc(100%-4px)] hover:translate-y-0"
+            : "relative z-40 shrink-0 translate-y-0"
+        } ${
+          scrolled || isZenMode
+            ? "bg-[var(--color-bg)]/90 backdrop-blur-md border-[var(--color-border)] shadow-sm"
             : "bg-[var(--color-bg)] border-transparent"
         }`}
       >
@@ -643,15 +673,40 @@ export default function Detail() {
               </button>
             )}
 
+            {/* Zen Mode Toggle */}
+            {isDesktop && (
+              <button
+                onClick={toggleZenMode}
+                className={`p-2 rounded-lg transition-all duration-200 ${
+                  isZenMode
+                    ? "text-[var(--color-primary)] bg-[var(--color-primary)]/10"
+                    : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-card)]"
+                }`}
+                title={isZenMode ? t("detail.zenMode.exit", "退出沉浸模式 (Esc)") : t("detail.zenMode.enter", "开启沉浸模式")}
+              >
+                {isZenMode ? (
+                  <Icons.Minimize className="w-5 h-5" />
+                ) : (
+                  <Icons.Maximize className="w-5 h-5" />
+                )}
+              </button>
+            )}
+
             {/* Add more header actions here if needed */}
           </div>
         </div>
+        {/* Invisible hit area for hover-reveal when hidden */}
+        {isZenMode && (
+          <div className="absolute top-full left-0 right-0 h-4 bg-transparent cursor-pointer" />
+        )}
       </header>
 
       {/* Main Content Area - Full viewport height, independent scroll */}
       <div
         ref={containerRef}
-        className={`flex-1 flex flex-col lg:flex-row min-h-0 w-full px-4 sm:px-6 lg:px-8 gap-6 lg:gap-0 overflow-y-auto lg:overflow-hidden ${mobileLayout === "split" ? "py-0 lg:py-4" : "py-4"}`}
+        className={`flex-1 flex flex-col lg:flex-row min-h-0 w-full px-4 sm:px-6 lg:px-8 gap-6 lg:gap-0 overflow-y-auto lg:overflow-hidden ${
+          mobileLayout === "split" ? "py-0 lg:py-4" : "py-4"
+        }`}
       >
         {/* Left panel expand handle (shown when left panel is collapsed on desktop) */}
         {isDesktop && collapsedPanel === "left" && (
@@ -729,7 +784,7 @@ export default function Detail() {
                 {/* Bottom: Reference Panel or Manual Notes */}
                 {vertCollapsed !== "bottom" && (
                   <div
-                    className={`ref-panel bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm flex flex-col min-h-0`}
+                    className={`ref-panel bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm flex flex-col min-h-0 relative`}
                     style={{
                       flex:
                         vertCollapsed === "top"
@@ -740,7 +795,11 @@ export default function Detail() {
                     {contentTab === "notes" || contentTab === "mindmap" ? (
                       <>
                         {/* Mini tab header */}
-                        <div className="px-4 py-2.5 border-b border-[var(--color-border)] flex items-center justify-between bg-[var(--color-card-muted)] shrink-0">
+                        <div
+                          className={`px-4 py-2.5 border-b border-[var(--color-border)] flex items-center justify-between bg-[var(--color-card-muted)] shrink-0 transition-opacity duration-300 ${
+                            isZenMode ? "opacity-0 absolute pointer-events-none" : "opacity-100"
+                          }`}
+                        >
                           <span className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">
                             {t("detail.refPanel.title")}
                           </span>
@@ -779,6 +838,46 @@ export default function Detail() {
                             </button>
                           </div>
                         </div>
+
+                        {/* Floating Pill Menu for Zen Mode */}
+                        {isZenMode && (
+                          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 opacity-30 hover:opacity-100 transition-opacity duration-300">
+                            <div className="flex bg-[var(--color-card)]/80 backdrop-blur-sm p-1 rounded-full shadow-lg border border-[var(--color-border)]">
+                              <button
+                                onClick={() => setRefPanelTab("segments")}
+                                className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                                  refPanelTab === "segments"
+                                    ? "bg-[var(--color-bg)] shadow-sm text-[var(--color-text)]"
+                                    : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                                }`}
+                              >
+                                {t("detail.transcription.listMode")}
+                              </button>
+                              <button
+                                onClick={() => setRefPanelTab("immersive")}
+                                className={`px-3 py-1 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
+                                  refPanelTab === "immersive"
+                                    ? "bg-[var(--color-bg)] shadow-sm text-[var(--color-text)]"
+                                    : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                                }`}
+                              >
+                                <Icons.Music className="w-3 h-3" />
+                                {t("detail.transcription.immersiveMode")}
+                              </button>
+                              <button
+                                onClick={() => setRefPanelTab("mindmap")}
+                                className={`px-3 py-1 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
+                                  refPanelTab === "mindmap"
+                                    ? "bg-[var(--color-bg)] shadow-sm text-[var(--color-text)]"
+                                    : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                                }`}
+                              >
+                                <Icons.GitBranch className="w-3 h-3" />
+                                {t("detail.aiNotes.mindmap", "导图")}
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Content */}
                         <div className="flex-1 min-h-0 overflow-y-auto">
@@ -1065,7 +1164,7 @@ export default function Detail() {
         {/* Right Column: Transcriptions */}
         {(!isDesktop || collapsedPanel !== "right") && (
           <div
-            className={`flex-1 flex-col flex min-h-0 lg:overflow-hidden lg:pl-3 ${mobileLayout === "split" ? "overflow-hidden" : ""}`}
+            className={`flex-1 flex-col flex min-h-0 lg:overflow-hidden lg:pl-3 relative ${mobileLayout === "split" ? "overflow-hidden" : ""}`}
             style={
               !isDesktop && mobileLayout === "split" && stickyHeight > 0
                 ? {
@@ -1083,28 +1182,32 @@ export default function Detail() {
               <div
                 className={`flex-1 flex flex-col ${mobileLayout === "split" ? "overflow-hidden min-h-0" : "lg:overflow-hidden"}`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4 shrink-0">
+                <div
+                  className={`items-center justify-between gap-3 mb-4 shrink-0 transition-opacity duration-300 ${
+                    isZenMode ? "hidden" : "flex flex-wrap opacity-100"
+                  }`}
+                >
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <Icons.FileText className="w-5 h-5" />
                     {t("detail.transcription.title")}
                   </h2>
-                  {/* Immersive Trigger */}
                   <div className="flex bg-[var(--color-card-muted)] p-1 rounded-lg">
                     <button
                       onClick={() => setContentTab("segments")}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
                         contentTab === "segments"
                           ? "bg-[var(--color-card)] shadow-sm text-[var(--color-text)]"
                           : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
                       }`}
                     >
+                      <Icons.List className="w-3 h-3" />
                       {t("detail.transcription.listMode")}
                     </button>
                     <button
                       onClick={() => setContentTab("immersive")}
                       className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
                         contentTab === "immersive"
-                          ? "bg-[var(--color-card)] shadow-sm text-[var(--color-text)]" // Active
+                          ? "bg-[var(--color-card)] shadow-sm text-[var(--color-text)]"
                           : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
                       }`}
                     >
@@ -1135,6 +1238,58 @@ export default function Detail() {
                     </button>
                   </div>
                 </div>
+                
+                {/* Floating Pill Menu for Right Panel Zen Mode */}
+                {isZenMode && (
+                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 opacity-30 hover:opacity-100 transition-opacity duration-300">
+                    <div className="flex bg-[var(--color-card)]/90 backdrop-blur-md p-1 rounded-full shadow-2xl border border-[var(--color-border)]">
+                      <button
+                        onClick={() => setContentTab("segments")}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5 ${
+                          contentTab === "segments"
+                            ? "bg-[var(--color-bg)] shadow-sm text-[var(--color-primary)] ring-1 ring-[var(--color-border)]"
+                            : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50"
+                        }`}
+                      >
+                        <Icons.List className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{t("detail.transcription.listMode")}</span>
+                      </button>
+                      <button
+                        onClick={() => setContentTab("immersive")}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5 ${
+                          contentTab === "immersive"
+                            ? "bg-[var(--color-bg)] shadow-sm text-[var(--color-primary)] ring-1 ring-[var(--color-border)]"
+                            : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50"
+                        }`}
+                      >
+                        <Icons.Music className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{t("detail.transcription.immersiveMode")}</span>
+                      </button>
+                      <button
+                        onClick={() => setContentTab("notes")}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5 ${
+                          contentTab === "notes"
+                            ? "bg-[var(--color-bg)] shadow-sm text-[var(--color-primary)] ring-1 ring-[var(--color-border)]"
+                            : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50"
+                        }`}
+                      >
+                        <Icons.FileText className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{t("detail.transcription.noteMode")}</span>
+                      </button>
+                      <button
+                        onClick={() => setContentTab("mindmap")}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5 ${
+                          contentTab === "mindmap"
+                            ? "bg-[var(--color-bg)] shadow-sm text-[var(--color-primary)] ring-1 ring-[var(--color-border)]"
+                            : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50"
+                        }`}
+                      >
+                        <Icons.GitBranch className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{t("detail.aiNotes.mindmap", "导图")}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {contentTab === "segments" ? (
                   segments?.length === 0 ? (
@@ -1209,6 +1364,7 @@ export default function Detail() {
                       onOpenMindmap={() => setContentTab("mindmap")}
                       scrollToHeadingRef={scrollToNoteHeadingRef}
                       onActiveHeadingChange={setActiveNoteHeading}
+                      isZenMode={isZenMode}
                     />
                   </div>
                 )}
