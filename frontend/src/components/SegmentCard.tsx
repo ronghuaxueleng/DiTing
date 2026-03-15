@@ -55,7 +55,13 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
 
     const hasVisibleAi = summaryTree.length > 0
     const [showTranscription, setShowTranscription] = useState(!hasVisibleAi)
-    const [showPreprocessPreview, setShowPreprocessPreview] = useState(false)
+    const [showPreprocessPreview, setShowPreprocessPreview] = useState(() => {
+        return localStorage.getItem('segment-preprocess-preview') === 'true'
+    })
+
+    useEffect(() => {
+        localStorage.setItem('segment-preprocess-preview', String(showPreprocessPreview))
+    }, [showPreprocessPreview])
 
     const aiSectionRef = useRef<HTMLDivElement>(null)
     // previewRef removed — preview is now inline, no click-outside needed

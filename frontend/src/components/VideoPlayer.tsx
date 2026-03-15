@@ -45,7 +45,13 @@ export default function VideoPlayer({
     isZenMode
 }: VideoPlayerProps) {
     const { t } = useTranslation()
-    const [showCacheBar, setShowCacheBar] = React.useState(false)
+    const [showCacheBar, setShowCacheBar] = React.useState(() => {
+        return localStorage.getItem('detail-show-cache-bar') === 'true'
+    })
+
+    React.useEffect(() => {
+        localStorage.setItem('detail-show-cache-bar', String(showCacheBar))
+    }, [showCacheBar])
 
     if (!video) return null
 
