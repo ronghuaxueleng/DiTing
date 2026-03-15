@@ -49,6 +49,19 @@ export default function Detail() {
     setIsZenMode((prev) => !prev);
   }, []);
 
+  // Lock body/html scroll to prevent outer scroll layer on Detail page
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    window.scrollTo(0, 0);
+    return () => {
+      html.style.overflow = '';
+      body.style.overflow = '';
+    };
+  }, []);
+
   // Exit Zen Mode on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
