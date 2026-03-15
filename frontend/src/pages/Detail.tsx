@@ -43,16 +43,10 @@ export default function Detail() {
   const queryClient = useQueryClient();
 
   // Zen Mode State
-  const [isZenMode, setIsZenMode] = useState(() => {
-    return localStorage.getItem("detail-zen-mode") === "true";
-  });
+  const [isZenMode, setIsZenMode] = useState(false);
 
   const toggleZenMode = useCallback(() => {
-    setIsZenMode((prev) => {
-      const next = !prev;
-      localStorage.setItem("detail-zen-mode", String(next));
-      return next;
-    });
+    setIsZenMode((prev) => !prev);
   }, []);
 
   // Exit Zen Mode on Escape key
@@ -60,7 +54,6 @@ export default function Detail() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isZenMode) {
         setIsZenMode(false);
-        localStorage.setItem("detail-zen-mode", "false");
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -438,6 +431,47 @@ export default function Detail() {
       "split"
     );
   });
+
+  // Initialize active tab based on availability
+  useEffect(() => {
+    if (video) {
+      if (video.media_available) {
+        setActiveTab("local");
+      } else if (video.stream_url && !video.stream_expired) {
+        setActiveTab("stream");
+      } else if (video.embed_url) {
+        setActiveTab("embed");
+      } else {
+        setActiveTab("local"); // Default fallback even if empty
+      }
+    }
+  }, [
+    video?.media_available,
+    video?.stream_url,
+    video?.embed_url,
+    video?.stream_expired,
+  ]);
+
+  // Initialize selected version
+  useEffect(() => {
+    if (video?.cache_versions?.length) {
+      const match = video.cache_versions.find(
+        (v) => v.media_path === video.media_path,
+      );
+      if (match) setSelectedVersion(match);
+      else if (video.cache_versions[0])
+        setSelectedVersion(video.cache_versions[0]);
+    } else {
+      setSelectedVersion(null);
+    }
+  }, [video?.cache_versions, video?.media_path]);
+
+  // Synchronize Zen mode Pill state depending on which tab user is on
+  useEffect(() => {
+    if (isZenMode && contentTab !== "notes") {
+      setZenToolbarMode("tabs");
+    }
+  }, [isZenMode, contentTab]);
 
   const toggleMobileLayout = () => {
     const next = mobileLayout === "scroll" ? "split" : "scroll";
@@ -1248,13 +1282,15 @@ export default function Detail() {
                 {isZenMode && zenToolbarMode === 'tabs' && (
                   <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 opacity-30 hover:opacity-100 transition-opacity duration-300">
                     <div className="flex bg-[var(--color-card)]/90 backdrop-blur-md p-1 rounded-full shadow-2xl border border-[var(--color-border)] flex-nowrap shrink-0 whitespace-nowrap max-w-[95vw] overflow-x-auto hide-scrollbar">
-                      <button
-                        onClick={() => setZenToolbarMode('tools')}
-                        className="px-2 py-1.5 text-xs font-medium rounded-full transition-all flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg)]/50 mr-1"
-                        title={t('detail.layout.switchTools', '切换工具')}
-                      >
-                        <Icons.Wrench className="w-3.5 h-3.5" />
-                      </button>
+                      {contentTab === "notes" && (
+                        <button
+                          onClick={() => setZenToolbarMode('tools')}
+                          className="px-2 py-1.5 text-xs font-medium rounded-full transition-all flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg)]/50 mr-1"
+                          title={t('detail.layout.switchTools', '切换工具')}
+                        >
+                          <Icons.Wrench className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
                         onClick={() => setContentTab("segments")}
                         className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5 ${
@@ -1298,6 +1334,14 @@ export default function Detail() {
                       >
                         <Icons.GitBranch className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">{t("detail.aiNotes.mindmap", "导图")}</span>
+                      </button>
+                      <div className="w-px h-6 bg-[var(--color-border)] mx-1 self-center opacity-50 hidden sm:block"></div>
+                      <button
+                        onClick={() => setIsZenMode(false)}
+                        className="px-2 py-1.5 text-xs font-medium rounded-full transition-all flex items-center justify-center text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 ml-1"
+                        title={t('detail.layout.exitZenMode', '退出专注模式')}
+                      >
+                        <Icons.Shrink className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -1379,6 +1423,7 @@ export default function Detail() {
                       isZenMode={isZenMode}
                       zenToolbarMode={zenToolbarMode}
                       onToggleZenToolbar={setZenToolbarMode}
+                      onExitZenMode={() => setIsZenMode(false)}
                     />
                   </div>
                 )}

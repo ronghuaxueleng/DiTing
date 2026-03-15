@@ -30,6 +30,7 @@ interface NoteViewProps {
     isZenMode?: boolean
     zenToolbarMode?: 'tools' | 'tabs'
     onToggleZenToolbar?: (mode: 'tools' | 'tabs') => void
+    onExitZenMode?: () => void
 }
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath]
@@ -633,7 +634,21 @@ function GeneratePanel({
 }
 
 // ---- Main Component ----
-export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap: _onOpenMindmap, onOpenDetail, scrollToHeadingRef, onActiveHeadingChange, isZenMode, zenToolbarMode = 'tools', onToggleZenToolbar }: NoteViewProps) {
+export default function NoteView({
+    sourceId,
+    segments,
+    video,
+    onSeek,
+    playerRef,
+    onOpenMindmap: _onOpenMindmap,
+    onOpenDetail,
+    scrollToHeadingRef,
+    onActiveHeadingChange,
+    isZenMode,
+    zenToolbarMode,
+    onToggleZenToolbar,
+    onExitZenMode
+}: NoteViewProps) {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
@@ -1497,6 +1512,19 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                         >
                             ✨ {t('detail.aiNotes.generate')}
                         </button>
+                    )}
+
+                    {isZenMode && onExitZenMode && (
+                        <>
+                            <div className="w-px h-6 bg-[var(--color-border)] mx-1 self-center opacity-50 hidden sm:block"></div>
+                            <button
+                                className="note-btn note-btn-icon text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 ml-1"
+                                onClick={onExitZenMode}
+                                title={t('detail.layout.exitZenMode', '退出专注模式')}
+                            >
+                                <Icons.Minimize />
+                            </button>
+                        </>
                     )}
                 </div>
             </div>

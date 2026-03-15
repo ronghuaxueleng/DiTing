@@ -750,6 +750,12 @@ const Icons = {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
         </svg>
     ),
+    Shrink: ({ className, strokeWidth }: IconProps) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="m8 32l4-4m0 0l-4-4m4 4H2m30-10l-4 4m0 0l4 4m-4-4h10m-20-8l-4 4m0 0l4 4m-4-4h10m10-20l4-4m0 0l-4-4m4 4H22" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="m15 15l-6-6m15 0l-6 6M9 9h6v-6M21 9h-6v-6m-6 24h6v6m6-6h-6v6m6-6l6 6m-15 0l-6 6" />
+        </svg>
+    ),
 }
 
 // Database
