@@ -1100,6 +1100,9 @@ body {
   background: var(--color-card-muted, var(--color-card));
   font-size: 0.78rem;
   /* width is now set via inline style from React */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* Invisible hit area when snapped to the edge to prevent hover flickering */
@@ -1119,12 +1122,13 @@ body {
   position: absolute;
   left: -3px;
   top: 0;
-  bottom: 12px;
+  bottom: 0;
   width: 6px;
   cursor: ew-resize;
-  z-index: 10;
+  z-index: 50;
   border-radius: 3px 0 0 3px;
   transition: background 0.15s;
+  pointer-events: auto;
 }
 
 /* 2D Resize Handle (bottom-left corner) */
@@ -1132,12 +1136,13 @@ body {
   position: absolute;
   left: -3px;
   bottom: -3px;
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   cursor: nwse-resize;
-  z-index: 11;
+  z-index: 51;
   border-radius: 0 0 0 6px;
   transition: background 0.15s;
+  pointer-events: auto;
 }
 
 .note-toc-resize-handle:hover,
@@ -1229,6 +1234,12 @@ body {
   margin: 0 0 0 10px;
   padding: 6px 0;
   border-left: 1px solid var(--color-border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .note-toc-item {
@@ -1296,6 +1307,7 @@ body {
 /* TOC Slider */
 .note-toc-header-container {
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
 .note-toc-header {

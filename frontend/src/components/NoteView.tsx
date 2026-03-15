@@ -1409,6 +1409,12 @@ export default function NoteView({
                                 onClick={() => setShowToc(v => {
                                     const next = !v
                                     localStorage.setItem('note-show-toc', String(next))
+                                    // Reset TOC position when toggling from hidden to visible
+                                    if (next) {
+                                        localStorage.removeItem('note-toc-position')
+                                        localStorage.removeItem('note-toc-width')
+                                        localStorage.removeItem('note-toc-height')
+                                    }
                                     return next
                                 })}
                                 title={showToc ? t('detail.aiNotes.hideToc', '隐藏目录') : t('detail.aiNotes.showToc', '显示目录')}
