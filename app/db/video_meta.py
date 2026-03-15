@@ -210,10 +210,10 @@ def query_video_list_with_stats(*, source_type: str = None, tag_id: int = None, 
     Query video_meta joined with transcription stats.
     Returns raw rows as tuples for build_video_list_row().
     Pre-filters by source_type, tag_id, exclude_tag_id at the SQL/Python level.
-    
+
     Each row: (source_id, original_source, source_type, video_title, video_cover,
                created_at, updated_at, is_archived, count, row_ids, latest_status,
-               latest_timestamp, latest_asr_model, is_subtitle, is_analyzing_ai)
+               latest_timestamp, latest_asr_model, is_subtitle, is_analyzing_ai, notes_count)
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -231,7 +231,7 @@ def query_video_list_with_stats(*, source_type: str = None, tag_id: int = None, 
 
     query = '''
         WITH ranked_transcriptions AS (
-            SELECT 
+            SELECT
                 source, id, status, asr_model, is_subtitle, ai_status, timestamp,
                 ROW_NUMBER() OVER(PARTITION BY source ORDER BY id DESC) as rn
             FROM transcriptions
@@ -240,25 +240,35 @@ def query_video_list_with_stats(*, source_type: str = None, tag_id: int = None, 
             SELECT * FROM ranked_transcriptions WHERE rn = 1
         ),
         transcription_stats AS (
-            SELECT 
+            SELECT
                 source,
                 COUNT(*) as seg_count,
                 GROUP_CONCAT(id) as row_ids,
                 MAX(CASE WHEN ai_status IN ('queued', 'processing') THEN 1 ELSE 0 END) as has_ai_processing
             FROM transcriptions
             GROUP BY source
+        ),
+        notes_stats AS (
+            SELECT
+                source_id,
+                COUNT(*) as notes_count
+            FROM video_notes
+            WHERE is_active = 1
+            GROUP BY source_id
         )
-        SELECT 
+        SELECT
             vm.source_id, vm.original_source, vm.source_type,
             vm.video_title, vm.video_cover, vm.created_at, vm.updated_at, vm.is_archived,
             COALESCE(ts.seg_count, 0) as count, ts.row_ids,
             lt.status as latest_status, lt.timestamp as latest_timestamp,
             lt.asr_model as latest_asr_model,
             COALESCE(lt.is_subtitle, 0) as is_subtitle,
-            COALESCE(ts.has_ai_processing, 0) as is_analyzing_ai
+            COALESCE(ts.has_ai_processing, 0) as is_analyzing_ai,
+            COALESCE(ns.notes_count, 0) as notes_count
         FROM video_meta vm
         LEFT JOIN transcription_stats ts ON vm.source_id = ts.source
         LEFT JOIN latest_transcriptions lt ON vm.source_id = lt.source
+        LEFT JOIN notes_stats ns ON vm.source_id = ns.source_id
     '''
 
     cursor.execute(query)

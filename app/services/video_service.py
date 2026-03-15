@@ -147,6 +147,7 @@ def build_video_list_row(r, format_cover) -> dict:
     latest_asr_model = r[12]
     subtitle_flag = r[13]
     is_analyzing = bool(r[14])
+    notes_count = r[15] if len(r) > 15 else 0
 
     r_ids = [int(x) for x in row_ids_str.split(',')] if row_ids_str else []
 
@@ -165,6 +166,7 @@ def build_video_list_row(r, format_cover) -> dict:
         "count": count,
         "ai_count": 0,
         "is_analyzing_ai": is_analyzing,
+        "notes_count": notes_count,
         "id": r_ids[0] if r_ids else None,
         "_row_ids": r_ids,
         "is_archived": is_archived,

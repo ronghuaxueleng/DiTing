@@ -16,6 +16,7 @@ export interface Video {
     count: number                    // Backend field name (not segment_count)
     segment_count?: number           // Alternative field name
     ai_count: number                 // AI summary count
+    notes_count?: number             // AI notes count
     is_subtitle: number | boolean    // Has subtitle (0/1 or boolean)
     media_path?: string
     stream_url?: string

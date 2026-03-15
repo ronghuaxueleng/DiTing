@@ -271,6 +271,16 @@ export default function VideoCard({ video, onRefresh, onOpenPanel, selectionMode
                         </span>
                     )}
 
+                    {(video.notes_count ?? 0) > 0 && (
+                        <span
+                            className="h-5 px-1.5 rounded flex items-center gap-0.5 bg-violet-500/15 text-violet-400 border border-violet-500/25"
+                            title={t('videoCard.aiNotes')}
+                        >
+                            <Icons.BookOpen className="w-2.5 h-2.5" />
+                            {(video.notes_count ?? 0) > 1 && <span>{video.notes_count}</span>}
+                        </span>
+                    )}
+
                     {(video.is_subtitle === 1 || video.is_subtitle === true) && (
                         <span
                             className="w-5 h-5 rounded flex items-center justify-center bg-pink-500/15 text-pink-400 border border-pink-500/25"
