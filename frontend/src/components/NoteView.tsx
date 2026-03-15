@@ -28,6 +28,8 @@ interface NoteViewProps {
     /** Fired when the user scrolls to a different heading */
     onActiveHeadingChange?: (headingText: string | null) => void
     isZenMode?: boolean
+    zenToolbarMode?: 'tools' | 'tabs'
+    onToggleZenToolbar?: (mode: 'tools' | 'tabs') => void
 }
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath]
@@ -631,7 +633,7 @@ function GeneratePanel({
 }
 
 // ---- Main Component ----
-export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap: _onOpenMindmap, onOpenDetail, scrollToHeadingRef, onActiveHeadingChange, isZenMode }: NoteViewProps) {
+export default function NoteView({ sourceId, segments, video, onSeek, playerRef, onOpenMindmap: _onOpenMindmap, onOpenDetail, scrollToHeadingRef, onActiveHeadingChange, isZenMode, zenToolbarMode = 'tools', onToggleZenToolbar }: NoteViewProps) {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
@@ -1332,11 +1334,21 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
     }
 
     return (
-        <div className={`note-view${isEditing ? ' note-view--editing' : ''} ${isZenMode ? 'relative' : ''}`}>
+        <div className={`note-view${isEditing ? ' note-view--editing' : ''} ${isZenMode ? 'relative h-full flex flex-col' : ''}`}>
             {/* ---- TOOLBAR ---- */}
-            <div className={`note-toolbar ${isZenMode ? 'absolute top-2 right-4 z-50 opacity-20 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 bg-[var(--color-bg)]/90 backdrop-blur-md border border-[var(--color-border)] rounded-xl shadow-lg shadow-black/10 p-1 min-h-[40px]' : ''}`}>
-                <div className="note-toolbar-left">
-                    {/* Version history toggle */}
+            {(!isZenMode || zenToolbarMode === 'tools') && (
+                <div className={`note-toolbar ${isZenMode ? 'absolute bottom-6 left-1/2 -translate-x-1/2 z-50 opacity-10 hover:opacity-100 focus-within:opacity-100 transition-opacity !flex-nowrap duration-300 bg-[var(--color-card)]/90 backdrop-blur-md rounded-full shadow-2xl border border-[var(--color-border)] p-1.5 h-auto max-w-[95vw] overflow-x-auto hide-scrollbar whitespace-nowrap' : ''}`}>
+                    <div className={`note-toolbar-left ${isZenMode ? '!flex-nowrap shrink-0' : ''}`}>
+                        {isZenMode && onToggleZenToolbar && (
+                            <button
+                                className="note-btn note-btn-icon"
+                                onClick={() => onToggleZenToolbar('tabs')}
+                                title={t('detail.layout.switchTabs', '切换视图')}
+                            >
+                                <Icons.LayoutDashboard />
+                            </button>
+                        )}
+                        {/* Version history toggle */}
                     {notes.length > 0 && (
                         <button
                             className={`note-btn note-btn-icon ${showVersions ? 'active' : ''}`}
@@ -1359,7 +1371,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                     )}
                 </div>
 
-                <div className="note-toolbar-right">
+                <div className={`note-toolbar-right ${isZenMode ? '!flex-nowrap shrink-0' : ''}`}>
                     {activeNote && !isEditing && (
                         <>
                             {activeNote.is_edited && (
@@ -1488,6 +1500,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                     )}
                 </div>
             </div>
+            )}
 
             {/* ---- GENERATE CONFIG PANEL ---- */}
             {showGenPanel && (

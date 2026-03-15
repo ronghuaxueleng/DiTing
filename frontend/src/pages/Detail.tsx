@@ -180,6 +180,9 @@ export default function Detail() {
   const [activeNoteHeading, setActiveNoteHeading] = useState<string | null>(
     null,
   );
+  
+  // Unified Zen Mode bottom toolbar toggle state
+  const [zenToolbarMode, setZenToolbarMode] = useState<'tools' | 'tabs'>('tools');
 
   const applyDragWidth = useCallback(
     (rawWidth: number) => {
@@ -704,8 +707,10 @@ export default function Detail() {
       {/* Main Content Area - Full viewport height, independent scroll */}
       <div
         ref={containerRef}
-        className={`flex-1 flex flex-col lg:flex-row min-h-0 w-full px-4 sm:px-6 lg:px-8 gap-6 lg:gap-0 overflow-y-auto lg:overflow-hidden ${
-          mobileLayout === "split" ? "py-0 lg:py-4" : "py-4"
+        className={`flex-1 flex flex-col lg:flex-row min-h-0 w-full gap-6 lg:gap-0 overflow-y-auto lg:overflow-hidden ${
+          isZenMode 
+            ? "p-0"
+            : `px-4 sm:px-6 lg:px-8 ${mobileLayout === "split" ? "py-0 lg:py-4" : "py-4"}`
         }`}
       >
         {/* Left panel expand handle (shown when left panel is collapsed on desktop) */}
@@ -1240,9 +1245,16 @@ export default function Detail() {
                 </div>
                 
                 {/* Floating Pill Menu for Right Panel Zen Mode */}
-                {isZenMode && (
+                {isZenMode && zenToolbarMode === 'tabs' && (
                   <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 opacity-30 hover:opacity-100 transition-opacity duration-300">
-                    <div className="flex bg-[var(--color-card)]/90 backdrop-blur-md p-1 rounded-full shadow-2xl border border-[var(--color-border)]">
+                    <div className="flex bg-[var(--color-card)]/90 backdrop-blur-md p-1 rounded-full shadow-2xl border border-[var(--color-border)] flex-nowrap shrink-0 whitespace-nowrap max-w-[95vw] overflow-x-auto hide-scrollbar">
+                      <button
+                        onClick={() => setZenToolbarMode('tools')}
+                        className="px-2 py-1.5 text-xs font-medium rounded-full transition-all flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg)]/50 mr-1"
+                        title={t('detail.layout.switchTools', '切换工具')}
+                      >
+                        <Icons.Wrench className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => setContentTab("segments")}
                         className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5 ${
@@ -1365,6 +1377,8 @@ export default function Detail() {
                       scrollToHeadingRef={scrollToNoteHeadingRef}
                       onActiveHeadingChange={setActiveNoteHeading}
                       isZenMode={isZenMode}
+                      zenToolbarMode={zenToolbarMode}
+                      onToggleZenToolbar={setZenToolbarMode}
                     />
                   </div>
                 )}
