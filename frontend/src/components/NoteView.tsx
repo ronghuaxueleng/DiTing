@@ -74,11 +74,12 @@ const TOC_MIN_WIDTH = 120
 const TOC_MAX_WIDTH = 480
 const TOC_DEFAULT_WIDTH = 180
 
-function NoteTOC({ items, activeId, onItemClick, isZenMode }: {
+function NoteTOC({ items, activeId, onItemClick, isZenMode, showToc }: {
     items: TocItem[]
     activeId: string | null
     onItemClick: (id: string) => void
     isZenMode?: boolean
+    showToc: boolean
 }) {
     const { t } = useTranslation()
     const [collapsed, setCollapsed] = useState(false)
@@ -86,6 +87,26 @@ function NoteTOC({ items, activeId, onItemClick, isZenMode }: {
         const saved = localStorage.getItem('note-toc-width')
         return saved ? Math.max(TOC_MIN_WIDTH, Math.min(TOC_MAX_WIDTH, Number(saved))) : TOC_DEFAULT_WIDTH
     })
+    const [tocHeight, setTocHeight] = useState<number | undefined>(() => {
+        const saved = localStorage.getItem('note-toc-height')
+        return saved ? Number(saved) : undefined
+    })
+
+    const [position, setPosition] = useState<{ right: number; top: number }>(() => {
+        const saved = localStorage.getItem('note-toc-position')
+        if (saved) {
+            try {
+                return JSON.parse(saved)
+            } catch (e) {}
+        }
+        return { right: 24, top: 120 } // default right offset 24px, top 120px
+    })
+
+    const [isPinned, setIsPinned] = useState<boolean>(() => {
+        return localStorage.getItem('note-toc-pinned') !== 'false'
+    })
+
+    const isSnappedToEdge = position.right < 40
 
     // Dynamic max level filter
     const availableMaxLevel = useMemo(() => items.reduce((max, item) => Math.max(max, item.level), 1), [items])
@@ -105,17 +126,29 @@ function NoteTOC({ items, activeId, onItemClick, isZenMode }: {
         e.stopPropagation()
         isDragging.current = true
         const startX = e.clientX
+        const startY = e.clientY
         const startWidth = tocWidth
+        
+        // Grab the container's rendered height as the baseline if it's currently auto
+        const container = (e.target as HTMLElement).closest('.note-toc')
+        const startHeight = container ? container.getBoundingClientRect().height : (tocHeight || 400)
 
-        document.body.style.cursor = 'col-resize'
+        // Change cursor to indicate 2D scaling
+        document.body.style.cursor = 'nwse-resize'
         document.body.style.userSelect = 'none'
 
         const onMove = (ev: MouseEvent) => {
             if (!isDragging.current) return
-            // Dragging to the left = wider TOC (handle is on left edge of TOC)
-            const delta = startX - ev.clientX
-            const newWidth = Math.max(TOC_MIN_WIDTH, Math.min(TOC_MAX_WIDTH, startWidth + delta))
+            // Dragging left = wider. Dragging down = taller.
+            const deltaX = startX - ev.clientX
+            const deltaY = ev.clientY - startY
+            
+            const newWidth = Math.max(TOC_MIN_WIDTH, Math.min(TOC_MAX_WIDTH, startWidth + deltaX))
+            // Apply a minimum height of roughly 150px
+            const newHeight = Math.max(150, startHeight + deltaY)
+            
             setTocWidth(newWidth)
+            setTocHeight(newHeight)
         }
         const onUp = () => {
             isDragging.current = false
@@ -123,12 +156,72 @@ function NoteTOC({ items, activeId, onItemClick, isZenMode }: {
             document.body.style.userSelect = ''
             window.removeEventListener('mousemove', onMove)
             window.removeEventListener('mouseup', onUp)
-            // Persist after drag ends
+            // Persist both
             setTocWidth(w => { localStorage.setItem('note-toc-width', String(w)); return w })
+            setTocHeight(h => { if (h) localStorage.setItem('note-toc-height', String(h)); return h })
         }
         window.addEventListener('mousemove', onMove)
         window.addEventListener('mouseup', onUp)
-    }, [tocWidth])
+    }, [tocWidth, tocHeight])
+
+    const isMoving = useRef(false)
+    const handleMoveStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+        // Only allow dragging from header element itself, not its button children
+        if ((e.target as HTMLElement).tagName.toLowerCase() === 'button' || (e.target as HTMLElement).tagName.toLowerCase() === 'input') return
+        
+        e.preventDefault()
+        e.stopPropagation()
+        isMoving.current = true
+
+        const isTouch = 'touches' in e;
+        const clientX = isTouch ? ((e as React.TouchEvent).touches[0]?.clientX ?? 0) : (e as React.MouseEvent).clientX
+        const clientY = isTouch ? ((e as React.TouchEvent).touches[0]?.clientY ?? 0) : (e as React.MouseEvent).clientY
+        
+        const startX = clientX
+        const startY = clientY
+        const startPos = position
+
+        document.body.style.userSelect = 'none'
+
+        const onMove = (ev: MouseEvent | TouchEvent) => {
+            if (!isMoving.current) return
+            const isTouchEvent = 'touches' in ev;
+            const cX = isTouchEvent ? ((ev as TouchEvent).touches[0]?.clientX ?? 0) : (ev as MouseEvent).clientX
+            const cY = isTouchEvent ? ((ev as TouchEvent).touches[0]?.clientY ?? 0) : (ev as MouseEvent).clientY
+            
+            const deltaX = startX - cX
+            const deltaY = cY - startY
+            
+            setPosition({
+                right: (startPos?.right ?? 24) + deltaX,
+                top: (startPos?.top ?? 120) + deltaY
+            })
+        }
+        
+        const onUp = () => {
+            isMoving.current = false
+            document.body.style.userSelect = ''
+            window.removeEventListener('mousemove', onMove)
+            window.removeEventListener('mouseup', onUp)
+            window.removeEventListener('touchmove', onMove)
+            window.removeEventListener('touchend', onUp)
+            
+            setPosition((p: { right: number; top: number }) => {
+                const snappedPosition = { ...p }
+                // Edge Snapping Threshold: 40px
+                if (snappedPosition.right < 40) {
+                    snappedPosition.right = 16 // Dock back to default right padding
+                }
+                localStorage.setItem('note-toc-position', JSON.stringify(snappedPosition))
+                return snappedPosition
+            })
+        }
+        
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+        window.addEventListener('touchmove', onMove, { passive: false })
+        window.addEventListener('touchend', onUp)
+    }, [position])
 
     const handleDoubleClick = useCallback((e: React.MouseEvent) => {
         e.preventDefault()
@@ -136,27 +229,48 @@ function NoteTOC({ items, activeId, onItemClick, isZenMode }: {
         setTocWidth(TOC_DEFAULT_WIDTH)
     }, [])
 
-    if (items.length < 2) return null
+    if (!showToc || items.length < 2) return null
 
-    if (isZenMode && collapsed) {
+    // Option 1: Edge Snapped Collapsed Tab
+    if (collapsed) {
         return (
-            <button 
+            <div 
+                className="note-toc-edge-collapsed"
                 onClick={() => setCollapsed(false)}
-                className="fixed right-6 top-1/2 -translate-y-1/2 z-[100] w-10 h-10 rounded-full bg-[var(--color-card)]/90 backdrop-blur shadow-lg border border-[var(--color-border)] flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:scale-110 transition-all duration-300 opacity-50 hover:opacity-100"
+                onMouseEnter={() => {
+                    if (!isPinned && isSnappedToEdge) setCollapsed(false)
+                }}
+                onMouseDown={handleMoveStart}
+                onTouchStart={handleMoveStart}
+                style={{ top: `${position.top}px` }}
                 title={t('detail.aiNotes.tocExpand', '展开目录')}
             >
-                <Icons.List className="w-5 h-5" />
-            </button>
+                <Icons.ChevronLeft className="w-4 h-4 text-[var(--color-primary)] mb-1 opacity-70" />
+                <Icons.List />
+                <span>{t('detail.aiNotes.toc', '目录')}</span>
+            </div>
         )
     }
 
     return (
         <div
-            className={`note-toc ${collapsed ? 'note-toc--collapsed' : ''} ${isZenMode ? 'fixed right-6 top-1/2 -translate-y-1/2 z-[100] bg-[var(--color-card)]/90 backdrop-blur-md shadow-2xl rounded-xl border border-[var(--color-border)] opacity-30 hover:opacity-100 transition-all duration-300 max-h-[60vh] overflow-y-auto' : ''}`}
-            style={collapsed ? undefined : { width: tocWidth }}
+            className={`note-toc ${
+                isZenMode 
+                    ? 'fixed z-[100] bg-[var(--color-card)]/90 backdrop-blur-md shadow-2xl rounded-xl border opacity-30 hover:opacity-100 transition-opacity duration-300' 
+                    : 'fixed z-[40]'
+            } ${isSnappedToEdge ? 'note-toc-snapped' : ''}`}
+            style={{ width: tocWidth, height: tocHeight, right: `${position.right}px`, top: `${position.top}px` }}
+            onMouseLeave={(e) => {
+                // Ensure the mouse actually left the entire container, not just moved between children
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    if (!isPinned && isSnappedToEdge && !isDragging.current && !isMoving.current) {
+                        setCollapsed(true)
+                    }
+                }
+            }}
         >
-            {/* Drag handle on left edge */}
-            {!collapsed && !isZenMode && (
+            {/* Drag handle on left edge (width) */}
+            {!isZenMode && (
                 <div
                     className="note-toc-resize-handle"
                     onMouseDown={handleDragStart}
@@ -164,19 +278,44 @@ function NoteTOC({ items, activeId, onItemClick, isZenMode }: {
                     title={t('detail.aiNotes.tocResizeHint', 'Drag to resize, double-click to reset')}
                 />
             )}
-            <div className="note-toc-header-container">
+            
+            {/* 2D Drag handle on bottom-left corner (width & height) */}
+            {!isZenMode && (
+                <div
+                    className="note-toc-resize-handle-corner"
+                    onMouseDown={handleDragStart}
+                    title={t('detail.aiNotes.tocResizeHint', 'Drag to resize, double-click to reset')}
+                />
+            )}
+            <div className="note-toc-header-container cursor-move" onMouseDown={handleMoveStart} onTouchStart={handleMoveStart}>
                 <div
                     className="note-toc-header flex items-center"
-                    onClick={() => setCollapsed(v => !v)}
                     title={collapsed ? t('detail.aiNotes.tocExpand', '展开目录') : undefined}
                 >
-                    <Icons.List className={collapsed ? "w-4 h-4 mx-auto" : "w-3 h-3"} />
-                    {!collapsed && (
-                        <>
-                            <span className="ml-1.5">{t('detail.aiNotes.toc')}</span>
-                            <Icons.ChevronRight className="w-3 h-3 ml-auto transition-transform rotate-90" />
-                        </>
-                    )}
+                    <Icons.List className="w-3 h-3" />
+                    <>
+                        <span className="ml-1.5">{t('detail.aiNotes.toc')}</span>
+                        <div className="ml-auto flex items-center gap-0.5">
+                            <button 
+                                onClick={() => setIsPinned(v => {
+                                    const next = !v;
+                                    localStorage.setItem('note-toc-pinned', String(next));
+                                    return next;
+                                })} 
+                                className={`p-1 hover:bg-[var(--color-bg-muted)] rounded transition-colors ${isPinned ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)] opacity-60'}`} 
+                                title={isPinned ? t('detail.aiNotes.tocUnpin', '取消固定 (自动隐藏)') : t('detail.aiNotes.tocPin', '固定目录')}
+                            >
+                                {isPinned ? <Icons.Pin className="w-3.5 h-3.5" /> : <Icons.PinOff className="w-3.5 h-3.5" />}
+                            </button>
+                            <button 
+                                onClick={() => setCollapsed(v => !v)} 
+                                className="p-1 hover:bg-[var(--color-bg-muted)] rounded transition-colors text-[var(--color-text-muted)] hover:text-inherit" 
+                                title={t('detail.aiNotes.tocCollapse', '收起目录')}
+                            >
+                                <Icons.ChevronRight className="w-3.5 h-3.5 transition-transform" />
+                            </button>
+                        </div>
+                    </>
                 </div>
                 {!collapsed && availableMaxLevel > 1 && (
                     <div className="note-toc-filter px-[10px] pb-2 flex items-center gap-2">
@@ -514,6 +653,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
     const [activeTocId, setActiveTocId] = useState<string | null>(null)
     const [hideScreenshots, setHideScreenshots] = useState<boolean>(() => localStorage.getItem('note-hide-screenshots') === 'true')
     const [enableInlineScreenshots, setEnableInlineScreenshots] = useState<boolean>(() => localStorage.getItem('note-enable-inline-screenshots') !== 'false') // Default to true
+    const [showToc, setShowToc] = useState<boolean>(() => localStorage.getItem('note-show-toc') !== 'false')
     const [isCapturing, setIsCapturing] = useState(false)
     const [expandedVersionId, setExpandedVersionId] = useState<number | null>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -1236,6 +1376,18 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                                     <Icons.Undo />
                                 </button>
                             )}
+                            {/* Toggle TOC visibility */}
+                            <button
+                                className={`note-btn note-btn-icon ${showToc ? 'active' : ''}`}
+                                onClick={() => setShowToc(v => {
+                                    const next = !v
+                                    localStorage.setItem('note-show-toc', String(next))
+                                    return next
+                                })}
+                                title={showToc ? t('detail.aiNotes.hideToc', '隐藏目录') : t('detail.aiNotes.showToc', '显示目录')}
+                            >
+                                <Icons.List />
+                            </button>
                             <button className="note-btn note-btn-icon" onClick={handleExport}
                                 title={t('detail.aiNotes.exportMd')}>
                                 <Icons.Download />
@@ -1510,6 +1662,7 @@ export default function NoteView({ sourceId, segments, video, onSeek, playerRef,
                         activeId={activeTocId}
                         onItemClick={handleTocClick}
                         isZenMode={isZenMode}
+                        showToc={showToc}
                     />
                 </div>
             )}

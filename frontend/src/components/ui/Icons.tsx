@@ -682,6 +682,14 @@ const Icons = {
             <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.68V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v4.68a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
         </svg>
     ),
+    PinOff: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
+        <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+            <line x1="2" y1="2" x2="22" y2="22"></line>
+            <line x1="12" y1="17" x2="12" y2="22"></line>
+            <path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h9"></path>
+            <path d="M15 9.34V6a3 3 0 0 0-5.68-1.33"></path>
+        </svg>
+    ),
     Download,
     Monitor,
     Activity,
