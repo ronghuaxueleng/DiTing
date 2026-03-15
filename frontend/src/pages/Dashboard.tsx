@@ -46,7 +46,8 @@ export default function Dashboard() {
 
     // Read State from URL Params (with defaults)
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const defaultLimit = localStorage.getItem('dashboard-limit') || '20'
+    const limit = parseInt(searchParams.get('limit') || defaultLimit)
     const sourceType = searchParams.get('source') || ''
     const status = searchParams.get('status') || ''
     const selectedTagId = searchParams.get('tag') ? Number(searchParams.get('tag')) : undefined
@@ -54,12 +55,16 @@ export default function Dashboard() {
     const sortBy = (searchParams.get('sort') || 'time') as 'time' | 'title' | 'segments'
     const defaultView = localStorage.getItem('dashboard-view-mode') || 'grid'
     const viewMode = (searchParams.get('view') || defaultView) as 'grid' | 'list' | 'notes'
-    
-    // Save view mode preference when user changes it
+
+    // Save view mode and limit preferences when user changes them
     useEffect(() => {
         const view = searchParams.get('view')
         if (view) {
             localStorage.setItem('dashboard-view-mode', view)
+        }
+        const limitParam = searchParams.get('limit')
+        if (limitParam) {
+            localStorage.setItem('dashboard-limit', limitParam)
         }
     }, [searchParams])
     const [selectedNoteVideo, setSelectedNoteVideo] = useState<Video | null>(null)
