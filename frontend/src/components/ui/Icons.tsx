@@ -620,13 +620,13 @@ const Icons = {
     Layout,
     Lightbulb,
     // Square / Unchecked
-    Square: ({ className, strokeWidth }: IconProps) => (
+    Square: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeWidth={strokeWidth} />
         </svg>
     ),
     // CheckSquare / Checked
-    CheckSquare: ({ className, strokeWidth }: IconProps) => (
+    CheckSquare: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeWidth={strokeWidth} />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M9 11l3 3L22 4" />
@@ -634,18 +634,18 @@ const Icons = {
     ),
     Image,
     Camera,
-    Quote: ({ className, strokeWidth }: IconProps) => (
+    Quote: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M10 14h4m-2 4v-4m6-10l-2.09 6.26a2 2 0 01-1.91 1.34H11V5.4L13.1 2.3a1 1 0 011.3 0L16 4zM6 9H4v12h12v-2" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M8 9h.01" />
         </svg>
     ),
-    MessageSquare: ({ className, strokeWidth }: IconProps) => (
+    MessageSquare: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
     ),
-    Server: ({ className, strokeWidth }: IconProps) => (
+    Server: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M20 16.2A4.5 4.5 0 0 0 3.2 14M20 7.8A4.5 4.5 0 0 1 3.2 10M2 12h20M12 2v20" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M12 2v20" />
@@ -655,7 +655,7 @@ const Icons = {
             <line x1="6" y1="18" x2="6.01" y2="18" />
         </svg>
     ),
-    MoreVertical: ({ className, strokeWidth }: IconProps) => (
+    MoreVertical: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="1" strokeWidth={strokeWidth} />
             <circle cx="12" cy="5" r="1" strokeWidth={strokeWidth} />
@@ -663,7 +663,7 @@ const Icons = {
         </svg>
     ),
 
-    GitCommit: ({ className, strokeWidth }: IconProps) => (
+    GitCommit: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="3" strokeWidth={strokeWidth} />
             <line x1="1.05" y1="12" x2="7" y2="12" strokeWidth={strokeWidth} strokeLinecap="round" />
@@ -697,34 +697,34 @@ const Icons = {
     EyeOff,
     Upload,
     UploadCloud,
-    List: ({ className, strokeWidth }: IconProps) => (
+    List: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
     ),
-    ListFilter: ({ className, strokeWidth }: IconProps) => (
+    ListFilter: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
         </svg>
     ),
-    Tags: ({ className, strokeWidth }: IconProps) => (
+    Tags: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
         </svg>
     ),
     Archive,
     ArchiveRestore,
-    SplitSquareHorizontal: ({ className, strokeWidth }: IconProps) => (
+    SplitSquareHorizontal: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M8 19H5C3.89543 19 3 18.1046 3 17V7C3 5.89543 3.89543 5 5 5H19C20.1046 5 21 5.89543 21 7V17C21 18.1046 20.1046 19 19 19H16M3 12H21" />
         </svg>
     ),
-    ArrowUpDown: ({ className, strokeWidth }: IconProps) => (
+    ArrowUpDown: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16" />
         </svg>
     ),
-    BookOpen: ({ className, strokeWidth }: IconProps) => (
+    BookOpen: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
@@ -745,15 +745,14 @@ const Icons = {
     ),
     GitBranch,
     Maximize,
-    Minimize: ({ className, strokeWidth }: IconProps) => (
+    Minimize: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
         </svg>
     ),
-    Shrink: ({ className, strokeWidth }: IconProps) => (
+    Shrink: ({ className, strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="m8 32l4-4m0 0l-4-4m4 4H2m30-10l-4 4m0 0l4 4m-4-4h10m-20-8l-4 4m0 0l4 4m-4-4h10m10-20l4-4m0 0l-4-4m4 4H22" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="m15 15l-6-6m15 0l-6 6M9 9h6v-6M21 9h-6v-6m-6 24h6v6m6-6h-6v6m6-6l6 6m-15 0l-6 6" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="m15 15 6 6m-6-6v6m0-6h6m-6-12l6 6m-6 0V3m0 6h6M9 9L3 3m6 6V3m0 6H3m6 6l-6 6m6-6v6m0-6H3" />
         </svg>
     ),
 }

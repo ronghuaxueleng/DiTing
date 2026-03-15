@@ -1341,7 +1341,7 @@ export default function Detail() {
                         className="px-2 py-1.5 text-xs font-medium rounded-full transition-all flex items-center justify-center text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 ml-1"
                         title={t('detail.layout.exitZenMode', '退出专注模式')}
                       >
-                        <Icons.Shrink className="w-4 h-4" />
+                        <Icons.Minimize className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
