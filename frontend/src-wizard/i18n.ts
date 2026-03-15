@@ -48,6 +48,8 @@ const translations = {
         'llm.saving': '保存中...',
         'llm.save': '保存',
         'llm.saved': 'LLM 服务商已保存！',
+        'llm.endpointPreview': '端点预览',
+        'llm.baseUrlHint': '大多数 OpenAI 兼容 API 需要 /v1 后缀（如 https://api.example.com/v1）',
         // DoneStep
         'done.title': '设置完成！',
         'done.desc': 'DiTing 已准备就绪。你可以随时在管理页面调整设置。',
@@ -103,6 +105,8 @@ const translations = {
         'llm.saving': 'Saving...',
         'llm.save': 'Save Provider',
         'llm.saved': 'LLM provider saved!',
+        'llm.endpointPreview': 'Endpoint Preview',
+        'llm.baseUrlHint': 'Most OpenAI-compatible APIs require /v1 suffix (e.g., https://api.example.com/v1)',
         'done.title': "You're All Set!",
         'done.desc': 'DiTing is ready to use. You can always adjust settings from the Management page later.',
         'done.opening': 'Opening...',

@@ -17,6 +17,11 @@ export default function LLMSetupStep({ onNext, onBack }: Props) {
     const [message, setMessage] = useState('')
     const [success, setSuccess] = useState<boolean | null>(null)
 
+    // Compute endpoint preview and validation
+    const trimmedBaseUrl = baseUrl.trim().replace(/\/+$/, '')
+    const previewUrl = trimmedBaseUrl ? `POST ${trimmedBaseUrl}/chat/completions` : ''
+    const missingV1 = trimmedBaseUrl.length > 0 && !trimmedBaseUrl.endsWith('/v1')
+
     const saveProvider = async () => {
         if (!name || !baseUrl || !apiKey) return
         setSaving(true)
@@ -56,14 +61,32 @@ export default function LLMSetupStep({ onNext, onBack }: Props) {
                     className="px-3 py-2 rounded-lg text-sm border outline-none"
                     style={{ background: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
                 />
-                <input
-                    type="text"
-                    value={baseUrl}
-                    onChange={e => setBaseUrl(e.target.value)}
-                    placeholder={t('llm.baseUrl')}
-                    className="px-3 py-2 rounded-lg text-sm border outline-none"
-                    style={{ background: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
-                />
+                <div className="flex flex-col gap-1.5">
+                    <input
+                        type="text"
+                        value={baseUrl}
+                        onChange={e => setBaseUrl(e.target.value)}
+                        placeholder={t('llm.baseUrl')}
+                        className="px-3 py-2 rounded-lg text-sm border outline-none"
+                        style={{ background: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+                    />
+                    {/* Endpoint preview */}
+                    {previewUrl && (
+                        <div className="px-3 py-2 rounded-lg border" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}>
+                            <div className="flex items-center gap-1.5 text-[11px] mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                                <span>⚡</span>
+                                <span>{t('llm.endpointPreview') || 'Endpoint Preview'}</span>
+                            </div>
+                            <code className="text-xs font-mono break-all" style={{ color: 'var(--color-text)' }}>{previewUrl}</code>
+                        </div>
+                    )}
+                    {missingV1 && (
+                        <p className="flex items-center gap-1 text-[11px]" style={{ color: '#f59e0b' }}>
+                            <span>⚠️</span>
+                            <span>{t('llm.baseUrlHint') || 'Most OpenAI-compatible APIs require /v1 suffix (e.g., https://api.example.com/v1)'}</span>
+                        </p>
+                    )}
+                </div>
                 <input
                     type="password"
                     value={apiKey}
