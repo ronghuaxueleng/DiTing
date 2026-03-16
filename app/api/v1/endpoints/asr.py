@@ -11,6 +11,15 @@ class ASRConfigUpdate(BaseModel):
     active_engine: Optional[str] = None
     disabled_engines: Optional[List[str]] = None
 
+
+class WorkerRegisterRequest(BaseModel):
+    engine: str
+    url: str
+    gpu: Optional[dict] = None
+    device: Optional[str] = None
+    model_id: Optional[str] = None
+    version: Optional[str] = None
+
 @router.get("/status")
 async def get_asr_status(refresh: bool = False):
     """
@@ -67,3 +76,20 @@ async def remove_worker(engine: str):
         raise HTTPException(status_code=404, detail=str(e))
     await asr_client.check_health()
     return asr_client.get_status()
+
+
+@router.post("/workers/register")
+async def register_worker(body: WorkerRegisterRequest):
+    """
+    Register a worker (called by the worker itself on startup).
+    Returns server data paths for shared_paths negotiation.
+    """
+    if not body.url.startswith("http"):
+        raise HTTPException(status_code=422, detail="Invalid URL: must start with http or https")
+    result = asr_client.register_worker(
+        engine=body.engine,
+        url=body.url,
+        metadata=body.model_dump(exclude={"engine", "url"}),
+    )
+    await asr_client.check_health()
+    return result

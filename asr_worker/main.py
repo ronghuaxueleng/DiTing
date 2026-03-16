@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, Form
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import time
+import socket
 from starlette.concurrency import run_in_threadpool
 from worker_logger import setup_worker_logger
 from config import get_config
@@ -66,9 +67,110 @@ async def lifespan(app: FastAPI):
             raise
     else:
         logger.error(f"❌ Unknown Engine: {ASR_ENGINE_TYPE}")
-        
+
+    # Auto-register with DiTing Server if configured
+    server_url = _cfg.get("server_url")
+    if server_url:
+        asyncio.create_task(_register_with_server(server_url))
+
     yield
     logger.info("🛑 Shutting down ASR Worker")
+
+
+async def _register_with_server(server_url: str):
+    """Register with DiTing Server on startup, negotiate shared_paths."""
+    import httpx
+    from urllib.parse import urlparse
+
+    # Determine advertise_url: if server is on localhost, use localhost too
+    advertise_url = _cfg.get("advertise_url")
+    if not advertise_url:
+        server_host = urlparse(server_url).hostname or ""
+        if server_host in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+            advertise_url = f"http://127.0.0.1:{PORT}"
+        else:
+            advertise_url = f"http://{_get_local_ip()}:{PORT}"
+
+    gpu_info = _get_gpu_info()
+    model_id = _get_model_id()
+
+    payload = {
+        "engine": ASR_ENGINE_TYPE,
+        "url": advertise_url,
+        "gpu": gpu_info,
+        "device": _cfg.get("device", "cpu"),
+        "model_id": model_id,
+    }
+
+    # Retry with backoff (server may not be up yet)
+    for attempt in range(5):
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(
+                    f"{server_url.rstrip('/')}/api/asr/workers/register",
+                    json=payload,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    logger.info(f"✅ Registered with server: {server_url}")
+                    _negotiate_shared_paths(data.get("data_paths", []))
+                    return
+                else:
+                    logger.warning(f"Registration attempt {attempt+1}: HTTP {resp.status_code}")
+        except Exception as e:
+            logger.warning(f"Registration attempt {attempt+1} failed: {e}")
+        await asyncio.sleep(5 * (attempt + 1))
+
+    logger.error("❌ Failed to register with server after 5 attempts")
+
+
+def _negotiate_shared_paths(server_data_paths: list):
+    """Check if server paths are accessible locally, update SHARED_PATHS."""
+    global SHARED_PATHS
+    negotiated = []
+    for sp in server_data_paths:
+        if os.path.isdir(sp):
+            negotiated.append(sp)
+            logger.info(f"📂 Shared path negotiated: {sp}")
+
+    if negotiated:
+        SHARED_PATHS = negotiated
+        logger.info(f"📂 shared_paths updated: {SHARED_PATHS}")
+    else:
+        logger.info("📤 No shared paths detected, using upload mode")
+
+
+def _get_local_ip() -> str:
+    """Get the local LAN IP address."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def _get_gpu_info() -> dict | None:
+    """Collect GPU info for registration payload."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return {
+                "name": torch.cuda.get_device_name(0),
+                "total_gb": round(torch.cuda.get_device_properties(0).total_memory / 1024**3, 1),
+            }
+    except Exception:
+        pass
+    return None
+
+
+def _get_model_id() -> str | None:
+    """Get current model ID from config."""
+    models = _cfg.get("models", {})
+    engine_cfg = models.get(ASR_ENGINE_TYPE, {})
+    return engine_cfg.get("model_id") or engine_cfg.get("model_name")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -93,10 +195,12 @@ async def health():
     except Exception:
         pass
     return {
-        "status": "ok", 
-        "engine": ASR_ENGINE_TYPE, 
+        "status": "ok",
+        "engine": ASR_ENGINE_TYPE,
         "loaded": recognizer is not None,
         "gpu": gpu_info,
+        "device": _cfg.get("device", "cpu"),
+        "model_id": _get_model_id(),
         "shared_paths": SHARED_PATHS,
         "concurrency": {
             "max": MAX_CONCURRENCY,

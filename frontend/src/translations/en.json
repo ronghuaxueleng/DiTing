@@ -271,7 +271,11 @@
                 "sensevoice",
                 "whisper",
                 "qwen3asr"
-            ]
+            ],
+            "registered": "Registered",
+            "manual": "Manual",
+            "pathMode": "Path Mode",
+            "uploadMode": "Upload Mode"
         },
         "prompt": {
             "title": "Prompt Management",

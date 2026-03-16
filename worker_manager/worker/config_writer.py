@@ -17,6 +17,8 @@ port: {port}
 device: "{device}"
 max_concurrency: 1
 
+server_url: {server_url}
+advertise_url: {advertise_url}
 shared_paths: []
 temp_upload_dir: "temp_uploads"
 model_base_path: "{model_base_path}"
@@ -60,6 +62,7 @@ def write_config(
     port: int = 8001,
     device: str = "cuda:0",
     model_base_path: str = "",
+    server_url: str = "",
 ) -> str:
     """
     Write worker_config.yaml to the worker directory.
@@ -83,10 +86,16 @@ def write_config(
     # Normalize path separators for YAML
     model_base_path_normalized = model_base_path.replace("\\", "/")
 
+    # Format server_url and advertise_url for YAML
+    server_url_yaml = f'"{server_url}"' if server_url else "null"
+    advertise_url_yaml = "null"
+
     content = _CONFIG_TEMPLATE.format(
         engine=engine,
         port=port,
         device=device,
+        server_url=server_url_yaml,
+        advertise_url=advertise_url_yaml,
         model_base_path=model_base_path_normalized,
         models_section=models_section,
     )

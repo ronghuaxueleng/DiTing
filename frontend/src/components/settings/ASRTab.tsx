@@ -473,7 +473,11 @@ export default function ASRTab() {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
                                         <span className="font-medium font-mono text-sm">{engineName}</span>
-                                        <span className="bg-purple-500/10 text-purple-500 text-[10px] px-1.5 py-0.5 rounded">Local</span>
+                                        {info.registered ? (
+                                            <span className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] px-1.5 py-0.5 rounded">{t('settings.asr.registered')}</span>
+                                        ) : (
+                                            <span className="bg-purple-500/10 text-purple-500 text-[10px] px-1.5 py-0.5 rounded">{t('settings.asr.manual')}</span>
+                                        )}
                                         <span className={`flex items-center gap-1 text-[10px] font-medium ${info.online ? 'text-green-500' : 'text-red-500'}`}>
                                             <span className={`w-1.5 h-1.5 rounded-full ${info.online ? 'bg-green-500' : 'bg-red-500'}`} />
                                             {info.online ? 'Online' : 'Offline'}
@@ -481,14 +485,29 @@ export default function ASRTab() {
                                     </div>
                                     <div className="text-xs text-[var(--color-text-muted)] mt-0.5 font-mono truncate">{info.url}</div>
                                     {info.online && (
-                                        <div className="text-[10px] mt-0.5 flex items-center gap-1">
+                                        <div className="text-[10px] mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                                            {info.gpu && (
+                                                <span className="text-[var(--color-text-secondary)]" title={`${info.gpu.name} (${info.gpu.total_gb}GB)`}>
+                                                    GPU: {info.gpu.name} ({info.gpu.total_gb}GB)
+                                                </span>
+                                            )}
+                                            {info.device && (
+                                                <span className="text-[var(--color-text-muted)]">
+                                                    Device: {info.device}
+                                                </span>
+                                            )}
+                                            {info.model_id && (
+                                                <span className="text-[var(--color-text-muted)]">
+                                                    Model: {info.model_id}
+                                                </span>
+                                            )}
                                             {info.shared_paths && info.shared_paths.length > 0 ? (
                                                 <span className="text-green-600 dark:text-green-400" title={info.shared_paths.map((p: any) => typeof p === 'string' ? p : `${p.server} → ${p.worker}`).join(', ')}>
-                                                    📂 Path Mode ({info.shared_paths.length} shared {info.shared_paths.length === 1 ? 'dir' : 'dirs'})
+                                                    {t('settings.asr.pathMode')} ({info.shared_paths.length})
                                                 </span>
                                             ) : (
                                                 <span className="text-[var(--color-text-muted)]" title="No shared directories configured — files will be uploaded to worker">
-                                                    📤 Upload Mode
+                                                    {t('settings.asr.uploadMode')}
                                                 </span>
                                             )}
                                         </div>

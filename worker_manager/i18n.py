@@ -58,6 +58,10 @@ _translations: Dict[str, Dict[str, str]] = {
         "engine.proxy": "网络代理：",
         "engine.proxy_placeholder": "可选，如 http://127.0.0.1:7890",
 
+        "engine.server_url": "服务端地址：",
+        "engine.server_url_placeholder": "可选，如 http://192.168.1.100:5023",
+        "engine.server_url_hint": "填写后 Worker 启动时自动注册到服务端",
+
         # ── Step 3: Install ──
         "install.title": "正在安装",
         "install.subtitle": "正在搭建 ASR Worker 运行环境...",
@@ -85,7 +89,10 @@ _translations: Dict[str, Dict[str, str]] = {
         "complete.engine": "引擎",
         "complete.worker_url": "Worker 地址",
         "complete.install_dir": "安装目录",
+        "complete.server_url": "服务端",
         "complete.tip": "在 DiTing 服务端设置中添加此 Worker 地址即可连接。",
+        "complete.auto_register": "自动注册",
+        "complete.manual_register": "未配置（需手动添加）",
         "complete.start_now": "立即启动 Worker",
         "complete.run_tray": "常驻系统托盘",
         "complete.launch": "启动 Worker",
@@ -174,6 +181,10 @@ _translations: Dict[str, Dict[str, str]] = {
         "engine.proxy": "HTTP Proxy:",
         "engine.proxy_placeholder": "Optional, e.g. http://127.0.0.1:7890",
 
+        "engine.server_url": "Server URL:",
+        "engine.server_url_placeholder": "Optional, e.g. http://192.168.1.100:5023",
+        "engine.server_url_hint": "Worker will auto-register with server on startup",
+
         # ── Step 3: Install ──
         "install.title": "Installing",
         "install.subtitle": "Setting up your ASR worker environment...",
@@ -201,7 +212,10 @@ _translations: Dict[str, Dict[str, str]] = {
         "complete.engine": "Engine",
         "complete.worker_url": "Worker URL",
         "complete.install_dir": "Install Dir",
+        "complete.server_url": "Server",
         "complete.tip": "Add this Worker URL in DiTing Server settings to connect.",
+        "complete.auto_register": "Auto-register",
+        "complete.manual_register": "Not configured (add manually)",
         "complete.start_now": "Start Worker now",
         "complete.run_tray": "Run in system tray",
         "complete.launch": "Launch Worker",

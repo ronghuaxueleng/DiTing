@@ -6,7 +6,7 @@ from ... import constants
 from ...i18n import t
 
 # Internal keys for info labels (not displayed)
-_INFO_KEYS = ["engine", "worker_url", "install_dir"]
+_INFO_KEYS = ["engine", "worker_url", "install_dir", "server_url"]
 
 
 class StepComplete(ctk.CTkFrame):
@@ -36,6 +36,7 @@ class StepComplete(ctk.CTkFrame):
             "engine": t("complete.engine"),
             "worker_url": t("complete.worker_url"),
             "install_dir": t("complete.install_dir"),
+            "server_url": t("complete.server_url"),
         }
         for key in _INFO_KEYS:
             ctk.CTkLabel(
@@ -95,6 +96,7 @@ class StepComplete(ctk.CTkFrame):
         engine_name = model.display_name if model else "Unknown"
         port = state.port
         install_dir = state.install_dir
+        server_url = state.server_url
 
         self._info_labels["engine"].configure(text=engine_name)
         self._info_labels["worker_url"].configure(
@@ -102,6 +104,17 @@ class StepComplete(ctk.CTkFrame):
             text_color=("#3b82f6", "#60a5fa"),
         )
         self._info_labels["install_dir"].configure(text=install_dir)
+
+        if server_url:
+            self._info_labels["server_url"].configure(
+                text=f"{server_url}  ({t('complete.auto_register')})",
+                text_color=("#10b981", "#10b981"),
+            )
+        else:
+            self._info_labels["server_url"].configure(
+                text=t("complete.manual_register"),
+                text_color=("gray50", "gray55"),
+            )
 
     def _on_launch_click(self):
         self.controller.state.auto_start = self._auto_start_var.get()

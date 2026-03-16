@@ -29,6 +29,8 @@ class WizardState:
         # Network settings
         self.use_mirror: bool = False  # Use China mirrors
         self.proxy: str = ""           # HTTP proxy (e.g. http://127.0.0.1:7890)
+        # Server registration
+        self.server_url: str = ""      # DiTing Server URL for auto-registration
 
 
 class WizardController:

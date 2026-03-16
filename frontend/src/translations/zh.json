@@ -276,7 +276,11 @@
                 "sensevoice",
                 "whisper",
                 "qwen3asr"
-            ]
+            ],
+            "registered": "已注册",
+            "manual": "手动添加",
+            "pathMode": "路径模式",
+            "uploadMode": "上传模式"
         },
         "prompt": {
             "title": "提示词管理",

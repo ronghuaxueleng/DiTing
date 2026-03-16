@@ -23,6 +23,7 @@ class ASRClient:
         self._check_task = None
         self.shared_paths = {}  # {"sensevoice": ["/data", ...], ...}
         self._last_health = {}  # Cache full /health response per engine
+        self._worker_metadata: Dict[str, dict] = {}  # Metadata from registered workers
         
         # Runtime Config - Load from DB or use defaults
         # Only include cloud engines that have at least one model configured
@@ -61,6 +62,25 @@ class ASRClient:
         for ce in self._configured_clouds:
             self.availability[ce] = True
             self.latency[ce] = 0.0
+
+    def register_worker(self, engine: str, url: str, metadata: dict = None) -> dict:
+        """Register a worker, return server data paths for shared_paths negotiation."""
+        self.add_worker(engine, url)
+        if metadata:
+            self._worker_metadata[engine] = metadata
+        logger.info(f"📋 Worker [{engine}] registered from {url}")
+        return {
+            "status": "registered",
+            "engine": engine,
+            "data_paths": self._get_data_paths(),
+        }
+
+    def _get_data_paths(self) -> List[str]:
+        """Return server-side data directories for shared_paths negotiation."""
+        return [
+            str(os.path.abspath(settings.MEDIA_CACHE_DIR)),
+            str(os.path.abspath(settings.TEMP_DOWNLOADS_DIR)),
+        ]
 
     def refresh_cloud_engines(self):
         """Re-scan DB for configured cloud engines and update priority/availability."""
@@ -196,6 +216,16 @@ class ASRClient:
                             data = resp.json()
                             self.shared_paths[engine] = data.get("shared_paths", [])
                             self._last_health[engine] = data
+                            # Refresh metadata from health response (covers unregistered workers too)
+                            if engine not in self._worker_metadata:
+                                self._worker_metadata[engine] = {}
+                            meta = self._worker_metadata[engine]
+                            if data.get("gpu"):
+                                meta["gpu"] = data["gpu"]
+                            if data.get("device"):
+                                meta["device"] = data["device"]
+                            if data.get("model_id"):
+                                meta["model_id"] = data["model_id"]
                         except Exception:
                             self.shared_paths[engine] = []
                             self._last_health[engine] = {}
@@ -219,12 +249,17 @@ class ASRClient:
         status = {}
         # Workers
         for engine, url in self.workers.items():
+            meta = self._worker_metadata.get(engine, {})
             status[engine] = {
                 "type": "worker",
                 "online": self.availability.get(engine, False),
                 "latency": self.latency.get(engine, -1),
                 "url": url,
-                "shared_paths": self.shared_paths.get(engine, [])
+                "shared_paths": self.shared_paths.get(engine, []),
+                "gpu": meta.get("gpu"),
+                "device": meta.get("device"),
+                "model_id": meta.get("model_id"),
+                "registered": engine in self._worker_metadata,
             }
         # Cloud (only configured ones)
         for ce in self._configured_clouds:
@@ -299,6 +334,7 @@ class ASRClient:
             self.latency.pop(engine, None)
             self.shared_paths.pop(engine, None)
             self._last_health.pop(engine, None)
+            self._worker_metadata.pop(engine, None)
             if engine in self.config["priority"]:
                 self.config["priority"].remove(engine)
             if self.config.get("active_engine") == engine:

@@ -95,6 +95,7 @@ class StepInstall(ctk.CTkFrame):
             auto_start=state.auto_start,
             use_mirror=state.use_mirror,
             proxy=state.proxy,
+            server_url=state.server_url,
         )
 
         self._pipeline = InstallPipeline(config, progress_callback=self._on_progress)

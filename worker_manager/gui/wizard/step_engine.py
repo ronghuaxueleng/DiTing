@@ -95,6 +95,23 @@ class StepEngine(ctk.CTkFrame):
         )
         self._proxy_entry.grid(row=1, column=1, sticky="ew", pady=2)
 
+        # Server URL (for auto-registration)
+        ctk.CTkLabel(
+            net_frame, text=t("engine.server_url"),
+            font=ctk.CTkFont(size=12),
+        ).grid(row=2, column=0, sticky="e", padx=(0, 8), pady=2)
+        self._server_url_entry = ctk.CTkEntry(
+            net_frame,
+            font=ctk.CTkFont(size=12),
+            placeholder_text=t("engine.server_url_placeholder"),
+        )
+        self._server_url_entry.grid(row=2, column=1, sticky="ew", pady=2)
+        ctk.CTkLabel(
+            net_frame, text=t("engine.server_url_hint"),
+            font=ctk.CTkFont(size=10),
+            text_color=("gray50", "gray55"),
+        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=(0, 8), pady=(0, 2))
+
         # Buttons
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.grid(row=4, column=0, sticky="ew", padx=20, pady=(5, 20))
@@ -205,6 +222,7 @@ class StepEngine(ctk.CTkFrame):
         # Network settings
         self.controller.state.use_mirror = self._mirror_var.get()
         self.controller.state.proxy = self._proxy_entry.get().strip()
+        self.controller.state.server_url = self._server_url_entry.get().strip()
 
         # Set device string
         device = self.controller.state.selected_device

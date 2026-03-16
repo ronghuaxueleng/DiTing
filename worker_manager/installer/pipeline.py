@@ -63,6 +63,8 @@ class InstallConfig:
     # Network
     use_mirror: bool = False
     proxy: str = ""
+    # Server registration
+    server_url: str = ""
 
 
 class InstallPipeline:
@@ -221,6 +223,7 @@ class InstallPipeline:
             port=self.config.port,
             device=self.config.device,
             model_base_path=model_dir,
+            server_url=self.config.server_url,
         )
         self._msg("Configuration generated")
 
