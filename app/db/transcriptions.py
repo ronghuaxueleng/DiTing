@@ -29,7 +29,7 @@ def get_history():
     cursor = conn.cursor()
     cursor.execute('''
         SELECT t.*, 
-               vm.video_title, vm.video_cover, vm.stream_url, vm.stream_expired,
+               vm.video_title, vm.video_cover, vm.source_type, vm.stream_url, vm.stream_expired,
                vm.cache_expires_at, vm.cache_policy, vm.notes,
                vm.original_source
         FROM transcriptions t
@@ -88,7 +88,7 @@ def get_transcription_by_source(source_id):
     cursor = conn.cursor()
     cursor.execute('''
         SELECT t.*, 
-               vm.video_title, vm.video_cover, vm.stream_url, vm.stream_expired,
+               vm.video_title, vm.video_cover, vm.source_type, vm.stream_url, vm.stream_expired,
                vm.cache_expires_at, vm.cache_policy, vm.notes,
                vm.original_source
         FROM transcriptions t
@@ -131,7 +131,7 @@ def get_transcription(item_id):
     cursor = conn.cursor()
     cursor.execute('''
         SELECT t.*, 
-               vm.video_title, vm.video_cover, vm.stream_url, vm.stream_expired,
+               vm.video_title, vm.video_cover, vm.source_type, vm.stream_url, vm.stream_expired,
                vm.cache_expires_at, vm.cache_policy, vm.notes,
                vm.original_source
         FROM transcriptions t
@@ -167,7 +167,7 @@ def get_all_transcriptions_by_source(source_id):
     cursor = conn.cursor()
     cursor.execute('''
         SELECT t.*, 
-               vm.video_title, vm.video_cover, vm.stream_url, vm.stream_expired,
+               vm.video_title, vm.video_cover, vm.source_type, vm.stream_url, vm.stream_expired,
                vm.cache_expires_at, vm.cache_policy, vm.notes,
                vm.original_source
         FROM transcriptions t

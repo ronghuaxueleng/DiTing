@@ -451,14 +451,14 @@ async def refresh_metadata(source_id: str, format_cover, download_cover_fn) -> d
 
     if local_record:
         rec_dict = dict(local_record)
-        source_type = rec_dict.get('source_type') or 'bilibili'
+        source_type = rec_dict.get('source_type') or infer_source_type(source_id)
         actual_source = rec_dict.get('original_source') or rec_dict.get('source') or source_id
     else:
         meta = _get_video_meta(source_id)
         if meta:
             meta_dict = dict(meta)
             actual_source = meta_dict.get('original_source') or source_id
-            source_type = infer_source_type(source_id)
+        source_type = infer_source_type(source_id)
 
     if source_type == 'douyin':
         raise ValueError("抖音不支持服务器端同步 (请使用浏览器插件)")
