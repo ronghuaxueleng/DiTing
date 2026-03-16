@@ -174,7 +174,7 @@ async def check_system_update():
             "update_available": update_available,
             "current_version": APP_VERSION,
             "latest_version": tag,
-            "release_notes": notes[:500],
+            "release_notes": notes[:2000],
             "download_url": html_url,
         }
 

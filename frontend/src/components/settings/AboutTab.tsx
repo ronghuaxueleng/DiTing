@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import ReactMarkdown from 'react-markdown'
 import { getSystemVersion, checkSystemUpdate } from '../../api'
 import { useToast } from '../../contexts/ToastContext'
 import Icons from '../ui/Icons'
@@ -103,21 +104,42 @@ export default function AboutTab() {
                     }`}>
                     <div className="flex items-start gap-3">
                         {updateInfo.update_available ? (
-                            <Icons.AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
+                            <Icons.AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
                         ) : (
-                            <Icons.CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                            <Icons.CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                         )}
-                        <div>
+                        <div className="flex-1 min-w-0">
                             <div className={`font-medium ${updateInfo.update_available ? 'text-blue-500' : 'text-green-500'
                                 }`}>
                                 {updateInfo.update_available ? t('settings.about.newVersionFound') : t('settings.about.currentIsLatest')}
                             </div>
-                            <div className="text-sm mt-1 opacity-80">
-                                {updateInfo.release_notes}
-                            </div>
-                            <div className="text-xs mt-2 opacity-60">
+                            <div className="text-xs mt-2 opacity-60 mb-2">
                                 {t('settings.about.currentVersion')}: {updateInfo.current_version} | {t('settings.about.latestVersion')}: {updateInfo.latest_version}
                             </div>
+                            {updateInfo.release_notes && (
+                                <div className="text-sm mt-2 opacity-80 prose prose-sm dark:prose-invert max-w-none overflow-hidden">
+                                    <ReactMarkdown
+                                        components={{
+                                            h1: ({node, ...props}) => <h3 className="text-base font-semibold mt-2 mb-1" {...props} />,
+                                            h2: ({node, ...props}) => <h3 className="text-sm font-semibold mt-2 mb-1" {...props} />,
+                                            h3: ({node, ...props}) => <h4 className="text-xs font-semibold mt-1.5 mb-0.5" {...props} />,
+                                            p: ({node, ...props}) => <p className="text-xs mb-1" {...props} />,
+                                            ul: ({node, ...props}) => <ul className="text-xs list-disc list-inside mb-1 space-y-0.5" {...props} />,
+                                            ol: ({node, ...props}) => <ol className="text-xs list-decimal list-inside mb-1 space-y-0.5" {...props} />,
+                                            li: ({node, ...props}) => <li className="text-xs" {...props} />,
+                                            table: ({node, ...props}) => <div className="text-xs overflow-x-auto mb-1"><table className="border-collapse border border-gray-300 dark:border-gray-600" {...props} /></div>,
+                                            th: ({node, ...props}) => <th className="border border-gray-300 dark:border-gray-600 px-2 py-1 bg-gray-100 dark:bg-gray-700" {...props} />,
+                                            td: ({node, ...props}) => <td className="border border-gray-300 dark:border-gray-600 px-2 py-1" {...props} />,
+                                            code: ({node, inline, ...props}) => inline
+                                                ? <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded text-xs" {...props} />
+                                                : <code className="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded text-xs block mb-1 overflow-x-auto" {...props} />,
+                                            a: ({node, ...props}) => <a className="text-blue-500 hover:underline" {...props} />,
+                                        }}
+                                    >
+                                        {updateInfo.release_notes}
+                                    </ReactMarkdown>
+                                </div>
+                            )}
                             {updateInfo.update_available && updateInfo.download_url && (
                                 <a
                                     href={updateInfo.download_url}
