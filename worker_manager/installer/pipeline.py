@@ -60,6 +60,9 @@ class InstallConfig:
     port: int = constants.DEFAULT_WORKER_PORT
     device: str = "cuda:0"
     auto_start: bool = True
+    # Network
+    use_mirror: bool = False
+    proxy: str = ""
 
 
 class InstallPipeline:
@@ -150,21 +153,25 @@ class InstallPipeline:
 
     def _step_python(self):
         uv = self._uv_path()
-        install_python(uv, progress_callback=self._msg)
+        install_python(uv, progress_callback=self._msg,
+                       use_mirror=self.config.use_mirror, proxy=self.config.proxy)
 
     def _step_venv(self):
         uv = self._uv_path()
-        create_venv(uv, self.config.install_dir, progress_callback=self._msg)
+        create_venv(uv, self.config.install_dir, progress_callback=self._msg,
+                    use_mirror=self.config.use_mirror, proxy=self.config.proxy)
 
     def _step_pytorch(self):
         uv = self._uv_path()
         venv = self._venv_path()
-        install_pytorch(uv, venv, self.config.compute_key, progress_callback=self._msg)
+        install_pytorch(uv, venv, self.config.compute_key, progress_callback=self._msg,
+                        use_mirror=self.config.use_mirror, proxy=self.config.proxy)
 
     def _step_base_deps(self):
         uv = self._uv_path()
         venv = self._venv_path()
-        install_worker_base(uv, venv, progress_callback=self._msg)
+        install_worker_base(uv, venv, progress_callback=self._msg,
+                            use_mirror=self.config.use_mirror, proxy=self.config.proxy)
 
     def _step_engine_deps(self):
         if not self.config.model or not self.config.model.pip_extras:
@@ -172,7 +179,8 @@ class InstallPipeline:
         uv = self._uv_path()
         venv = self._venv_path()
         install_engine_deps(uv, venv, self.config.model.pip_extras,
-                            progress_callback=self._msg)
+                            progress_callback=self._msg,
+                            use_mirror=self.config.use_mirror, proxy=self.config.proxy)
 
     def _step_model(self):
         if not self.config.model:
@@ -180,7 +188,8 @@ class InstallPipeline:
         venv = self._venv_path()
         model_dir = os.path.join(self.config.install_dir, "models")
         download_model(self.config.model, venv, model_dir,
-                       progress_callback=self._msg)
+                       progress_callback=self._msg,
+                       use_mirror=self.config.use_mirror, proxy=self.config.proxy)
 
     def _step_worker_files(self):
         """Copy asr_worker source files to install directory."""

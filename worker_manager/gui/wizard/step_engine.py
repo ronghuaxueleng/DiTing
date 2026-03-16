@@ -69,6 +69,32 @@ class StepEngine(ctk.CTkFrame):
         self._port_entry.grid(row=1, column=1, sticky="w", pady=4)
         self._port_entry.insert(0, str(constants.DEFAULT_WORKER_PORT))
 
+        # ── Network settings ──
+        net_frame = ctk.CTkFrame(self._config_frame, fg_color="transparent")
+        net_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        net_frame.grid_columnconfigure(1, weight=1)
+
+        # Mirror checkbox
+        self._mirror_var = ctk.BooleanVar(value=self._detect_china_locale())
+        self._mirror_check = ctk.CTkCheckBox(
+            net_frame, text=t("engine.use_mirror"),
+            variable=self._mirror_var,
+            font=ctk.CTkFont(size=12),
+        )
+        self._mirror_check.grid(row=0, column=0, columnspan=2, sticky="w", pady=2)
+
+        # Proxy
+        ctk.CTkLabel(
+            net_frame, text=t("engine.proxy"),
+            font=ctk.CTkFont(size=12),
+        ).grid(row=1, column=0, sticky="e", padx=(0, 8), pady=2)
+        self._proxy_entry = ctk.CTkEntry(
+            net_frame,
+            font=ctk.CTkFont(size=12),
+            placeholder_text=t("engine.proxy_placeholder"),
+        )
+        self._proxy_entry.grid(row=1, column=1, sticky="ew", pady=2)
+
         # Buttons
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.grid(row=4, column=0, sticky="ew", padx=20, pady=(5, 20))
@@ -176,6 +202,10 @@ class StepEngine(ctk.CTkFrame):
         except ValueError:
             self.controller.state.port = constants.DEFAULT_WORKER_PORT
 
+        # Network settings
+        self.controller.state.use_mirror = self._mirror_var.get()
+        self.controller.state.proxy = self._proxy_entry.get().strip()
+
         # Set device string
         device = self.controller.state.selected_device
         if device == "cuda":
@@ -186,3 +216,23 @@ class StepEngine(ctk.CTkFrame):
             self.controller.state.selected_device = "cpu"
 
         self.controller.next_step()
+
+    @staticmethod
+    def _detect_china_locale() -> bool:
+        """Auto-detect if user is likely in China (for mirror default)."""
+        import locale
+        try:
+            loc = locale.getdefaultlocale()[0] or ""
+            if loc.startswith("zh"):
+                return True
+        except Exception:
+            pass
+        # Check timezone
+        import time
+        try:
+            # CST = UTC+8
+            if time.timezone == -28800 or time.altzone == -28800:
+                return True
+        except Exception:
+            pass
+        return False

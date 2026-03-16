@@ -26,6 +26,9 @@ class WizardState:
         self.port: int = 8001
         self.auto_start: bool = True
         self.compute_key: str = "cpu"  # cu121, cu124, cpu, mps
+        # Network settings
+        self.use_mirror: bool = False  # Use China mirrors
+        self.proxy: str = ""           # HTTP proxy (e.g. http://127.0.0.1:7890)
 
 
 class WizardController:

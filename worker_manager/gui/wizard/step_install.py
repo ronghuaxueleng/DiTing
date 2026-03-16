@@ -93,6 +93,8 @@ class StepInstall(ctk.CTkFrame):
             port=state.port,
             device=state.selected_device,
             auto_start=state.auto_start,
+            use_mirror=state.use_mirror,
+            proxy=state.proxy,
         )
 
         self._pipeline = InstallPipeline(config, progress_callback=self._on_progress)

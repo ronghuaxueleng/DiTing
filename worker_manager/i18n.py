@@ -54,6 +54,9 @@ _translations: Dict[str, Dict[str, str]] = {
         "engine.download": "下载大小",
         "engine.accuracy": "精度",
         "engine.speed": "速度",
+        "engine.use_mirror": "使用国内镜像加速（阿里云 PyPI + 上交大 PyTorch + hf-mirror）",
+        "engine.proxy": "网络代理：",
+        "engine.proxy_placeholder": "可选，如 http://127.0.0.1:7890",
 
         # ── Step 3: Install ──
         "install.title": "正在安装",
@@ -167,6 +170,9 @@ _translations: Dict[str, Dict[str, str]] = {
         "engine.download": "Download",
         "engine.accuracy": "Accuracy",
         "engine.speed": "Speed",
+        "engine.use_mirror": "Use China mirrors (Aliyun PyPI + SJTU PyTorch + hf-mirror)",
+        "engine.proxy": "HTTP Proxy:",
+        "engine.proxy_placeholder": "Optional, e.g. http://127.0.0.1:7890",
 
         # ── Step 3: Install ──
         "install.title": "Installing",
