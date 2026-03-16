@@ -239,12 +239,22 @@ class StepEngine(ctk.CTkFrame):
     def _detect_china_locale() -> bool:
         """Auto-detect if user is likely in China (for mirror default)."""
         import locale
+        import os
         try:
-            loc = locale.getdefaultlocale()[0] or ""
+            loc = locale.getlocale()[0] or ""
+            # Windows returns names like "Chinese (Simplified)_China"
+            if "Chinese" in loc or "chinese" in loc:
+                return True
+            # Unix returns codes like "zh_CN"
             if loc.startswith("zh"):
                 return True
         except Exception:
             pass
+        # Check env vars (Unix)
+        for var in ("LANG", "LC_ALL", "LC_MESSAGES"):
+            val = os.environ.get(var, "")
+            if val.startswith("zh"):
+                return True
         # Check timezone
         import time
         try:

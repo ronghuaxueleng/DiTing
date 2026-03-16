@@ -47,12 +47,11 @@ def _download_sensevoice(python: str, model: ModelInfo, model_dir: str,
     script = f"""
 import os
 os.environ['MODELSCOPE_CACHE'] = {repr(model_dir)}
-from modelscope.hub.api import HubApi
-api = HubApi()
+from modelscope import snapshot_download
 # Download main model
-api.model_download('{model.model_id}')
+snapshot_download('{model.model_id}', cache_dir={repr(model_dir)})
 # Download VAD model
-api.model_download('iic/speech_fsmn_vad_zh-cn-16k-common-pytorch')
+snapshot_download('iic/speech_fsmn_vad_zh-cn-16k-common-pytorch', cache_dir={repr(model_dir)})
 print('DOWNLOAD_COMPLETE')
 """
     _run_python_script(python, script, progress_callback, proxy=proxy)
