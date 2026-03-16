@@ -31,6 +31,8 @@ whisper = ["openai-whisper>=20250625"]
 qwen = ["qwen-asr>=0.0.6"]
 # 一键全装 (PC 桌面用户的默认选择)
 all = ["diting[desktop,worker,sensevoice,whisper,qwen]"]
+# Worker Manager GUI (独立安装向导 + 托盘管理)
+manager = ["customtkinter>=5.2.0", "darkdetect>=0.8.0", "pystray>=0.19.5", "pyinstaller>=6.19.0"]
 # Tauri 桌面端打包
 tauri = ["pyinstaller>=6.19.0"]
 
