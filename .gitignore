@@ -36,5 +36,3 @@ CLAUDE.md
 src-tauri/target/
 src-tauri/binaries/
 src-tauri/diting-server-*
-src-tauri/icons/*.ico
-src-tauri/icons/*.icns
