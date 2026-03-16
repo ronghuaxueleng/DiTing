@@ -130,7 +130,7 @@ export default function AboutTab() {
                                             table: ({node, ...props}) => <div className="text-xs overflow-x-auto mb-1"><table className="border-collapse border border-gray-300 dark:border-gray-600" {...props} /></div>,
                                             th: ({node, ...props}) => <th className="border border-gray-300 dark:border-gray-600 px-2 py-1 bg-gray-100 dark:bg-gray-700" {...props} />,
                                             td: ({node, ...props}) => <td className="border border-gray-300 dark:border-gray-600 px-2 py-1" {...props} />,
-                                            code: ({node, inline, ...props}) => inline
+                                            code: ({node, inline, ...props}: any) => inline
                                                 ? <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded text-xs" {...props} />
                                                 : <code className="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded text-xs block mb-1 overflow-x-auto" {...props} />,
                                             a: ({node, ...props}) => <a className="text-blue-500 hover:underline" {...props} />,
