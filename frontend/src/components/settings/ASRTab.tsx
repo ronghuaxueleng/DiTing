@@ -103,45 +103,41 @@ export default function ASRTab() {
     })
 
     // ── Worker URL management ──
-    const PRESET_ENGINES = ['sensevoice', 'whisper', 'qwen3asr']
     const [showWorkerForm, setShowWorkerForm] = useState(false)
-    const [editingWorkerEngine, setEditingWorkerEngine] = useState<string | null>(null)
-    const [workerForm, setWorkerForm] = useState({ engine: 'sensevoice', customEngine: '', url: 'http://localhost:8001' })
+    const [workerUrlInput, setWorkerUrlInput] = useState('http://localhost:8001')
 
-
-    const saveWorkerMutation = useMutation({
-        mutationFn: async ({ engine, url }: { engine: string; url: string }) => {
-            // Get current workers and merge
-            const current = statusData?.engines
-                ? Object.fromEntries(
-                    Object.entries(statusData.engines)
-                        .filter(([, info]: [string, any]) => info.type === 'worker')
-                        .map(([e, info]: [string, any]) => [e, info.url])
-                )
-                : {}
-            return updateASRWorkers({ ...current, [engine]: url })
+    const addWorkerMutation = useMutation({
+        mutationFn: async (url: string) => {
+            // Build workers map: current workers + new URL
+            const currentWorkers = statusData?.workers || {}
+            const newWorkers: Record<string, any> = {}
+            for (const [, info] of Object.entries(currentWorkers)) {
+                newWorkers[info.url] = {}
+            }
+            newWorkers[url] = {}
+            return updateASRWorkers(newWorkers)
         },
         onSuccess: (data) => {
             queryClient.setQueryData(['asr-status'], data)
             setShowWorkerForm(false)
-            setEditingWorkerEngine(null)
+            setWorkerUrlInput('http://localhost:8001')
             showToast('success', t('settings.asr.workerSaved'))
         },
         onError: (e) => showToast('error', t('settings.asr.workerSaveFailed') + ': ' + e.message)
     })
 
     const removeWorkerMutation = useMutation({
-        mutationFn: (engine: string) => deleteASRWorker(engine),
+        mutationFn: (workerId: string) => deleteASRWorker(workerId),
         onSuccess: (data) => {
             queryClient.setQueryData(['asr-status'], data)
-            setDeleteConfirmWorkerEngineForModal(null)
+            setDeleteConfirmWorkerId(null)
             showToast('success', t('settings.asr.workerRemoved'))
         },
         onError: (e) => showToast('error', t('settings.asr.workerRemoveFailed') + ': ' + e.message)
     })
 
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
-    const [deleteConfirmWorkerEngineForModal, setDeleteConfirmWorkerEngineForModal] = useState<string | null>(null)
+    const [deleteConfirmWorkerId, setDeleteConfirmWorkerId] = useState<string | null>(null)
 
     const handleDeleteModel = (id: number) => {
         setDeleteConfirmId(null)
@@ -236,10 +232,10 @@ export default function ASRTab() {
         showToast('success', t('settings.asr.statusRefreshed'))
     }
 
-    const handleMove = (engine: string, direction: 'up' | 'down') => {
+    const handleMove = (key: string, direction: 'up' | 'down') => {
         if (!statusData?.config?.priority) return
         const current = [...statusData.config.priority]
-        const idx = current.indexOf(engine)
+        const idx = current.indexOf(key)
         if (idx === -1) return
 
         if (direction === 'up' && idx > 0) {
@@ -259,25 +255,57 @@ export default function ASRTab() {
         configMutation.mutate({ strict_mode: !statusData.config.strict_mode })
     }
 
-    const toggleEngineEnabled = (engine: string) => {
+    const toggleEnabled = (key: string) => {
         if (!statusData?.config) return
         const disabled = new Set(statusData.config.disabled_engines || [])
-        if (disabled.has(engine)) {
-            disabled.delete(engine)
+        if (disabled.has(key)) {
+            disabled.delete(key)
         } else {
-            disabled.add(engine)
+            disabled.add(key)
         }
         configMutation.mutate({ disabled_engines: Array.from(disabled) })
     }
 
     if (statusLoading || modelsLoading) return <div className="text-center py-10 text-[var(--color-text-muted)]">{t('common.loading')}</div>
 
-    const engines = statusData?.engines || {}
+    const workers = statusData?.workers || {}
+    const clouds = statusData?.clouds || {}
     const config = statusData?.config || { priority: [], strict_mode: false, active_engine: null, disabled_engines: [] }
-    const priority = config.priority || Object.keys(engines)
+    const priority = config.priority || [...Object.keys(workers), ...Object.keys(clouds)]
     const strictMode = config.strict_mode || false
     const activeEngine = config.active_engine || (priority.length > 0 ? priority[0] : null)
     const disabledEngines = new Set(config.disabled_engines || [])
+
+    // Helper: is a priority item a cloud engine or a worker?
+    const isCloud = (key: string) => key in clouds
+    const isWorker = (key: string) => key in workers
+
+    // Get display info for a priority item
+    const getItemInfo = (key: string) => {
+        if (isCloud(key)) {
+            const cloud = clouds[key]
+            return {
+                type: 'cloud' as const,
+                online: cloud?.online ?? false,
+                latency: 0,
+                displayName: cloud?.badge || key,
+                subtitle: key,
+                engine: key,
+            }
+        }
+        if (isWorker(key)) {
+            const w = workers[key]
+            return {
+                type: 'worker' as const,
+                online: w?.online ?? false,
+                latency: w?.latency ?? -1,
+                displayName: key,
+                subtitle: w?.engine ? `${w.engine}${w.model_id ? ` / ${w.model_id}` : ''}` : t('settings.asr.idle'),
+                engine: w?.engine || null,
+            }
+        }
+        return null
+    }
 
     return (
         <div className="space-y-6">
@@ -313,23 +341,19 @@ export default function ASRTab() {
                 </button>
             </div>
 
-            {/* Engine List (Ordered by Priority) */}
+            {/* Priority List (Workers + Clouds mixed) */}
             <div className="space-y-3">
                 <div className="text-sm font-medium text-[var(--color-text-muted)] px-1">{t('settings.asr.priority')}</div>
-                {priority.map((engineName, index) => {
-                    const info = engines[engineName]
+                {priority.map((key, index) => {
+                    const info = getItemInfo(key)
                     if (!info) return null
 
-                    const isOnline = info.online
-                    const latency = info.latency
-
-                    const isActive = activeEngine === engineName
-                    const isCloud = info.type === 'cloud'
-                    const isDisabled = disabledEngines.has(engineName)
+                    const isActive = activeEngine === key
+                    const isDisabled = disabledEngines.has(key)
 
                     return (
                         <div
-                            key={engineName}
+                            key={key}
                             className={`
                                     relative p-4 rounded-lg border flex items-center gap-4 transition-all duration-200
                                     ${isActive && strictMode
@@ -343,10 +367,10 @@ export default function ASRTab() {
                                 {index + 1}
                             </div>
 
-                            {/* Enable/Disable Toggle - Only visible in Non-Strict Mode or if not active */}
+                            {/* Enable/Disable Toggle */}
                             <div className="flex items-center justify-center w-8">
                                 <button
-                                    onClick={() => toggleEngineEnabled(engineName)}
+                                    onClick={() => toggleEnabled(key)}
                                     className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${!isDisabled ? 'bg-green-500' : 'bg-[var(--color-border)]'
                                         }`}
                                     title={isDisabled ? t('settings.asr.enableTooltip') : t('settings.asr.disableTooltip')}
@@ -364,7 +388,7 @@ export default function ASRTab() {
                                     type="radio"
                                     name="active_engine"
                                     checked={isActive}
-                                    onChange={() => configMutation.mutate({ active_engine: engineName })}
+                                    onChange={() => configMutation.mutate({ active_engine: key })}
                                     className="w-4 h-4 text-[var(--color-primary)] bg-[var(--color-bg)] border-[var(--color-border)] focus:ring-[var(--color-primary)] cursor-pointer"
                                     title={t('settings.asr.setPrimaryTooltip')}
                                 />
@@ -374,7 +398,7 @@ export default function ASRTab() {
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                     <span className={`font-medium ${isActive && strictMode ? 'text-[var(--color-primary)]' : ''}`}>
-                                        {isCloud ? (info.badge || engineName) : engineName}
+                                        {info.displayName}
                                     </span>
 
                                     {/* Badges */}
@@ -389,27 +413,32 @@ export default function ASRTab() {
                                                 Disabled
                                             </span>
                                         )}
-                                        <span className={`px-2 py-0.5 rounded text-[10px] ${isCloud ? 'bg-blue-500/10 text-blue-500' : 'bg-purple-500/10 text-purple-500'
+                                        <span className={`px-2 py-0.5 rounded text-[10px] ${info.type === 'cloud' ? 'bg-blue-500/10 text-blue-500' : 'bg-purple-500/10 text-purple-500'
                                             }`}>
-                                            {isCloud ? (info.badge || 'Cloud') : 'Local'}
+                                            {info.type === 'cloud' ? 'Cloud' : 'Worker'}
                                         </span>
+                                        {info.type === 'worker' && !info.engine && (
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-500">
+                                                {t('settings.asr.idle')}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="text-xs text-[var(--color-text-muted)] mt-1 flex items-center gap-2 truncate">
-                                    {info.url && <span className="truncate">URL: {info.url}</span>}
+                                <div className="text-xs text-[var(--color-text-muted)] mt-1 truncate">
+                                    {info.subtitle}
                                 </div>
                             </div>
 
                             {/* Status */}
                             <div className="flex flex-col items-end gap-1 min-w-[80px]">
-                                <div className={`flex items-center gap-1.5 text-xs font-medium ${isOnline ? 'text-green-500' : 'text-red-500'
+                                <div className={`flex items-center gap-1.5 text-xs font-medium ${info.online ? 'text-green-500' : 'text-red-500'
                                     }`}>
-                                    <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
-                                    {isOnline ? 'Online' : 'Offline'}
+                                    <div className={`w-2 h-2 rounded-full ${info.online ? 'bg-green-500' : 'bg-red-500'}`} />
+                                    {info.online ? 'Online' : 'Offline'}
                                 </div>
-                                {isOnline && latency >= 0 && (
+                                {info.online && info.latency >= 0 && info.type === 'worker' && (
                                     <div className="text-[10px] text-[var(--color-text-muted)]">
-                                        {latency.toFixed(0)} ms
+                                        {info.latency.toFixed(0)} ms
                                     </div>
                                 )}
                             </div>
@@ -417,14 +446,14 @@ export default function ASRTab() {
                             {/* Reorder Controls */}
                             <div className="flex flex-col gap-1 pl-2 border-l border-[var(--color-border)]">
                                 <button
-                                    onClick={() => handleMove(engineName, 'up')}
+                                    onClick={() => handleMove(key, 'up')}
                                     disabled={index === 0}
                                     className="p-1 hover:bg-[var(--color-bg-hover)] rounded text-[var(--color-text-muted)] disabled:opacity-30"
                                 >
                                     <Icons.ChevronDown className="w-3.5 h-3.5 rotate-180" />
                                 </button>
                                 <button
-                                    onClick={() => handleMove(engineName, 'down')}
+                                    onClick={() => handleMove(key, 'down')}
                                     disabled={index === priority.length - 1}
                                     className="p-1 hover:bg-[var(--color-bg-hover)] rounded text-[var(--color-text-muted)] disabled:opacity-30"
                                 >
@@ -436,7 +465,7 @@ export default function ASRTab() {
                 })}
             </div>
 
-            {/* ── Local Worker Endpoints ── */}
+            {/* ── Workers Section ── */}
             <div className="pt-4 border-t border-[var(--color-border)]">
                 <div className="flex items-center justify-between mb-3">
                     <div>
@@ -448,8 +477,7 @@ export default function ASRTab() {
                     </div>
                     <button
                         onClick={() => {
-                            setEditingWorkerEngine(null)
-                            setWorkerForm({ engine: 'sensevoice', customEngine: '', url: 'http://localhost:8001' })
+                            setWorkerUrlInput('http://localhost:8001')
                             setShowWorkerForm(true)
                         }}
                         className="flex items-center gap-1 text-sm text-[var(--color-primary)] hover:underline shrink-0"
@@ -461,125 +489,106 @@ export default function ASRTab() {
 
                 {/* Worker List */}
                 <div className="space-y-2">
-                    {Object.entries(engines).filter(([, info]: [string, any]) => info.type === 'worker').length === 0 && (
+                    {Object.keys(workers).length === 0 && (
                         <div className="text-sm text-[var(--color-text-muted)] text-center py-4 bg-[var(--color-bg)] rounded-lg border border-[var(--color-border)] border-dashed">
                             {t('settings.asr.noWorkers')}
                         </div>
                     )}
-                    {Object.entries(engines)
-                        .filter(([, info]: [string, any]) => info.type === 'worker')
-                        .map(([engineName, info]: [string, any]) => (
-                            <div key={engineName} className="bg-[var(--color-bg)] p-3 rounded-lg border border-[var(--color-border)] flex items-center gap-3">
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-medium font-mono text-sm">{engineName}</span>
-                                        {info.registered ? (
-                                            <span className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] px-1.5 py-0.5 rounded">{t('settings.asr.registered')}</span>
-                                        ) : (
-                                            <span className="bg-purple-500/10 text-purple-500 text-[10px] px-1.5 py-0.5 rounded">{t('settings.asr.manual')}</span>
-                                        )}
-                                        <span className={`flex items-center gap-1 text-[10px] font-medium ${info.online ? 'text-green-500' : 'text-red-500'}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${info.online ? 'bg-green-500' : 'bg-red-500'}`} />
-                                            {info.online ? 'Online' : 'Offline'}
-                                        </span>
-                                    </div>
-                                    <div className="text-xs text-[var(--color-text-muted)] mt-0.5 font-mono truncate">{info.url}</div>
-                                    {info.online && (
-                                        <div className="text-[10px] mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                                            {info.gpu && (
-                                                <span className="text-[var(--color-text-secondary)]" title={`${info.gpu.name} (${info.gpu.total_gb}GB)`}>
-                                                    GPU: {info.gpu.name} ({info.gpu.total_gb}GB)
-                                                </span>
-                                            )}
-                                            {info.device && (
-                                                <span className="text-[var(--color-text-muted)]">
-                                                    Device: {info.device}
-                                                </span>
-                                            )}
-                                            {info.model_id && (
-                                                <span className="text-[var(--color-text-muted)]">
-                                                    Model: {info.model_id}
-                                                </span>
-                                            )}
-                                            {info.shared_paths && info.shared_paths.length > 0 ? (
-                                                <span className="text-green-600 dark:text-green-400" title={info.shared_paths.map((p: any) => typeof p === 'string' ? p : `${p.server} → ${p.worker}`).join(', ')}>
-                                                    {t('settings.asr.pathMode')} ({info.shared_paths.length})
-                                                </span>
-                                            ) : (
-                                                <span className="text-[var(--color-text-muted)]" title="No shared directories configured — files will be uploaded to worker">
-                                                    {t('settings.asr.uploadMode')}
-                                                </span>
-                                            )}
-                                        </div>
+                    {Object.entries(workers).map(([workerId, info]) => (
+                        <div key={workerId} className="bg-[var(--color-bg)] p-3 rounded-lg border border-[var(--color-border)] flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-medium font-mono text-sm">{workerId}</span>
+                                    {info.registered ? (
+                                        <span className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] px-1.5 py-0.5 rounded">{t('settings.asr.registered')}</span>
+                                    ) : (
+                                        <span className="bg-purple-500/10 text-purple-500 text-[10px] px-1.5 py-0.5 rounded">{t('settings.asr.manual')}</span>
                                     )}
+                                    <span className={`flex items-center gap-1 text-[10px] font-medium ${info.online ? 'text-green-500' : 'text-red-500'}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${info.online ? 'bg-green-500' : 'bg-red-500'}`} />
+                                        {info.online ? 'Online' : 'Offline'}
+                                    </span>
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                        onClick={() => {
-                                            const isPreset = PRESET_ENGINES.includes(engineName)
-                                            setEditingWorkerEngine(engineName)
-                                            setWorkerForm({
-                                                engine: isPreset ? engineName : 'custom',
-                                                customEngine: isPreset ? '' : engineName,
-                                                url: info.url
-                                            })
-                                            setShowWorkerForm(true)
-                                        }}
-                                        className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] rounded"
-                                        title={t('settings.asr.editWorker')}
-                                    >
-                                        <Icons.Edit className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                        onClick={() => setDeleteConfirmWorkerEngineForModal(engineName)}
-                                        className="p-1.5 text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-500/10 rounded"
-                                        title={t('settings.asr.deleteWorker')}
-                                    >
-                                        <Icons.Trash className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
+                                <div className="text-xs text-[var(--color-text-muted)] mt-0.5 font-mono truncate">{info.url}</div>
+                                {info.online && (
+                                    <div className="text-[10px] mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                                        {info.engine ? (
+                                            <span className="text-[var(--color-text-secondary)] font-medium">
+                                                Engine: {info.engine}
+                                            </span>
+                                        ) : (
+                                            <span className="text-amber-500 font-medium">
+                                                {t('settings.asr.idle')}
+                                            </span>
+                                        )}
+                                        {info.gpu && (
+                                            <span className="text-[var(--color-text-secondary)]" title={`${info.gpu.name} (${info.gpu.total_gb}GB)`}>
+                                                GPU: {info.gpu.name} ({info.gpu.total_gb}GB)
+                                            </span>
+                                        )}
+                                        {info.device && (
+                                            <span className="text-[var(--color-text-muted)]">
+                                                Device: {info.device}
+                                            </span>
+                                        )}
+                                        {info.model_id && (
+                                            <span className="text-[var(--color-text-muted)]">
+                                                Model: {info.model_id}
+                                            </span>
+                                        )}
+                                        {info.shared_paths && info.shared_paths.length > 0 ? (
+                                            <span className="text-green-600 dark:text-green-400" title={info.shared_paths.map((p: any) => typeof p === 'string' ? p : `${p.server} → ${p.worker}`).join(', ')}>
+                                                {t('settings.asr.pathMode')} ({info.shared_paths.length})
+                                            </span>
+                                        ) : (
+                                            <span className="text-[var(--color-text-muted)]" title="No shared directories configured — files will be uploaded to worker">
+                                                {t('settings.asr.uploadMode')}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        ))}
+                            <div className="flex items-center gap-1 shrink-0">
+                                {info.online && info.management && (
+                                    <a
+                                        href={`${info.url}/management`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs px-2 py-1 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded hover:bg-[var(--color-primary)]/20"
+                                        title={t('settings.asr.manage')}
+                                    >
+                                        {t('settings.asr.manage')}
+                                    </a>
+                                )}
+                                <button
+                                    onClick={() => setDeleteConfirmWorkerId(workerId)}
+                                    className="p-1.5 text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-500/10 rounded"
+                                    title={t('settings.asr.deleteWorker')}
+                                >
+                                    <Icons.Trash className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
 
-                {/* Add/Edit Worker Form Modal */}
+                {/* Add Worker Form Modal */}
                 {showWorkerForm && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" onClick={() => setShowWorkerForm(false)}>
                         <div className="bg-[var(--color-card)] p-6 rounded-lg w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
                             <h3 className="font-medium text-lg">
-                                {editingWorkerEngine ? t('settings.asr.editWorker') : t('settings.asr.addWorker')}
+                                {t('settings.asr.addWorker')}
                             </h3>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-sm font-medium block mb-1">{t('settings.asr.workerEngine')}</label>
-                                    <select
-                                        value={workerForm.engine}
-                                        onChange={e => setWorkerForm({ ...workerForm, engine: e.target.value })}
-                                        disabled={!!editingWorkerEngine}
-                                        className={`w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm ${editingWorkerEngine ? 'opacity-50' : ''}`}
-                                    >
-                                        {PRESET_ENGINES.map(e => <option key={e} value={e}>{e}</option>)}
-                                        <option value="custom">✨ Custom…</option>
-                                    </select>
-                                    {workerForm.engine === 'custom' && (
-                                        <input
-                                            type="text"
-                                            value={workerForm.customEngine}
-                                            onChange={e => setWorkerForm({ ...workerForm, customEngine: e.target.value })}
-                                            placeholder={t('settings.asr.workerEnginePlaceholder')}
-                                            className="mt-2 w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
-                                            autoFocus
-                                        />
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium block mb-1">{t('settings.asr.workerUrl')}</label>
+                                    <label className="text-sm font-medium block mb-1">{t('settings.asr.workerUrlLabel')}</label>
                                     <input
                                         type="text"
-                                        value={workerForm.url}
-                                        onChange={e => setWorkerForm({ ...workerForm, url: e.target.value })}
-                                        placeholder={t('settings.asr.workerUrlPlaceholder')}
+                                        value={workerUrlInput}
+                                        onChange={e => setWorkerUrlInput(e.target.value)}
+                                        placeholder={t('settings.asr.addWorkerUrlPlaceholder')}
                                         className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                        autoFocus
                                     />
                                     <div className="text-xs text-[var(--color-text-muted)] mt-1">{t('settings.asr.workerUrlHint')}</div>
                                 </div>
@@ -593,11 +602,11 @@ export default function ASRTab() {
                                 </button>
                                 <button
                                     onClick={() => {
-                                        const engineName = workerForm.engine === 'custom' ? workerForm.customEngine.trim() : workerForm.engine
-                                        if (!engineName || !workerForm.url) return
-                                        saveWorkerMutation.mutate({ engine: engineName, url: workerForm.url.trim() })
+                                        const url = workerUrlInput.trim()
+                                        if (!url || !url.startsWith('http')) return
+                                        addWorkerMutation.mutate(url)
                                     }}
-                                    disabled={saveWorkerMutation.isPending}
+                                    disabled={addWorkerMutation.isPending}
                                     className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
                                 >
                                     {t('common.save')}
@@ -609,12 +618,12 @@ export default function ASRTab() {
 
                 {/* Delete Worker Confirm */}
                 <ConfirmModal
-                    isOpen={deleteConfirmWorkerEngineForModal !== null}
+                    isOpen={deleteConfirmWorkerId !== null}
                     title={t('settings.asr.deleteWorker')}
-                    message={t('settings.asr.confirmDeleteWorker', { engine: deleteConfirmWorkerEngineForModal ?? '' })}
+                    message={t('settings.asr.confirmDeleteWorker', { worker: deleteConfirmWorkerId ?? '' })}
                     variant="danger"
-                    onConfirm={() => deleteConfirmWorkerEngineForModal && removeWorkerMutation.mutate(deleteConfirmWorkerEngineForModal)}
-                    onCancel={() => setDeleteConfirmWorkerEngineForModal(null)}
+                    onConfirm={() => deleteConfirmWorkerId && removeWorkerMutation.mutate(deleteConfirmWorkerId)}
+                    onCancel={() => setDeleteConfirmWorkerId(null)}
                 />
             </div>
 
@@ -880,7 +889,7 @@ export default function ASRTab() {
                                 disabled={createModelMutation.isPending || updateModelMutation.isPending}
                                 className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
                             >
-                                {editingModel ? t('common.save') : t('common.save')}
+                                {t('common.save')}
                             </button>
                         </div>
                     </div>

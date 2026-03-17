@@ -27,9 +27,12 @@ from app.services.transcription import (
 from app.api.v1.endpoints.covers import download_and_cache_cover
 
 def get_current_asr_info():
-    """Resolve ASR engine info from settings and client availability"""
+    """Resolve ASR engine info from settings and client availability.
+
+    Returns: (engine_key, display_name) — unchanged interface.
+    """
     try:
-        engine_key = asr_client.select_worker()
+        _worker_id, engine_key = asr_client.select_worker()
         display_name = f"{engine_key.capitalize()}"
         if engine_key in ["bailian", "paraformer"]:
             if engine_key == "bailian":

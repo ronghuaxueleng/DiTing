@@ -604,12 +604,16 @@ export async function updateASRConfig(config: { priority?: string[], strict_mode
     await fetchJson(`${API_BASE}/asr/config`, { method: 'POST', body: JSON.stringify(config) })
 }
 
-export async function updateASRWorkers(workers: Record<string, string>): Promise<ASRStatus> {
+export async function updateASRWorkers(workers: Record<string, any>): Promise<ASRStatus> {
     return fetchJson(`${API_BASE}/asr/workers`, { method: 'PUT', body: JSON.stringify({ workers }) })
 }
 
-export async function deleteASRWorker(engine: string): Promise<ASRStatus> {
-    return fetchJson(`${API_BASE}/asr/workers/${encodeURIComponent(engine)}`, { method: 'DELETE' })
+export async function addASRWorkerUrl(url: string): Promise<ASRStatus> {
+    return fetchJson(`${API_BASE}/asr/workers`, { method: 'PUT', body: JSON.stringify({ urls: [url] }) })
+}
+
+export async function deleteASRWorker(workerId: string): Promise<ASRStatus> {
+    return fetchJson(`${API_BASE}/asr/workers/${encodeURIComponent(workerId)}`, { method: 'DELETE' })
 }
 
 
@@ -617,13 +621,13 @@ export async function toggleASRStrict(strict: boolean): Promise<void> {
     await updateASRConfig({ strict_mode: strict })
 }
 
-export async function toggleASREngineEnabled(engine: string, enabled: boolean): Promise<void> {
+export async function toggleASREngineEnabled(key: string, enabled: boolean): Promise<void> {
     const status = await getASRStatus()
     let disabled = status.config.disabled_engines || []
     if (enabled) {
-        disabled = disabled.filter(e => e !== engine)
+        disabled = disabled.filter(e => e !== key)
     } else {
-        if (!disabled.includes(engine)) disabled.push(engine)
+        if (!disabled.includes(key)) disabled.push(key)
     }
     await updateASRConfig({ disabled_engines: disabled })
 }

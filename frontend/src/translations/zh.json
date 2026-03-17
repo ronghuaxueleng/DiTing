@@ -260,7 +260,7 @@
             "addWorker": "添加 Worker",
             "editWorker": "编辑 Worker URL",
             "deleteWorker": "移除",
-            "confirmDeleteWorker": "确定移除 Worker \"{{engine}}\" ?",
+            "confirmDeleteWorker": "确定移除 Worker \"{{worker}}\" ?",
             "workerEngine": "引擎名称",
             "workerEnginePlaceholder": "如 sensevoice、whisper、qwen3asr",
             "workerUrl": "Worker 地址 (URL)",
@@ -280,7 +280,12 @@
             "registered": "已注册",
             "manual": "手动添加",
             "pathMode": "路径模式",
-            "uploadMode": "上传模式"
+            "uploadMode": "上传模式",
+            "idle": "空闲",
+            "manage": "管理",
+            "workerUrlLabel": "Worker URL",
+            "addWorkerUrl": "添加 Worker URL",
+            "addWorkerUrlPlaceholder": "http://localhost:8001"
         },
         "prompt": {
             "title": "提示词管理",

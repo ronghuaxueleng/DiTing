@@ -5,7 +5,7 @@ import asyncio
 from urllib.parse import urlparse
 from starlette.concurrency import run_in_threadpool
 import time
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from app.core.config import settings
 from app.core.logger import logger
 from app.db.asr_config import get_active_model_for_engine, get_configured_cloud_engines
@@ -14,63 +14,179 @@ import json
 
 CLOUD_ENGINES = {"bailian", "openai_asr"}
 
+
+def _url_to_worker_id(url: str) -> str:
+    """Convert a URL to a stable worker ID.
+
+    http://localhost:8001 → localhost:8001
+    http://gpu-server:8001 → gpu-server:8001
+    """
+    parsed = urlparse(url)
+    host = parsed.hostname or "localhost"
+    port = parsed.port or 80
+    return f"{host}:{port}"
+
+
+def _migrate_workers_format(raw: dict) -> dict:
+    """Convert old {engine: url} format to new {worker_id: {url, ...}} format.
+
+    Old: {"sensevoice": "http://localhost:8001"}
+    New: {"localhost:8001": {"url": "http://localhost:8001"}}
+    """
+    if not raw:
+        return {}
+    first_val = next(iter(raw.values()))
+    if isinstance(first_val, str) and first_val.startswith("http"):
+        # Old format: {engine: url} → convert
+        migrated = {}
+        for engine, url in raw.items():
+            worker_id = _url_to_worker_id(url)
+            migrated[worker_id] = {"url": url}
+        return migrated
+    elif isinstance(first_val, dict):
+        # Already new format
+        return raw
+    # URL-as-key with empty dict: {"http://localhost:8001": {}}
+    result = {}
+    for key, val in raw.items():
+        if key.startswith("http"):
+            worker_id = _url_to_worker_id(key)
+            result[worker_id] = {"url": key, **(val if isinstance(val, dict) else {})}
+        else:
+            result[key] = val if isinstance(val, dict) else {"url": str(val)}
+    return result
+
+
+def _migrate_priority(old_priority: list, old_workers: dict, new_workers: dict) -> list:
+    """Convert old engine-name priority list to worker_id-based priority list.
+
+    Maps engine names to worker_ids using the old worker URL mapping.
+    Cloud engine names pass through unchanged.
+    """
+    if not old_priority:
+        return []
+
+    # Build engine→worker_id mapping from old format
+    engine_to_id = {}
+    first_val = next(iter(old_workers.values()), None) if old_workers else None
+    if isinstance(first_val, str) and first_val.startswith("http"):
+        for engine, url in old_workers.items():
+            engine_to_id[engine] = _url_to_worker_id(url)
+
+    migrated = []
+    for item in old_priority:
+        if item in CLOUD_ENGINES:
+            migrated.append(item)
+        elif item in engine_to_id:
+            wid = engine_to_id[item]
+            if wid not in migrated:
+                migrated.append(wid)
+        elif item in new_workers:
+            # Already a worker_id
+            migrated.append(item)
+
+    return migrated
+
+
 class ASRClient:
     def __init__(self):
-        # Bootstrap defaults from config/env (only used on first run)
-        self.workers = dict(settings.ASR_WORKERS)  # mutable copy
-        self.availability = {}  # {"sensevoice": True, "whisper": False}
-        self.latency = {}       # {"sensevoice": 0.0, "whisper": -1}
+        # workers: {worker_id → metadata dict}
+        self.workers: Dict[str, dict] = {}
         self._check_task = None
-        self.shared_paths = {}  # {"sensevoice": ["/data", ...], ...}
-        self._last_health = {}  # Cache full /health response per engine
-        self._worker_metadata: Dict[str, dict] = {}  # Metadata from registered workers
-        
-        # Runtime Config - Load from DB or use defaults
-        # Only include cloud engines that have at least one model configured
+
+        # Cloud engines that have at least one model configured in DB
         self._configured_clouds = get_configured_cloud_engines() & CLOUD_ENGINES
 
-        default_priority = list(self.workers.keys())
-        for ce in sorted(self._configured_clouds):
-            if ce not in default_priority:
-                default_priority.append(ce)
-            
+        # Runtime Config
         self.config = {
-             # Default priority is order in settings or just list of keys
-             "priority": default_priority, 
-             "strict_mode": False,
-             "active_engine": None # Explicitly selected active engine
+            "priority": [],           # Mix of worker_ids + cloud engine names
+            "strict_mode": False,
+            "active_engine": None,    # DEPRECATED: kept for backward compat
+            "disabled_engines": [],
         }
-        
-        # Load persisted config from DB (may override self.workers)
+
+        # Load persisted config from DB, with format migration
         self._load_config_from_db()
-        
-        # If no workers loaded from DB yet, persist the bootstrap defaults
-        # This ensures first-run env/config values get saved to DB
+
+        # If no workers loaded from DB, bootstrap from settings
+        if not self.workers:
+            raw = dict(settings.ASR_WORKERS)
+            self.workers = _migrate_workers_format(raw)
+
+        # Ensure initial priority list
+        if not self.config["priority"]:
+            self.config["priority"] = list(self.workers.keys())
+            for ce in sorted(self._configured_clouds):
+                if ce not in self.config["priority"]:
+                    self.config["priority"].append(ce)
+
+        # Persist bootstrap defaults if DB is empty
         self._ensure_workers_in_db()
-        
-        # Set default active engine if not loaded
+
+        # Set default active engine for backward compat
         if not self.config.get("active_engine") and self.config["priority"]:
             self.config["active_engine"] = self.config["priority"][0]
-        
+
         self._init_state()
 
     def _init_state(self):
-        for engine in self.workers.keys():
-            self.availability[engine] = False
-            self.latency[engine] = -1.0
-        # Cloud engines assumed available (only if configured)
-        for ce in self._configured_clouds:
-            self.availability[ce] = True
-            self.latency[ce] = 0.0
+        """Initialize runtime state for all workers and cloud engines."""
+        for worker_id, meta in self.workers.items():
+            meta.setdefault("online", False)
+            meta.setdefault("latency", -1.0)
+            meta.setdefault("engine", None)
+            meta.setdefault("model_id", None)
+            meta.setdefault("management", False)
+            meta.setdefault("gpu", None)
+            meta.setdefault("device", None)
+            meta.setdefault("shared_paths", [])
+            meta.setdefault("registered", False)
 
     def register_worker(self, engine: str, url: str, metadata: dict = None) -> dict:
         """Register a worker, return server data paths for shared_paths negotiation."""
-        self.add_worker(engine, url)
-        if metadata:
-            self._worker_metadata[engine] = metadata
-        logger.info(f"📋 Worker [{engine}] registered from {url}")
+        worker_id = _url_to_worker_id(url)
+        meta = metadata or {}
+
+        if worker_id in self.workers:
+            # Update existing worker
+            w = self.workers[worker_id]
+            w["url"] = url
+            w["engine"] = engine
+            w["online"] = True
+            w["registered"] = True
+            w["management"] = meta.get("management", False)
+            if meta.get("gpu"):
+                w["gpu"] = meta["gpu"]
+            if meta.get("device"):
+                w["device"] = meta["device"]
+            if meta.get("model_id"):
+                w["model_id"] = meta["model_id"]
+        else:
+            # New worker
+            self.workers[worker_id] = {
+                "url": url,
+                "engine": engine,
+                "online": True,
+                "latency": -1.0,
+                "model_id": meta.get("model_id"),
+                "management": meta.get("management", False),
+                "gpu": meta.get("gpu"),
+                "device": meta.get("device"),
+                "shared_paths": [],
+                "registered": True,
+            }
+
+        # Add to priority if new
+        if worker_id not in self.config["priority"]:
+            self.config["priority"].append(worker_id)
+
+        self._save_workers_to_db()
+        self._save_config_to_db()
+
+        logger.info(f"📋 Worker [{worker_id}] registered from {url} (engine={engine})")
         return {
             "status": "registered",
+            "worker_id": worker_id,
             "engine": engine,
             "data_paths": self._get_data_paths(),
         }
@@ -89,15 +205,11 @@ class ASRClient:
         removed = self._configured_clouds - new_clouds
 
         for ce in added:
-            self.availability[ce] = True
-            self.latency[ce] = 0.0
             if ce not in self.config["priority"]:
                 self.config["priority"].append(ce)
             logger.info(f"☁️ Cloud engine [{ce}] added to priority list")
 
         for ce in removed:
-            self.availability.pop(ce, None)
-            self.latency.pop(ce, None)
             if ce in self.config["priority"]:
                 self.config["priority"].remove(ce)
             if self.config.get("active_engine") == ce:
@@ -109,40 +221,63 @@ class ASRClient:
             self._save_config_to_db()
 
     def _load_config_from_db(self):
-        """Load ASR config from system_configs table."""
+        """Load ASR config from system_configs table, with format migration."""
         try:
             # Worker URLs (overrides bootstrap defaults)
-            saved_workers = get_system_config("asr_workers")
-            if saved_workers:
-                loaded_workers = json.loads(saved_workers)
-                self.workers = loaded_workers
+            saved_workers_raw = get_system_config("asr_workers")
+            old_workers_raw = None  # Keep reference for priority migration
+            if saved_workers_raw:
+                old_workers_raw = json.loads(saved_workers_raw)
+                migrated = _migrate_workers_format(old_workers_raw)
+                self.workers = migrated
+
+                # Check if migration happened (old format → new format)
+                first_val = next(iter(old_workers_raw.values()), None) if old_workers_raw else None
+                if isinstance(first_val, str) and first_val.startswith("http"):
+                    # Was old format, re-save in new format
+                    self._save_workers_to_db()
+                    logger.info(f"🔄 Migrated ASR workers from engine-keyed to URL-keyed format")
+
                 logger.info(f"📂 Loaded ASR workers from DB: {list(self.workers.keys())}")
 
             # Priority
             saved_priority = get_system_config("asr_priority")
             if saved_priority:
                 loaded = json.loads(saved_priority)
-                # Filter out cloud engines that are no longer configured
-                valid_engines = set(self.workers.keys()) | self._configured_clouds
-                self.config["priority"] = [e for e in loaded if e in valid_engines]
-                # Add any new engines not in saved list
-                for e in valid_engines:
-                    if e not in self.config["priority"]:
-                        self.config["priority"].append(e)
-                logger.info(f"📂 Loaded ASR priority from DB: {self.config['priority']}")
-            
+
+                # Check if priority needs migration (contains engine names instead of worker_ids)
+                needs_migration = False
+                if old_workers_raw and loaded:
+                    first_val = next(iter(old_workers_raw.values()), None) if old_workers_raw else None
+                    if isinstance(first_val, str) and first_val.startswith("http"):
+                        needs_migration = True
+
+                if needs_migration:
+                    self.config["priority"] = _migrate_priority(loaded, old_workers_raw, self.workers)
+                    self._save_config_to_db()
+                    logger.info(f"🔄 Migrated ASR priority to worker_id format: {self.config['priority']}")
+                else:
+                    # Filter out stale entries
+                    valid_keys = set(self.workers.keys()) | self._configured_clouds
+                    self.config["priority"] = [e for e in loaded if e in valid_keys]
+                    # Add any new entries not in saved list
+                    for k in valid_keys:
+                        if k not in self.config["priority"]:
+                            self.config["priority"].append(k)
+                    logger.info(f"📂 Loaded ASR priority from DB: {self.config['priority']}")
+
             # Strict Mode
             saved_strict = get_system_config("asr_strict_mode")
             if saved_strict is not None:
                 self.config["strict_mode"] = saved_strict.lower() == "true"
                 logger.info(f"📂 Loaded ASR strict_mode from DB: {self.config['strict_mode']}")
-            
-            # Active Engine
+
+            # Active Engine (deprecated but still loaded for compat)
             saved_engine = get_system_config("asr_active_engine")
             if saved_engine:
                 self.config["active_engine"] = saved_engine
                 logger.info(f"📂 Loaded ASR active_engine from DB: {self.config['active_engine']}")
-            
+
             # Disabled Engines
             saved_disabled = get_system_config("asr_disabled_engines")
             if saved_disabled:
@@ -169,9 +304,13 @@ class ASRClient:
             logger.warning(f"⚠️ Failed to persist bootstrap workers to DB: {e}")
 
     def _save_workers_to_db(self):
-        """Persist current worker URL map to DB."""
+        """Persist current worker map to DB (only static config, not runtime state)."""
         try:
-            set_system_config("asr_workers", json.dumps(self.workers))
+            # Save only url field (not runtime fields like online, latency, etc.)
+            persist = {}
+            for wid, meta in self.workers.items():
+                persist[wid] = {"url": meta.get("url", "")}
+            set_system_config("asr_workers", json.dumps(persist))
         except Exception as e:
             logger.warning(f"⚠️ Failed to save ASR workers to DB: {e}")
 
@@ -188,54 +327,54 @@ class ASRClient:
             logger.warning(f"⚠️ Failed to save ASR config to DB: {e}")
 
     async def check_health(self):
-        """Perform a single health check pass for all workers"""
-        # Concurrent check
-        tasks = []
-        engines = list(self.workers.keys())
-        
-        async def check_one(engine, url):
+        """Perform a single health check pass for all workers."""
+        worker_ids = list(self.workers.keys())
+
+        async def check_one(worker_id: str):
+            worker = self.workers[worker_id]
+            url = worker.get("url", "")
+            if not url:
+                return
+
             start = time.time()
             try:
                 async with httpx.AsyncClient(timeout=2.0) as client:
                     resp = await client.get(f"{url}/health")
                     duration = (time.time() - start) * 1000
                     is_ok = resp.status_code == 200
-                    
-                    if is_ok != self.availability.get(engine, False):
-                         if is_ok:
-                             logger.info(f"🟢 ASR Worker [{engine}] is ONLINE ({duration:.0f}ms)")
-                         else:
-                             logger.warning(f"🔴 ASR Worker [{engine}] is OFFLINE")
-                    
-                    self.availability[engine] = is_ok
-                    self.latency[engine] = duration if is_ok else -1.0
-                    
-                    # Cache shared_paths from health response
+
+                    was_online = worker.get("online", False)
+                    if is_ok != was_online:
+                        if is_ok:
+                            logger.info(f"🟢 ASR Worker [{worker_id}] is ONLINE ({duration:.0f}ms)")
+                        else:
+                            logger.warning(f"🔴 ASR Worker [{worker_id}] is OFFLINE")
+
+                    worker["online"] = is_ok
+                    worker["latency"] = duration if is_ok else -1.0
+
                     if is_ok:
                         try:
                             data = resp.json()
-                            self.shared_paths[engine] = data.get("shared_paths", [])
-                            self._last_health[engine] = data
-                            # Refresh metadata from health response (covers unregistered workers too)
-                            if engine not in self._worker_metadata:
-                                self._worker_metadata[engine] = {}
-                            meta = self._worker_metadata[engine]
+                            # Update dynamic fields from worker's health response
+                            worker["engine"] = data.get("engine")
+                            worker["model_id"] = data.get("model_id")
+                            worker["management"] = data.get("management", False)
+                            worker["shared_paths"] = data.get("shared_paths", [])
                             if data.get("gpu"):
-                                meta["gpu"] = data["gpu"]
+                                worker["gpu"] = data["gpu"]
                             if data.get("device"):
-                                meta["device"] = data["device"]
-                            if data.get("model_id"):
-                                meta["model_id"] = data["model_id"]
+                                worker["device"] = data["device"]
                         except Exception:
-                            self.shared_paths[engine] = []
-                            self._last_health[engine] = {}
+                            pass
             except Exception:
-                if self.availability.get(engine, False):
-                     logger.warning(f"🔴 ASR Worker [{engine}] Connection Failed")
-                self.availability[engine] = False
-                self.latency[engine] = -1.0
+                was_online = worker.get("online", False)
+                if was_online:
+                    logger.warning(f"🔴 ASR Worker [{worker_id}] Connection Failed")
+                worker["online"] = False
+                worker["latency"] = -1.0
 
-        await asyncio.gather(*(check_one(e, self.workers[e]) for e in engines))
+        await asyncio.gather(*(check_one(wid) for wid in worker_ids))
 
     async def start_health_check(self, interval: int = 30):
         """Background task Loop"""
@@ -245,25 +384,26 @@ class ASRClient:
             await asyncio.sleep(interval)
 
     def get_status(self) -> Dict:
-        """Return current status of all engines"""
-        status = {}
+        """Return current status of all workers and clouds."""
         # Workers
-        for engine, url in self.workers.items():
-            meta = self._worker_metadata.get(engine, {})
-            status[engine] = {
-                "type": "worker",
-                "online": self.availability.get(engine, False),
-                "latency": self.latency.get(engine, -1),
-                "url": url,
-                "shared_paths": self.shared_paths.get(engine, []),
+        workers_status = {}
+        for worker_id, meta in self.workers.items():
+            workers_status[worker_id] = {
+                "url": meta.get("url", ""),
+                "engine": meta.get("engine"),
+                "model_id": meta.get("model_id"),
+                "online": meta.get("online", False),
+                "latency": meta.get("latency", -1),
+                "management": meta.get("management", False),
                 "gpu": meta.get("gpu"),
                 "device": meta.get("device"),
-                "model_id": meta.get("model_id"),
-                "registered": engine in self._worker_metadata,
+                "shared_paths": meta.get("shared_paths", []),
+                "registered": meta.get("registered", False),
             }
-        # Cloud (only configured ones)
+
+        # Clouds
+        clouds_status = {}
         for ce in self._configured_clouds:
-            # Read badge from active model config
             badge = ""
             try:
                 db_cfg = get_active_model_for_engine(ce)
@@ -272,143 +412,215 @@ class ASRClient:
                     badge = cfg.get("badge", "") or db_cfg.get("name", "")
             except Exception:
                 pass
-            status[ce] = {
-                "type": "cloud",
+            clouds_status[ce] = {
                 "online": True,
-                "latency": 0,
                 "badge": badge,
             }
+
+        # Build backward-compat `engines` field
+        engines_compat = {}
+        for worker_id, info in workers_status.items():
+            engines_compat[worker_id] = {
+                "type": "worker",
+                **info,
+            }
+        for ce, info in clouds_status.items():
+            engines_compat[ce] = {
+                "type": "cloud",
+                "latency": 0,
+                **info,
+            }
+
         return {
-            "engines": status,
-            "config": self.config
+            "workers": workers_status,
+            "clouds": clouds_status,
+            "engines": engines_compat,  # DEPRECATED: backward compat
+            "config": self.config,
         }
 
     def update_config(self, priority: List[str] = None, strict_mode: bool = None, active_engine: str = None, disabled_engines: List[str] = None):
-        """Update runtime config"""
+        """Update runtime config."""
         if priority is not None:
-            # Validate engines exist
-            valid_prio = [e for e in priority if e in self.workers or e in self._configured_clouds]
-            # Add missing engines to end
-            for w in self.workers:
-                if w not in valid_prio: valid_prio.append(w)
-            for ce in self._configured_clouds:
-                if ce not in valid_prio: valid_prio.append(ce)
-            
+            # Validate entries exist (worker_ids or cloud engine names)
+            valid_keys = set(self.workers.keys()) | self._configured_clouds
+            valid_prio = [e for e in priority if e in valid_keys]
+            # Add missing entries to end
+            for k in valid_keys:
+                if k not in valid_prio:
+                    valid_prio.append(k)
             self.config["priority"] = valid_prio
-            
+
         if strict_mode is not None:
             self.config["strict_mode"] = strict_mode
-            
+
         if active_engine is not None:
             if active_engine in self.workers or active_engine in self._configured_clouds:
                 self.config["active_engine"] = active_engine
 
         if disabled_engines is not None:
             self.config["disabled_engines"] = disabled_engines
-            
+
         logger.info(f"⚙️ ASR Config Updated: {self.config}")
-        
-        # Persist to DB
         self._save_config_to_db()
 
-    def update_workers(self, workers: Dict[str, str]):
+    def update_workers(self, workers: dict):
+        """Replace the full worker URL map at runtime.
+
+        Accepts both new format {worker_id: {url}} and old format {engine: url}.
+        Also accepts URL-as-key format {url: {}}.
         """
-        Replace the full worker URL map at runtime.
-        New engines are added to priority; removed engines are cleaned up.
-        """
-        old_engines = set(self.workers.keys())
-        new_engines = set(workers.keys())
+        new_workers = _migrate_workers_format(workers)
+        old_ids = set(self.workers.keys())
+        new_ids = set(new_workers.keys())
 
-        self.workers = dict(workers)
+        # Merge: new workers get default state
+        for wid in new_ids - old_ids:
+            new_workers[wid].setdefault("online", False)
+            new_workers[wid].setdefault("latency", -1.0)
+            new_workers[wid].setdefault("engine", None)
+            new_workers[wid].setdefault("model_id", None)
+            new_workers[wid].setdefault("management", False)
+            new_workers[wid].setdefault("gpu", None)
+            new_workers[wid].setdefault("device", None)
+            new_workers[wid].setdefault("shared_paths", [])
+            new_workers[wid].setdefault("registered", False)
+            if wid not in self.config["priority"]:
+                self.config["priority"].append(wid)
+            logger.info(f"➕ Worker [{wid}] added")
 
-        # Sync availability/latency state
-        for engine in new_engines - old_engines:
-            self.availability[engine] = False
-            self.latency[engine] = -1.0
-            if engine not in self.config["priority"]:
-                self.config["priority"].append(engine)
-            logger.info(f"➕ Worker [{engine}] added")
-
-        for engine in old_engines - new_engines:
-            self.availability.pop(engine, None)
-            self.latency.pop(engine, None)
-            self.shared_paths.pop(engine, None)
-            self._last_health.pop(engine, None)
-            self._worker_metadata.pop(engine, None)
-            if engine in self.config["priority"]:
-                self.config["priority"].remove(engine)
-            if self.config.get("active_engine") == engine:
+        for wid in old_ids - new_ids:
+            if wid in self.config["priority"]:
+                self.config["priority"].remove(wid)
+            if self.config.get("active_engine") == wid:
                 self.config["active_engine"] = self.config["priority"][0] if self.config["priority"] else None
-            logger.info(f"➖ Worker [{engine}] removed")
+            logger.info(f"➖ Worker [{wid}] removed")
 
+        # Preserve runtime state for existing workers
+        for wid in new_ids & old_ids:
+            old_meta = self.workers[wid]
+            new_meta = new_workers[wid]
+            new_meta["url"] = new_meta.get("url", old_meta.get("url", ""))
+            # Carry forward runtime state
+            for key in ("online", "latency", "engine", "model_id", "management", "gpu", "device", "shared_paths", "registered"):
+                new_meta.setdefault(key, old_meta.get(key))
+
+        self.workers = new_workers
         self._save_workers_to_db()
         self._save_config_to_db()
         logger.info(f"⚙️ ASR Workers Updated: {list(self.workers.keys())}")
 
-    def add_worker(self, engine: str, url: str):
-        """Add or update a single worker URL at runtime."""
-        new_workers = dict(self.workers)
-        new_workers[engine] = url
-        self.update_workers(new_workers)
+    def add_worker(self, url: str):
+        """Add a single worker URL at runtime."""
+        worker_id = _url_to_worker_id(url)
+        if worker_id not in self.workers:
+            self.workers[worker_id] = {
+                "url": url,
+                "online": False,
+                "latency": -1.0,
+                "engine": None,
+                "model_id": None,
+                "management": False,
+                "gpu": None,
+                "device": None,
+                "shared_paths": [],
+                "registered": False,
+            }
+            if worker_id not in self.config["priority"]:
+                self.config["priority"].append(worker_id)
+            self._save_workers_to_db()
+            self._save_config_to_db()
+            logger.info(f"➕ Worker [{worker_id}] added at {url}")
+        else:
+            # Update URL if changed
+            self.workers[worker_id]["url"] = url
+            self._save_workers_to_db()
 
-    def remove_worker(self, engine: str):
-        """Remove a single worker at runtime."""
-        if engine not in self.workers:
-            raise ValueError(f"Engine '{engine}' not found in workers")
-        new_workers = {k: v for k, v in self.workers.items() if k != engine}
-        self.update_workers(new_workers)
+    def remove_worker(self, worker_id: str):
+        """Remove a single worker by worker_id at runtime."""
+        if worker_id not in self.workers:
+            raise ValueError(f"Worker '{worker_id}' not found")
 
-    def select_worker(self, preferred_engine: str = None) -> str:
+        del self.workers[worker_id]
+        if worker_id in self.config["priority"]:
+            self.config["priority"].remove(worker_id)
+        if self.config.get("active_engine") == worker_id:
+            self.config["active_engine"] = self.config["priority"][0] if self.config["priority"] else None
+
+        self._save_workers_to_db()
+        self._save_config_to_db()
+        logger.info(f"➖ Worker [{worker_id}] removed")
+
+    def select_worker(self, preferred_engine: str = None) -> Tuple[str, str]:
+        """Select the best available worker.
+
+        Returns: (worker_id_or_cloud_name, engine_name)
+
+        For cloud engines: returns (cloud_name, cloud_name), e.g. ("bailian", "bailian")
+        For workers: returns (worker_id, engine_name), e.g. ("localhost:8001", "sensevoice")
         """
-        Select the best available worker based on priority and availability.
-        If config['strict_mode'] is True, strictly use active_engine.
-        Otherwise, use priority list, skipping disabled engines.
-        """
-        # 1. Determine candidates
-        candidates = []
         disabled_list = self.config.get("disabled_engines", [])
-        
-        # Priority 1: Request specific override (ALWAYS allow if available)
+
+        # Priority 1: Preferred engine override (always allow if available)
         if preferred_engine:
-             candidates.append(preferred_engine)
-             return self._check_availability(preferred_engine)
-        
+            # Check cloud engines first
+            if preferred_engine in CLOUD_ENGINES and preferred_engine in self._configured_clouds:
+                return (preferred_engine, preferred_engine)
+
+            # Find a worker running the preferred engine
+            for wid, meta in self.workers.items():
+                if meta.get("engine") == preferred_engine and meta.get("online", False):
+                    return (wid, preferred_engine)
+
+            # Also check if preferred_engine is actually a worker_id
+            if preferred_engine in self.workers:
+                w = self.workers[preferred_engine]
+                if w.get("online", False) and w.get("engine"):
+                    return (preferred_engine, w["engine"])
+
+            raise RuntimeError(f"Engine '{preferred_engine}' is offline or not available.")
+
         strict = self.config.get("strict_mode", False)
         active = self.config.get("active_engine")
 
-        # Priority 2: Strict Mode or Active Engine
+        # Priority 2: Strict Mode
         if strict and active:
-             try:
-                 return self._check_availability(active)
-             except RuntimeError:
-                 raise RuntimeError(f"Strict Mode: Active engine '{active}' is offline.")
+            # Active could be a worker_id or cloud name
+            if active in CLOUD_ENGINES and active in self._configured_clouds:
+                return (active, active)
+            if active in self.workers:
+                w = self.workers[active]
+                if w.get("online", False) and w.get("engine"):
+                    return (active, w["engine"])
+            raise RuntimeError(f"Strict Mode: Active engine '{active}' is offline.")
 
-        # Priority 3: Priority List (Skipping Disabled)
-        for e in self.config["priority"]:
-            # Skip disabled engines, unless it's the active one (though usually active one shouldn't be disabled)
-            if e in disabled_list and e != active:
+        # Priority 3: Walk priority list (skip disabled)
+        for item in self.config["priority"]:
+            if item in disabled_list:
                 continue
-                
-            if self.availability.get(e, False):
-                return e
 
-        # If we reached here, try fallback to active even if it was skipped above
-        # This covers cases where active was disabled but strict mode wasn't on,
-        # and it's the only available option after checking priority.
-        if active and self.availability.get(active, False):
-             return active
+            # Cloud engine?
+            if item in CLOUD_ENGINES:
+                if item in self._configured_clouds:
+                    return (item, item)
+                continue
+
+            # Worker?
+            if item in self.workers:
+                w = self.workers[item]
+                if w.get("online", False) and w.get("engine"):
+                    return (item, w["engine"])
+
+        # Fallback: any online worker with a loaded engine
+        for wid, meta in self.workers.items():
+            if meta.get("online", False) and meta.get("engine"):
+                return (wid, meta["engine"])
 
         raise RuntimeError("No available ASR engines (checked priority list and skipped disabled ones).")
 
-    def _check_availability(self, engine: str) -> str:
-         """Helper to check if specific engine is available, raise error if not"""
-         if self.availability.get(engine, False):
-             return engine
-         raise RuntimeError(f"Engine '{engine}' is offline.")
-
-    def _is_localhost(self, engine: str) -> bool:
+    def _is_localhost(self, worker_id: str) -> bool:
         """Check if a worker URL points to localhost."""
-        url = self.workers.get(engine, "")
+        meta = self.workers.get(worker_id, {})
+        url = meta.get("url", "")
         try:
             parsed = urlparse(url)
             host = parsed.hostname or ""
@@ -416,142 +628,122 @@ class ASRClient:
         except Exception:
             return False
 
-    def _resolve_path_mode(self, engine: str, audio_path: str) -> tuple:
-        """
-        Determine if path mode can be used, and resolve the mapped path.
-        Returns (can_use: bool, resolved_path: str)
-        
-        shared_paths supports two formats:
-        - Simple list:   ["server_path"] (same path on both machines)
-        - Mapping list:  [{"server": "server_path", "worker": "worker_path"}]
-        """
-        # Localhost = same machine, always path mode, no mapping needed
-        if self._is_localhost(engine):
+    def _resolve_path_mode(self, worker_id: str, audio_path: str) -> tuple:
+        """Determine if path mode can be used, and resolve the mapped path."""
+        # Localhost = same machine, always path mode
+        if self._is_localhost(worker_id):
             return True, audio_path
-        
-        # Check shared_paths declared by the worker
-        worker_paths = self.shared_paths.get(engine, [])
+
+        meta = self.workers.get(worker_id, {})
+        worker_paths = meta.get("shared_paths", [])
         if not worker_paths:
             return False, audio_path
-        
-        # Normalize audio_path for comparison
+
         norm_audio = os.path.normpath(os.path.abspath(audio_path))
-        
+
         for sp in worker_paths:
             if isinstance(sp, dict):
-                # Mapping format: {"server": "/app/data", "worker": "/mnt/nfs/data"}
                 server_prefix = os.path.normpath(os.path.abspath(sp.get("server", "")))
                 worker_prefix = sp.get("worker", "")
             else:
-                # Simple format: same path on both machines
                 server_prefix = os.path.normpath(os.path.abspath(str(sp)))
                 worker_prefix = str(sp)
-            
+
             if norm_audio.startswith(server_prefix + os.sep) or norm_audio == server_prefix:
-                # Replace server prefix with worker prefix
                 relative = norm_audio[len(server_prefix):]
-                # Convert path separators to POSIX for remote Linux workers
                 mapped = worker_prefix + relative.replace("\\", "/")
                 return True, mapped
-        
+
         return False, audio_path
 
     async def transcribe(self, audio_path: str, engine: str = None, language: str = "zh", prompt: str = None, output_format: str = "text") -> str:
-        """
-        Transcribe audio using selected engine.
-        """
-        
+        """Transcribe audio using selected engine."""
         try:
-             selected_engine = self.select_worker(engine)
+            selected_id, selected_engine = self.select_worker(engine)
         except RuntimeError as e:
-             # Re-raise with clear message
-             logger.error(f"❌ ASR Selection Failed: {e}")
-             raise e
+            logger.error(f"❌ ASR Selection Failed: {e}")
+            raise e
 
         engine_key = selected_engine.lower()
-        logger.info(f"🎤 Transcribing with [{engine_key}] (Requested: {engine})")
+        logger.info(f"🎤 Transcribing with [{engine_key}] via [{selected_id}] (Requested: {engine})")
 
-        # 1. Cloud Engines (currently: Alibaba DashScope / BaiLian)
-        # Future: add other cloud providers here (e.g. "baidu", "iflytek", "tencent")
+        # 1. Cloud Engines
         if engine_key == "bailian":
-             from app.asr.cloud import BaiLianASREngine
-             
-             # Fetch active config from DB
-             db_config = get_active_model_for_engine("bailian")
-             api_key = None
-             model_name = "paraformer-realtime-v2"  # Default: best general-purpose realtime model
-             
-             if db_config:
-                 try:
-                     cfg = json.loads(db_config["config"])
-                     api_key = cfg.get("api_key")
-                     model_name = cfg.get("model_name", model_name)
-                     logger.info(f"☁️ Using Bailian Config: {model_name} (ID: {db_config['id']})")
-                 except Exception as e:
-                     logger.error(f"❌ Failed to parse Bailian config: {e}")
+            from app.asr.cloud import BaiLianASREngine
 
-             cloud_engine = BaiLianASREngine(api_key=api_key, model_name=model_name)
-             # DashScope SDK calls are synchronous — run in threadpool to avoid blocking the event loop
-             if output_format == "srt":
-                 return await run_in_threadpool(cloud_engine.generate_srt, audio_path, language, prompt)
-             else:
-                 return await run_in_threadpool(cloud_engine.predict, audio_path, language, prompt)
+            db_config = get_active_model_for_engine("bailian")
+            api_key = None
+            model_name = "paraformer-realtime-v2"
 
-        # 1b. Cloud Engine: OpenAI-Compatible API
+            if db_config:
+                try:
+                    cfg = json.loads(db_config["config"])
+                    api_key = cfg.get("api_key")
+                    model_name = cfg.get("model_name", model_name)
+                    logger.info(f"☁️ Using Bailian Config: {model_name} (ID: {db_config['id']})")
+                except Exception as e:
+                    logger.error(f"❌ Failed to parse Bailian config: {e}")
+
+            cloud_engine = BaiLianASREngine(api_key=api_key, model_name=model_name)
+            if output_format == "srt":
+                return await run_in_threadpool(cloud_engine.generate_srt, audio_path, language, prompt)
+            else:
+                return await run_in_threadpool(cloud_engine.predict, audio_path, language, prompt)
+
         if engine_key == "openai_asr":
-             from app.asr.openai_asr import OpenAIASREngine
+            from app.asr.openai_asr import OpenAIASREngine
 
-             db_config = get_active_model_for_engine("openai_asr")
-             api_key = None
-             base_url = "https://api.openai.com/v1"
-             model_name = "whisper-1"
+            db_config = get_active_model_for_engine("openai_asr")
+            api_key = None
+            base_url = "https://api.openai.com/v1"
+            model_name = "whisper-1"
 
-             if db_config:
-                 try:
-                     cfg = json.loads(db_config["config"])
-                     api_key = cfg.get("api_key")
-                     base_url = cfg.get("base_url", base_url)
-                     model_name = cfg.get("model_name", model_name)
-                     logger.info(f"☁️ Using OpenAI ASR Config: {model_name} @ {base_url} (ID: {db_config['id']})")
-                 except Exception as e:
-                     logger.error(f"❌ Failed to parse OpenAI ASR config: {e}")
+            if db_config:
+                try:
+                    cfg = json.loads(db_config["config"])
+                    api_key = cfg.get("api_key")
+                    base_url = cfg.get("base_url", base_url)
+                    model_name = cfg.get("model_name", model_name)
+                    logger.info(f"☁️ Using OpenAI ASR Config: {model_name} @ {base_url} (ID: {db_config['id']})")
+                except Exception as e:
+                    logger.error(f"❌ Failed to parse OpenAI ASR config: {e}")
 
-             cloud_engine = OpenAIASREngine(api_key=api_key, base_url=base_url, model_name=model_name)
-             if output_format == "srt":
-                 return await run_in_threadpool(cloud_engine.generate_srt, audio_path, language, prompt)
-             else:
-                 return await run_in_threadpool(cloud_engine.predict, audio_path, language, prompt)
+            cloud_engine = OpenAIASREngine(api_key=api_key, base_url=base_url, model_name=model_name)
+            if output_format == "srt":
+                return await run_in_threadpool(cloud_engine.generate_srt, audio_path, language, prompt)
+            else:
+                return await run_in_threadpool(cloud_engine.predict, audio_path, language, prompt)
 
-        # 2. Worker Engines
-        url = self.workers[engine_key]
-        
-        can_path, resolved_path = self._resolve_path_mode(engine_key, audio_path)
+        # 2. Worker Engines — use worker_id to get URL
+        worker = self.workers.get(selected_id)
+        if not worker:
+            raise RuntimeError(f"Worker '{selected_id}' not found")
+        url = worker["url"]
+
+        can_path, resolved_path = self._resolve_path_mode(selected_id, audio_path)
         if can_path:
-            # ── Path mode (shared filesystem or localhost) ──
             payload = {
                 "audio_path": resolved_path,
                 "language": language,
                 "prompt": prompt or "",
                 "output_format": output_format
             }
-            logger.info(f"📡 Calling Worker [{engine_key}] -> {url}/transcribe (path mode)")
+            logger.info(f"📡 Calling Worker [{selected_id}] -> {url}/transcribe (path mode)")
             if resolved_path != audio_path:
                 logger.info(f"   Path mapped: {audio_path} -> {resolved_path}")
-            
+
             async with httpx.AsyncClient(timeout=300.0) as client:
                 resp = await client.post(f"{url}/transcribe", json=payload)
                 if resp.status_code != 200:
                     raise RuntimeError(f"Worker Error {resp.status_code}: {resp.text}")
-                
                 data = resp.json()
                 return data["text"]
         else:
-            # ── Upload mode (stream file to remote worker) ──
-            if not self._is_localhost(engine_key):
+            if not self._is_localhost(selected_id):
                 logger.warning(f"⚠️ No shared_path matched for '{audio_path}', falling back to upload mode (slower)")
             filename = os.path.basename(audio_path)
-            logger.info(f"📤 Uploading to Worker [{engine_key}] -> {url}/transcribe (upload mode, file={filename})")
-            
+            logger.info(f"📤 Uploading to Worker [{selected_id}] -> {url}/transcribe (upload mode, file={filename})")
+
             async with httpx.AsyncClient(timeout=600.0) as client:
                 with open(audio_path, "rb") as f:
                     resp = await client.post(
@@ -565,7 +757,6 @@ class ASRClient:
                     )
                 if resp.status_code != 200:
                     raise RuntimeError(f"Worker Error {resp.status_code}: {resp.text}")
-                
                 data = resp.json()
                 return data["text"]
 
@@ -573,18 +764,19 @@ class ASRClient:
         """Proxy a management API call to a worker.
 
         Args:
-            worker_key: Engine name or worker identifier
+            worker_key: Worker ID (e.g. "localhost:8001")
             method: HTTP method (GET, POST, DELETE)
             path: Path under /management/ on the worker
             body: Optional JSON body for POST/DELETE
         """
-        url = self.workers.get(worker_key)
-        if not url:
+        worker = self.workers.get(worker_key)
+        if not worker:
             raise ValueError(f"Worker '{worker_key}' not found")
 
-        if not self.availability.get(worker_key, False):
+        if not worker.get("online", False):
             raise RuntimeError(f"Worker '{worker_key}' is offline")
 
+        url = worker["url"]
         target = f"{url}/management/{path.lstrip('/')}"
         logger.info(f"Proxying {method} {target}")
 

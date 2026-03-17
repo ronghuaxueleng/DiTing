@@ -255,7 +255,7 @@
             "addWorker": "Add Worker",
             "editWorker": "Edit Worker URL",
             "deleteWorker": "Remove",
-            "confirmDeleteWorker": "Remove worker \"{{engine}}\"?",
+            "confirmDeleteWorker": "Remove worker \"{{worker}}\"?",
             "workerEngine": "Engine Name",
             "workerEnginePlaceholder": "e.g. sensevoice, whisper, qwen3asr",
             "workerUrl": "Worker URL",
@@ -275,7 +275,12 @@
             "registered": "Registered",
             "manual": "Manual",
             "pathMode": "Path Mode",
-            "uploadMode": "Upload Mode"
+            "uploadMode": "Upload Mode",
+            "idle": "Idle",
+            "manage": "Manage",
+            "workerUrlLabel": "Worker URL",
+            "addWorkerUrl": "Add Worker URL",
+            "addWorkerUrlPlaceholder": "http://localhost:8001"
         },
         "prompt": {
             "title": "Prompt Management",

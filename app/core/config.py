@@ -56,8 +56,10 @@ class Settings(BaseSettings):
     
     # ASR Configuration
     ASR_ENGINE: str = "sensevoice"
-    
-    # ASR Workers (Engine Name -> URL)
+
+    # ASR Workers — accepts both old {engine: url} and new {url: {}} or {worker_id: {url}} formats.
+    # Old format is auto-migrated on first load.
+    # In .env, you can also use a comma-separated list: ASR_WORKERS=http://localhost:8001,http://gpu:8001
     ASR_WORKERS: dict = {
         "sensevoice": "http://localhost:8001",
         "whisper": "http://localhost:8002",

@@ -163,22 +163,36 @@ export interface PromptCategory {
     sort_order: number
 }
 
-// ASR Status Types
+// ASR Status Types — Worker-centric (Phase 2)
+export interface WorkerInfo {
+    url: string
+    engine: string | null      // null if idle (no model loaded)
+    model_id: string | null
+    online: boolean
+    latency: number
+    management: boolean
+    gpu?: { name: string; total_gb: number } | null
+    device?: string
+    shared_paths?: any[]
+    registered?: boolean
+}
+
+export interface CloudInfo {
+    online: boolean
+    badge: string
+}
+
 export interface ASRStatus {
-    engines: Record<string, {
-        type: string
-        online: boolean
-        latency: number
-        url?: string
-        badge?: string
-    }>
+    workers: Record<string, WorkerInfo>    // worker_id → info
+    clouds: Record<string, CloudInfo>      // "bailian" | "openai_asr" → info
     config: {
-        priority: string[]
+        priority: string[]                 // worker_ids + cloud names
         strict_mode: boolean
         active_engine: string | null
-        active_model?: string | null
         disabled_engines: string[]
     }
+    // DEPRECATED backward compat — merges workers + clouds
+    engines?: Record<string, any>
 }
 
 // GC Candidate

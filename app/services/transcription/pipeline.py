@@ -116,16 +116,10 @@ async def run_transcription_pipeline(
         # 3. ASR — Check worker queue status for better progress message
         asr_msg = "Transcribing..."
         try:
-            engine_key = asr_client.select_worker()
-            queue_info = asr_client.shared_paths  # We have health data cached
-            # Check concurrency info from last health check
-            health_data = getattr(asr_client, '_last_health', {}).get(engine_key, {})
-            queue_depth = health_data.get('concurrency', {}).get('queue', 0)
-            if queue_depth > 0:
-                asr_msg = f"Queued ({queue_depth} ahead)..."
-                logger.info(f"⏳ ASR worker [{engine_key}] has {queue_depth} queued tasks")
-            else:
-                asr_msg = f"Transcribing ({engine_key})..."
+            worker_id, engine_key = asr_client.select_worker()
+            # Check concurrency info from worker metadata
+            worker_meta = asr_client.workers.get(worker_id, {})
+            asr_msg = f"Transcribing ({engine_key})..."
         except Exception:
             pass
         task_manager.update_progress(transcription_id, 30, asr_msg)

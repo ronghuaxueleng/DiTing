@@ -23,17 +23,19 @@ export default function ASRWorkerStep({ onNext, onBack }: Props) {
     const testConnection = async () => {
         setStatus({ testing: true, success: null, message: t('asr.testingMsg') })
         try {
+            // Send URL-keyed format (new): {workers: {url: {}}}
             const resp = await fetch(`${API_BASE}/asr/workers`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ workers: { [engine]: workerUrl } }),
+                body: JSON.stringify({ urls: [workerUrl] }),
             })
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
 
             const statusResp = await fetch(`${API_BASE}/asr/status?refresh=true`)
             const data = await statusResp.json()
-            const worker = data.workers?.[engine]
-            if (worker?.status === 'online') {
+            // Check if any worker is online
+            const anyOnline = Object.values(data.workers || {}).some((w: any) => w.online)
+            if (anyOnline) {
                 setStatus({ testing: false, success: true, message: t('asr.success.online') })
             } else {
                 setStatus({ testing: false, success: true, message: t('asr.success.configured') })
