@@ -85,7 +85,17 @@ function NoteTOC({ items, activeId, onItemClick, isZenMode, showToc }: {
     showToc: boolean
 }) {
     const { t } = useTranslation()
-    const [collapsed, setCollapsed] = useState(false)
+    const [collapsed, _setCollapsed] = useState(() => {
+        return localStorage.getItem('note-toc-collapsed') === 'true'
+    })
+    
+    const setCollapsed = useCallback((val: React.SetStateAction<boolean>) => {
+        _setCollapsed(prev => {
+            const next = typeof val === 'function' ? val(prev) : val
+            localStorage.setItem('note-toc-collapsed', String(next))
+            return next
+        })
+    }, [])
     const [tocWidth, setTocWidth] = useState(() => {
         const saved = localStorage.getItem('note-toc-width')
         return saved ? Math.max(TOC_MIN_WIDTH, Math.min(TOC_MAX_WIDTH, Number(saved))) : TOC_DEFAULT_WIDTH
