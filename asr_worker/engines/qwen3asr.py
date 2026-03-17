@@ -23,16 +23,16 @@ LANG_MAP = {
 
 
 class Qwen3ASREngine(ASREngine):
-    def __init__(self):
+    def __init__(self, model_name=None, aligner_name=None, device=None):
         from config import get_config, get_engine_config
         cfg = get_config()
         ecfg = get_engine_config("qwen3asr")
 
-        device_cfg = cfg.get("device", "cuda:0")
+        device_cfg = device or cfg.get("device", "cuda:0")
 
-        # Model paths: config > env > default HuggingFace IDs
-        model_name = ecfg.get("model_name") or os.getenv("QWEN3_ASR_MODEL") or "Qwen/Qwen3-ASR-1.7B"
-        aligner_name = ecfg.get("aligner_name") or os.getenv("QWEN3_ASR_ALIGNER") or "Qwen/Qwen3-ForcedAligner-0.6B"
+        # Model paths: constructor args > config > env > default HuggingFace IDs
+        model_name = model_name or ecfg.get("model_name") or os.getenv("QWEN3_ASR_MODEL") or "Qwen/Qwen3-ASR-1.7B"
+        aligner_name = aligner_name or ecfg.get("aligner_name") or os.getenv("QWEN3_ASR_ALIGNER") or "Qwen/Qwen3-ForcedAligner-0.6B"
         use_aligner = ecfg.get("use_aligner", True)
         batch_size = ecfg.get("batch_size", 8)
         max_tokens = ecfg.get("max_tokens", 256)
@@ -255,4 +255,13 @@ class Qwen3ASREngine(ASREngine):
         """Release temporary VRAM after inference to prevent accumulation."""
         if self._device.startswith("cuda"):
             gc.collect()
+            self._torch.cuda.empty_cache()
+
+    def unload(self):
+        """Release model, aligner and free all VRAM."""
+        if hasattr(self, "model"):
+            del self.model
+            self.model = None
+        gc.collect()
+        if hasattr(self, "_torch") and self._device.startswith("cuda"):
             self._torch.cuda.empty_cache()

@@ -25,7 +25,11 @@ class ASREngine(ABC):
     def generate_srt(self, audio_path: str, language: str = "zh", initial_prompt: str = None, check_cancel_func=None) -> str:
         """Transcribe audio to SRT format."""
         pass
-    
+
+    def unload(self):
+        """Release model resources and free VRAM. Override to delete model references."""
+        pass
+
     def load_audio(self, file: str, sr: int = 16000):
         """
         Safe audio loading ensuring no black window pops up on Windows.

@@ -460,8 +460,6 @@ class ASRClient:
         """
         Transcribe audio using selected engine.
         """
-        # Logic: Usage of `engine` param here acts as a "Preferred Engine" override request
-        # But we still respect strict/fallback logic via select_worker
         
         try:
              selected_engine = self.select_worker(engine)
@@ -570,5 +568,39 @@ class ASRClient:
                 
                 data = resp.json()
                 return data["text"]
+
+    async def proxy_management(self, worker_key: str, method: str, path: str, body=None) -> dict:
+        """Proxy a management API call to a worker.
+
+        Args:
+            worker_key: Engine name or worker identifier
+            method: HTTP method (GET, POST, DELETE)
+            path: Path under /management/ on the worker
+            body: Optional JSON body for POST/DELETE
+        """
+        url = self.workers.get(worker_key)
+        if not url:
+            raise ValueError(f"Worker '{worker_key}' not found")
+
+        if not self.availability.get(worker_key, False):
+            raise RuntimeError(f"Worker '{worker_key}' is offline")
+
+        target = f"{url}/management/{path.lstrip('/')}"
+        logger.info(f"Proxying {method} {target}")
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            if method.upper() == "GET":
+                resp = await client.get(target)
+            elif method.upper() == "POST":
+                resp = await client.post(target, json=body)
+            elif method.upper() == "DELETE":
+                resp = await client.delete(target, json=body)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
+
+            if resp.status_code >= 400:
+                raise RuntimeError(f"Worker returned HTTP {resp.status_code}: {resp.text}")
+
+            return resp.json()
 
 asr_client = ASRClient()

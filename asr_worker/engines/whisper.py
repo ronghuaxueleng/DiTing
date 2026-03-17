@@ -34,6 +34,21 @@ class WhisperEngine(ASREngine):
         logger.info(f"🖥️ Using Device: {device}")
 
         self.model = whisper.load_model(self.model_name, download_root=self.model_path, device=device)
+        self._device = device
+
+    def unload(self):
+        """Release model and free VRAM."""
+        import gc
+        if hasattr(self, "model"):
+            del self.model
+            self.model = None
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
 
     def predict(self, audio_path: str, language: str = "zh", initial_prompt: str = None, check_cancel_func=None):
         logger.info(f"📂 [Whisper] Processing: {audio_path}")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 from app.asr.client import asr_client
@@ -93,3 +93,33 @@ async def register_worker(body: WorkerRegisterRequest):
     )
     await asr_client.check_health()
     return result
+
+
+# ── Worker Management Proxy ──
+
+@router.api_route("/workers/{worker_key}/management/{path:path}", methods=["GET", "POST", "DELETE"])
+async def proxy_worker_management(worker_key: str, path: str, request: Request):
+    """
+    Proxy management API calls to a worker.
+    Frontend calls e.g. GET /api/asr/workers/sensevoice/management/models
+    and server proxies to the worker's /management/models endpoint.
+    """
+    body = None
+    if request.method in ("POST", "DELETE"):
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+
+    try:
+        result = await asr_client.proxy_management(
+            worker_key=worker_key,
+            method=request.method,
+            path=path,
+            body=body,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))

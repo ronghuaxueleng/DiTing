@@ -6,16 +6,16 @@ from .base import ASREngine, format_timestamp
 logger = logging.getLogger("ASR Worker")
 
 class SenseVoiceEngine(ASREngine):
-    def __init__(self):
+    def __init__(self, model_id=None, device=None, cache_dir=None):
         from config import get_config, get_engine_config
         cfg = get_config()
         ecfg = get_engine_config("sensevoice")
 
-        device = cfg.get("device", "cuda:0")
-        model_id = ecfg.get("model_id", "iic/SenseVoiceSmall")
+        device = device or cfg.get("device", "cuda:0")
+        model_id = model_id or ecfg.get("model_id", "iic/SenseVoiceSmall")
         vad_model = ecfg.get("vad_model", "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch")
         vad_max_seg = ecfg.get("vad_max_segment_time", 30000)
-        cache_dir = ecfg.get("cache_dir") or os.getenv("MODELSCOPE_CACHE")
+        cache_dir = cache_dir or ecfg.get("cache_dir") or os.getenv("MODELSCOPE_CACHE")
 
         logger.info(f"🚀 Loading SenseVoice model: {model_id} (device={device}, cache={cache_dir})")
         try:
@@ -31,6 +31,21 @@ class SenseVoiceEngine(ASREngine):
             trust_remote_code=True,
             disable_update=True,
         )
+        self._device = device
+
+    def unload(self):
+        """Release model and free VRAM."""
+        import gc
+        if hasattr(self, "model"):
+            del self.model
+            self.model = None
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
 
     def clean_text(self, text: str) -> str:
         # 1. Keep SenseVoice tags (<|HAPPY|>, <|zh|>, etc.) but remove sound events

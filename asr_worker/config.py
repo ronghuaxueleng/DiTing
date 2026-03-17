@@ -19,6 +19,7 @@ _DEFAULTS = {
     "model_base_path": None,
     "server_url": None,       # DiTing Server URL for auto-registration
     "advertise_url": None,    # Worker's externally-reachable URL (auto-derived if None)
+    "models_dir": None,       # Override for model storage directory (default: asr_worker/models)
     "models": {
         "sensevoice": {
             "model_id": "iic/SenseVoiceSmall",
