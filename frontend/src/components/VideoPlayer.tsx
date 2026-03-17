@@ -245,8 +245,8 @@ export default function VideoPlayer({
 
             {/* 2. Player Container */}
             <div className={`rounded-xl overflow-hidden bg-black relative group border border-[var(--color-border)] shadow-lg transition-all duration-300 ${isDouyinEmbedActive
-                ? 'aspect-[9/16] max-h-[100vh] mx-auto max-w-[350px]'
-                : 'aspect-video'
+                ? 'aspect-[9/16] w-full max-h-[100vh] mx-auto max-w-[350px]'
+                : 'aspect-video w-full'
                 }`}>
                 {content}
             </div>
