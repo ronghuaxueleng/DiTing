@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import {
     getASRStatus,
     updateASRConfig,
@@ -20,6 +21,7 @@ import ConfirmModal from '../ConfirmModal'
 export default function ASRTab() {
     const { t } = useTranslation()
     const queryClient = useQueryClient()
+    const navigate = useNavigate()
     const { showToast } = useToast()
 
     // Fetch Status & Config
@@ -550,15 +552,13 @@ export default function ASRTab() {
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                                 {info.online && info.management && (
-                                    <a
-                                        href={`${info.url}/management`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <button
+                                        onClick={() => navigate('/management', { state: { tab: 'workers', workerId } })}
                                         className="text-xs px-2 py-1 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded hover:bg-[var(--color-primary)]/20"
                                         title={t('settings.asr.manage')}
                                     >
                                         {t('settings.asr.manage')}
-                                    </a>
+                                    </button>
                                 )}
                                 <button
                                     onClick={() => setDeleteConfirmWorkerId(workerId)}

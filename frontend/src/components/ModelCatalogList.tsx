@@ -30,7 +30,7 @@ interface ModelInfo {
 
 export default function ModelCatalogList({ workerKey }: Props) {
     const { t } = useTranslation()
-    const { data, isLoading } = useWorkerModels(workerKey)
+    const { data, isLoading, isError } = useWorkerModels(workerKey)
     const downloadModel = useDownloadModel()
     const activateModel = useActivateModel()
     const unloadModel = useUnloadModel()
@@ -75,6 +75,15 @@ export default function ModelCatalogList({ workerKey }: Props) {
             <div className="flex items-center gap-2 text-[var(--color-text-muted)] py-4">
                 <Icons.Loader className="w-4 h-4 animate-spin" />
                 {t('common.loading')}
+            </div>
+        )
+    }
+
+    if (isError) {
+        return (
+            <div className="rounded-lg border border-red-500/20 p-4 text-sm text-[var(--color-text-muted)]">
+                <Icons.AlertCircle className="w-4 h-4 inline mr-1 text-red-400" />
+                {t('workers.models.error', { defaultValue: 'Failed to load model catalog' })}
             </div>
         )
     }

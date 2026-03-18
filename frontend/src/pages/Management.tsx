@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router-dom'
 import Icons from '../components/ui/Icons'
 import OverviewTab from './management/OverviewTab'
 import WorkersTab from './management/WorkersTab'
@@ -12,7 +13,18 @@ type Tab = 'overview' | 'entries' | 'cleanup' | 'batch' | 'logs' | 'workers'
 
 export default function Management() {
     const { t } = useTranslation()
-    const [activeTab, setActiveTab] = useState<Tab>('overview')
+    const location = useLocation()
+    const navState = location.state as { tab?: Tab; workerId?: string } | null
+
+    const [activeTab, setActiveTab] = useState<Tab>(navState?.tab || 'overview')
+    const [initialWorkerId] = useState<string | undefined>(navState?.workerId)
+
+    // If navigated here with state.tab, switch to that tab
+    useEffect(() => {
+        if (navState?.tab) {
+            setActiveTab(navState.tab)
+        }
+    }, [navState?.tab])
 
     const tabs = [
         { id: 'overview', label: t('management.tabs.overview'), icon: Icons.LayoutDashboard },
@@ -68,7 +80,7 @@ export default function Management() {
                     {activeTab === 'batch' && <BatchCacheTab />}
                     {activeTab === 'cleanup' && <CleanupTab />}
                     {activeTab === 'logs' && <LogsTab />}
-                    {activeTab === 'workers' && <WorkersTab />}
+                    {activeTab === 'workers' && <WorkersTab initialWorkerId={initialWorkerId} />}
                 </div>
             </div>
         </div >

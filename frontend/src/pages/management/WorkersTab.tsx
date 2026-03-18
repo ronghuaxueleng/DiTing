@@ -6,10 +6,14 @@ import WorkerDetailDrawer from '../../components/WorkerDetailDrawer'
 import { useASRStatus } from '../../hooks/useWorkerManagement'
 import type { WorkerInfo } from '../../api/types'
 
-export default function WorkersTab() {
+interface Props {
+    initialWorkerId?: string
+}
+
+export default function WorkersTab({ initialWorkerId }: Props) {
     const { t } = useTranslation()
     const { data: status } = useASRStatus()
-    const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null)
+    const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(initialWorkerId ?? null)
 
     const workers = status?.workers ?? {}
     const selectedWorkerInfo = selectedWorkerId ? (workers[selectedWorkerId] as WorkerInfo | undefined) ?? null : null

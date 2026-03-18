@@ -1,10 +1,21 @@
 """NVIDIA GPU detection via nvidia-smi (no torch required)."""
 
+import os
 import subprocess
 import re
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _startupinfo():
+    """Hide console window on Windows."""
+    if os.name == 'nt':
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = subprocess.SW_HIDE
+        return si
+    return None
 
 
 def detect_cuda() -> dict | None:
@@ -22,6 +33,7 @@ def detect_cuda() -> dict | None:
             capture_output=True,
             text=True,
             timeout=10,
+            startupinfo=_startupinfo(),
         )
         if result.returncode != 0:
             return None
@@ -59,6 +71,7 @@ def _get_cuda_version() -> str | None:
             capture_output=True,
             text=True,
             timeout=10,
+            startupinfo=_startupinfo(),
         )
         if result.returncode != 0:
             return None

@@ -63,6 +63,7 @@ export function useWorkerHardware(workerKey: string | null) {
         queryFn: () => proxyWorkerManagement(workerKey!, 'hardware'),
         enabled: !!workerKey,
         staleTime: 30000,
+        retry: 1,
     })
 }
 
@@ -72,5 +73,6 @@ export function useWorkerModels(workerKey: string | null) {
         queryFn: () => proxyWorkerManagement(workerKey!, 'models'),
         enabled: !!workerKey,
         staleTime: 15000,
+        retry: 1,
     })
 }

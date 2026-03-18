@@ -21,10 +21,11 @@ interface HardwareData {
 interface Props {
     data: HardwareData | undefined
     isLoading?: boolean
+    isError?: boolean
     compact?: boolean
 }
 
-export default function HardwareInfoCard({ data, isLoading, compact }: Props) {
+export default function HardwareInfoCard({ data, isLoading, isError, compact }: Props) {
     const { t } = useTranslation()
 
     if (isLoading) {
@@ -37,12 +38,25 @@ export default function HardwareInfoCard({ data, isLoading, compact }: Props) {
         )
     }
 
+    if (isError) {
+        return (
+            <div className="bg-[var(--color-card)] rounded-xl border border-red-500/20 p-4 text-sm text-[var(--color-text-muted)]">
+                <Icons.AlertCircle className="w-4 h-4 inline mr-1 text-red-400" />
+                {t('workers.hardware.error', { defaultValue: 'Failed to load hardware info' })}
+            </div>
+        )
+    }
+
     if (!data) return null
 
-    const { hardware, pytorch } = data
+    // Validate data shape
+    const hardware = data.hardware
+    const pytorch = data.pytorch
+    if (!hardware || !hardware.cpu || !hardware.memory) return null
+
     const gpu = hardware.gpu
     const vramUsed = gpu ? (gpu.vram_total_mb - gpu.vram_free_mb) : 0
-    const vramPercent = gpu ? Math.round((vramUsed / gpu.vram_total_mb) * 100) : 0
+    const vramPercent = gpu && gpu.vram_total_mb > 0 ? Math.round((vramUsed / gpu.vram_total_mb) * 100) : 0
 
     return (
         <div className="bg-[var(--color-card)] rounded-xl border border-[var(--color-border)] p-4 space-y-3">
@@ -55,14 +69,14 @@ export default function HardwareInfoCard({ data, isLoading, compact }: Props) {
                 {/* CPU */}
                 <div className="space-y-1">
                     <span className="text-[var(--color-text-muted)]">{t('workers.hardware.cpu', { defaultValue: 'CPU' })}</span>
-                    <p className="font-medium truncate">{hardware.cpu.brand}</p>
-                    <p className="text-[var(--color-text-muted)]">{hardware.cpu.cores}C / {hardware.cpu.threads}T</p>
+                    <p className="font-medium truncate">{hardware.cpu.brand || 'Unknown'}</p>
+                    <p className="text-[var(--color-text-muted)]">{hardware.cpu.cores ?? '?'}C / {hardware.cpu.threads ?? '?'}T</p>
                 </div>
 
                 {/* Memory */}
                 <div className="space-y-1">
                     <span className="text-[var(--color-text-muted)]">{t('workers.hardware.memory', { defaultValue: 'Memory' })}</span>
-                    <p className="font-medium">{hardware.memory.available_gb.toFixed(1)} / {hardware.memory.total_gb.toFixed(1)} GB</p>
+                    <p className="font-medium">{(hardware.memory.available_gb ?? 0).toFixed(1)} / {(hardware.memory.total_gb ?? 0).toFixed(1)} GB</p>
                 </div>
 
                 {/* GPU */}
@@ -79,7 +93,7 @@ export default function HardwareInfoCard({ data, isLoading, compact }: Props) {
                                     />
                                 </div>
                                 <span className="text-xs text-[var(--color-text-muted)]">
-                                    {(vramUsed / 1024).toFixed(1)}/{(gpu.vram_total_mb / 1024).toFixed(1)} GB
+                                    {(vramUsed / 1024).toFixed(1)}/{((gpu.vram_total_mb ?? 0) / 1024).toFixed(1)} GB
                                 </span>
                             </div>
                         </>

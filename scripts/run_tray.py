@@ -97,6 +97,7 @@ class WorkerManager:
         env = os.environ.copy()
         env["ASR_ENGINE"] = self.engine_type
         env["PORT"] = str(self.port)
+        env["SERVER_URL"] = "http://127.0.0.1:5023"
         env["PYTHONIOENCODING"] = "utf-8"
         
         # Assuming run from root
