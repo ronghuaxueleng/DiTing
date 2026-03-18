@@ -32,9 +32,14 @@ def _migrate_workers_format(raw: dict) -> dict:
 
     Old: {"sensevoice": "http://localhost:8001"}
     New: {"localhost:8001": {"url": "http://localhost:8001"}}
+    URL-as-key: {"http://localhost:8001": {}} → {"localhost:8001": {"url": "http://localhost:8001"}}
     """
     if not raw:
         return {}
+
+    # Check if any key looks like a full URL — needs normalization
+    has_url_keys = any(k.startswith("http") for k in raw)
+
     first_val = next(iter(raw.values()))
     if isinstance(first_val, str) and first_val.startswith("http"):
         # Old format: {engine: url} → convert
@@ -43,10 +48,11 @@ def _migrate_workers_format(raw: dict) -> dict:
             worker_id = _url_to_worker_id(url)
             migrated[worker_id] = {"url": url}
         return migrated
-    elif isinstance(first_val, dict):
-        # Already new format
+    elif isinstance(first_val, dict) and not has_url_keys:
+        # Already new format with proper worker_id keys
         return raw
-    # URL-as-key with empty dict: {"http://localhost:8001": {}}
+
+    # URL-as-key or mixed format: normalize all keys
     result = {}
     for key, val in raw.items():
         if key.startswith("http"):
@@ -231,12 +237,10 @@ class ASRClient:
                 migrated = _migrate_workers_format(old_workers_raw)
                 self.workers = migrated
 
-                # Check if migration happened (old format → new format)
-                first_val = next(iter(old_workers_raw.values()), None) if old_workers_raw else None
-                if isinstance(first_val, str) and first_val.startswith("http"):
-                    # Was old format, re-save in new format
+                # Check if migration happened (format changed)
+                if set(old_workers_raw.keys()) != set(migrated.keys()):
                     self._save_workers_to_db()
-                    logger.info(f"🔄 Migrated ASR workers from engine-keyed to URL-keyed format")
+                    logger.info(f"Migrated ASR workers format: {list(old_workers_raw.keys())} -> {list(migrated.keys())}")
 
                 logger.info(f"📂 Loaded ASR workers from DB: {list(self.workers.keys())}")
 
@@ -245,12 +249,10 @@ class ASRClient:
             if saved_priority:
                 loaded = json.loads(saved_priority)
 
-                # Check if priority needs migration (contains engine names instead of worker_ids)
+                # Check if priority needs migration (old format keys differ from migrated)
                 needs_migration = False
                 if old_workers_raw and loaded:
-                    first_val = next(iter(old_workers_raw.values()), None) if old_workers_raw else None
-                    if isinstance(first_val, str) and first_val.startswith("http"):
-                        needs_migration = True
+                    needs_migration = set(old_workers_raw.keys()) != set(self.workers.keys())
 
                 if needs_migration:
                     self.config["priority"] = _migrate_priority(loaded, old_workers_raw, self.workers)

@@ -609,7 +609,7 @@ export async function updateASRWorkers(workers: Record<string, any>): Promise<AS
 }
 
 export async function addASRWorkerUrl(url: string): Promise<ASRStatus> {
-    return fetchJson(`${API_BASE}/asr/workers`, { method: 'PUT', body: JSON.stringify({ urls: [url] }) })
+    return fetchJson(`${API_BASE}/asr/workers`, { method: 'POST', body: JSON.stringify({ url }) })
 }
 
 export async function deleteASRWorker(workerId: string): Promise<ASRStatus> {

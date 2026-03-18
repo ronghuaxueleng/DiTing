@@ -16,22 +16,27 @@ export default function WorkerManagementPanel({ onSelectWorker, selectedWorkerId
     const removeWorker = useRemoveWorker()
     const [newUrl, setNewUrl] = useState('')
     const [removingId, setRemovingId] = useState<string | null>(null)
+    const [error, setError] = useState<string | null>(null)
 
     const handleAdd = async () => {
         const url = newUrl.trim()
         if (!url) return
+        setError(null)
         try {
             await addWorker.mutateAsync(url)
             setNewUrl('')
-        } catch {
-            // error shown via toast or inline
+        } catch (e: any) {
+            setError(e?.message || 'Failed to add worker')
         }
     }
 
     const handleRemove = async (workerId: string) => {
         setRemovingId(workerId)
+        setError(null)
         try {
             await removeWorker.mutateAsync(workerId)
+        } catch (e: any) {
+            setError(e?.message || 'Failed to remove worker')
         } finally {
             setRemovingId(null)
         }
@@ -77,9 +82,10 @@ export default function WorkerManagementPanel({ onSelectWorker, selectedWorkerId
                         {t('workers.add', { defaultValue: 'Add' })}
                     </button>
                 </div>
+                {error && (
+                    <p className="mt-2 text-xs text-red-500">{error}</p>
+                )}
             </div>
-
-            {/* Worker List */}
             {workerEntries.length === 0 ? (
                 <div className="p-8 text-center text-[var(--color-text-muted)]">
                     <Icons.Server className="w-8 h-8 mx-auto mb-2 opacity-40" />

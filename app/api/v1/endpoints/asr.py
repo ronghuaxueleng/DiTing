@@ -82,6 +82,23 @@ async def update_workers(body: WorkerURLsUpdate):
     return asr_client.get_status()
 
 
+class WorkerAddRequest(BaseModel):
+    url: str
+
+
+@router.post("/workers")
+async def add_worker(body: WorkerAddRequest):
+    """
+    Add a single worker URL at runtime (incremental, does not replace existing workers).
+    """
+    url = body.url.strip()
+    if not url.startswith("http"):
+        raise HTTPException(status_code=422, detail="Invalid URL: must start with http or https")
+    asr_client.add_worker(url)
+    await asr_client.check_health()
+    return asr_client.get_status()
+
+
 @router.delete("/workers/{worker_id}")
 async def remove_worker(worker_id: str):
     """
