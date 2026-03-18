@@ -50,6 +50,18 @@ class ModelStateManager:
         self._state = ModelState()
         os.makedirs(models_dir, exist_ok=True)
 
+    def _sensevoice_candidate_paths(self, model: ModelInfo) -> list[str]:
+        """Return possible on-disk locations for a SenseVoice model.
+
+        ModelScope may cache under either:
+        - {models_dir}/iic/SenseVoiceSmall
+        - {models_dir}/models/iic/SenseVoiceSmall
+        """
+        return [
+            os.path.join(self.models_dir, model.model_id),
+            os.path.join(self.models_dir, "models", model.model_id),
+        ]
+
     def load(self):
         """Load state from disk, then auto-detect any pre-existing models."""
         self._load_from_disk()
@@ -130,10 +142,9 @@ class ModelStateManager:
     def _detect_model_on_disk(self, model: ModelInfo) -> str | None:
         """Check if a model's files exist in models_dir."""
         if model.engine == "sensevoice":
-            # ModelScope cache layout: {models_dir}/iic/SenseVoiceSmall/
-            path = os.path.join(self.models_dir, model.model_id)
-            if os.path.isdir(path):
-                return path
+            for path in self._sensevoice_candidate_paths(model):
+                if os.path.isdir(path):
+                    return path
 
         elif model.engine == "whisper":
             # Whisper downloads: {models_dir}/{name}.pt
@@ -154,7 +165,10 @@ class ModelStateManager:
     def _get_model_path(self, model: ModelInfo) -> str:
         """Get the expected model path for a catalog model."""
         if model.engine == "sensevoice":
-            return os.path.join(self.models_dir, model.model_id)
+            for path in self._sensevoice_candidate_paths(model):
+                if os.path.exists(path):
+                    return path
+            return self._sensevoice_candidate_paths(model)[0]
         elif model.engine == "whisper":
             name = model.whisper_model_name or model.model_id
             return os.path.join(self.models_dir, f"{name}.pt")
