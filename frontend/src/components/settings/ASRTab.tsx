@@ -10,7 +10,7 @@ import {
     updateASRModel,
     deleteASRModel,
     setActiveASRModel,
-    updateASRWorkers,
+    addASRWorkerUrl,
     deleteASRWorker,
 } from '../../api'
 import { ASRModel } from '../../api/types'
@@ -109,16 +109,7 @@ export default function ASRTab() {
     const [workerUrlInput, setWorkerUrlInput] = useState('http://localhost:8001')
 
     const addWorkerMutation = useMutation({
-        mutationFn: async (url: string) => {
-            // Build workers map: current workers + new URL
-            const currentWorkers = statusData?.workers || {}
-            const newWorkers: Record<string, any> = {}
-            for (const [, info] of Object.entries(currentWorkers)) {
-                newWorkers[info.url] = {}
-            }
-            newWorkers[url] = {}
-            return updateASRWorkers(newWorkers)
-        },
+        mutationFn: (url: string) => addASRWorkerUrl(url),
         onSuccess: (data) => {
             queryClient.setQueryData(['asr-status'], data)
             setShowWorkerForm(false)

@@ -3,7 +3,7 @@ import { getASRStatus, updateASRConfig, bulkUpdateASRWorkers, addASRWorkerUrl, d
 
 export function useASRStatus(refreshInterval = 15000) {
     return useQuery({
-        queryKey: ['asrStatus'],
+        queryKey: ['asr-status'],
         queryFn: () => getASRStatus(true),
         refetchInterval: refreshInterval,
         staleTime: 0,
@@ -15,7 +15,7 @@ export function useAddWorker() {
     return useMutation({
         mutationFn: (url: string) => addASRWorkerUrl(url),
         onSuccess: (data) => {
-            queryClient.setQueryData(['asrStatus'], data)
+            queryClient.setQueryData(['asr-status'], data)
         },
     })
 }
@@ -25,7 +25,7 @@ export function useRemoveWorker() {
     return useMutation({
         mutationFn: (workerId: string) => deleteASRWorker(workerId),
         onSuccess: (data) => {
-            queryClient.setQueryData(['asrStatus'], data)
+            queryClient.setQueryData(['asr-status'], data)
         },
     })
 }
@@ -35,7 +35,7 @@ export function useBulkUpdateWorkers() {
     return useMutation({
         mutationFn: bulkUpdateASRWorkers,
         onSuccess: (data) => {
-            queryClient.setQueryData(['asrStatus'], data)
+            queryClient.setQueryData(['asr-status'], data)
         },
     })
 }
@@ -45,7 +45,7 @@ export function useUpdateASRConfig() {
     return useMutation({
         mutationFn: updateASRConfig,
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['asrStatus'] })
+            queryClient.invalidateQueries({ queryKey: ['asr-status'] })
         },
     })
 }

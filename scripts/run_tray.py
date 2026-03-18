@@ -14,6 +14,7 @@ import pystray
 from pystray import MenuItem as item
 import logging
 import copy
+import uvicorn
 
 # Resolve project root (parent of scripts/)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -480,6 +481,7 @@ def update_menu(icon):
         item('Restart Service (Full)', action_restart),
         item('Exit', action_exit)
     )
+    icon.update_menu()
 
 
 

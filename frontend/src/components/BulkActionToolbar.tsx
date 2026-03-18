@@ -13,7 +13,7 @@ export default function BulkActionToolbar() {
         setRefreshing(true)
         try {
             const data = await getASRStatus(true)
-            queryClient.setQueryData(['asrStatus'], data)
+            queryClient.setQueryData(['asr-status'], data)
         } finally {
             setRefreshing(false)
         }
