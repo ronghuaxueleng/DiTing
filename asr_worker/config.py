@@ -17,6 +17,7 @@ _DEFAULTS = {
     "shared_paths": [],
     "temp_upload_dir": "temp_uploads",
     "model_base_path": None,
+    "model_state_path": None, # Directory for per-worker model_state.json (defaults to model_base_path)
     "server_url": None,       # DiTing Server URL for auto-registration
     "advertise_url": None,    # Worker's externally-reachable URL (auto-derived if None)
     "models_dir": None,       # Override for model storage directory (default: asr_worker/models)
@@ -50,6 +51,7 @@ _ENV_MAP = {
     "SHARED_PATHS":     "shared_paths",
     "TEMP_UPLOAD_DIR":  "temp_upload_dir",
     "MODEL_BASE_PATH":  "model_base_path",
+    "MODEL_STATE_PATH": "model_state_path",
     "SERVER_URL":       "server_url",
     "ADVERTISE_URL":    "advertise_url",
 }

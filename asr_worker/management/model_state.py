@@ -44,11 +44,13 @@ class ModelState:
 class ModelStateManager:
     """Manages installed model tracking with JSON persistence."""
 
-    def __init__(self, models_dir: str):
+    def __init__(self, models_dir: str, state_dir: str | None = None):
         self.models_dir = models_dir
-        self._state_path = os.path.join(models_dir, STATE_FILENAME)
+        self.state_dir = state_dir or models_dir
+        self._state_path = os.path.join(self.state_dir, STATE_FILENAME)
         self._state = ModelState()
         os.makedirs(models_dir, exist_ok=True)
+        os.makedirs(self.state_dir, exist_ok=True)
 
     def _sensevoice_candidate_paths(self, model: ModelInfo) -> list[str]:
         """Return possible on-disk locations for a SenseVoice model.

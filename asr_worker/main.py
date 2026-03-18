@@ -24,6 +24,7 @@ SHARED_PATHS = _cfg["shared_paths"]
 TEMP_UPLOAD_DIR = _cfg["temp_upload_dir"]
 MAX_CONCURRENCY = _cfg.get("max_concurrency", 1)
 MODELS_DIR = _cfg.get("model_base_path") or os.path.join(os.path.dirname(__file__), "models")
+MODEL_STATE_DIR = _cfg.get("model_state_path") or MODELS_DIR
 os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
 
 _queue_depth = 0  # Track how many requests are waiting
@@ -36,7 +37,7 @@ from management.model_state import ModelStateManager
 from management.engine_loader import EngineManager
 from management.routes import router as management_router, init_routes
 
-_model_state = ModelStateManager(MODELS_DIR)
+_model_state = ModelStateManager(MODELS_DIR, MODEL_STATE_DIR)
 _model_state.load()
 
 engine_manager = EngineManager(_model_state, max_concurrency=MAX_CONCURRENCY)
