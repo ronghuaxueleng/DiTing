@@ -66,6 +66,8 @@ class Settings(BaseSettings):
         "qwen3asr": "http://localhost:8003"
     }
 
+    WIZARD_COMPLETED: bool = False  # Persisted wizard completion flag
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_ignore_empty=True,

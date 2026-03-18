@@ -616,6 +616,23 @@ export async function deleteASRWorker(workerId: string): Promise<ASRStatus> {
     return fetchJson(`${API_BASE}/asr/workers/${encodeURIComponent(workerId)}`, { method: 'DELETE' })
 }
 
+// Bulk update ASR workers (array of {url})
+export async function bulkUpdateASRWorkers(workers: { url: string }[]): Promise<ASRStatus> {
+    // Assuming backend supports POST /asr/workers/bulk
+    return fetchJson(`${API_BASE}/asr/workers/bulk`, { method: 'POST', body: JSON.stringify({ workers }) })
+}
+
+// Proxy worker management helper
+export async function proxyWorkerManagement(workerKey: string, path: string, method: string = 'GET', body?: any): Promise<any> {
+    const url = `${API_BASE}/asr/workers/${encodeURIComponent(workerKey)}/management/${path}`
+    const options: RequestInit = { method }
+    if (body !== undefined) {
+        options.body = JSON.stringify(body)
+        options.headers = { 'Content-Type': 'application/json' }
+    }
+    return fetchJson(url, options)
+}
+
 
 export async function toggleASRStrict(strict: boolean): Promise<void> {
     await updateASRConfig({ strict_mode: strict })

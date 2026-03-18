@@ -384,7 +384,7 @@ class ASRClient:
             await asyncio.sleep(interval)
 
     def get_status(self) -> Dict:
-        """Return current status of all workers and clouds."""
+        """Return current status of all workers and clouds, plus wizard state."""
         # Workers
         workers_status = {}
         for worker_id, meta in self.workers.items():
@@ -434,6 +434,7 @@ class ASRClient:
         return {
             "workers": workers_status,
             "clouds": clouds_status,
+            "wizard_state": settings.WIZARD_COMPLETED,  # New flag
             "engines": engines_compat,  # DEPRECATED: backward compat
             "config": self.config,
         }

@@ -544,7 +544,8 @@
             "entries": "Cache Files",
             "batch": "Batch Cache",
             "cleanup": "Cleanup",
-            "logs": "Logs"
+            "logs": "Logs",
+            "workers": "Workers"
         },
         "overview": {
             "totalSize": "Total Cache Size",

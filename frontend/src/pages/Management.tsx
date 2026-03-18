@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Icons from '../components/ui/Icons'
 import OverviewTab from './management/OverviewTab'
+import WorkersTab from './management/WorkersTab'
 import CacheEntriesTab from './management/CacheEntriesTab'
 import BatchCacheTab from './management/BatchCacheTab'
 import CleanupTab from './management/CleanupTab'
 import LogsTab from './management/LogsTab'
 
-type Tab = 'overview' | 'entries' | 'cleanup' | 'batch' | 'logs'
+type Tab = 'overview' | 'entries' | 'cleanup' | 'batch' | 'logs' | 'workers'
 
 export default function Management() {
     const { t } = useTranslation()
@@ -19,6 +20,7 @@ export default function Management() {
         { id: 'batch', label: t('management.tabs.batch'), icon: Icons.Database },
         { id: 'cleanup', label: t('management.tabs.cleanup'), icon: Icons.Trash },
         { id: 'logs', label: t('management.tabs.logs'), icon: Icons.FileText },
+        { id: 'workers', label: t('management.tabs.workers'), icon: Icons.Server },
     ]
 
     return (
@@ -66,6 +68,7 @@ export default function Management() {
                     {activeTab === 'batch' && <BatchCacheTab />}
                     {activeTab === 'cleanup' && <CleanupTab />}
                     {activeTab === 'logs' && <LogsTab />}
+                    {activeTab === 'workers' && <WorkersTab />}
                 </div>
             </div>
         </div >
