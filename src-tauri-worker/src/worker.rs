@@ -79,28 +79,23 @@ pub struct WorkerOperationStatus {
     pub completed_at: Option<f64>,
 }
 
-fn default_status(url: String) -> WorkerStatus {
-    WorkerStatus {
-        running: false,
-        healthy: false,
-        url,
-        engine: "whisper".to_string(),
-        loaded: false,
-        model_id: None,
-        device: None,
-        management: false,
-    }
+fn worker_base_url(port: u16) -> String {
+    format!("http://127.0.0.1:{}", port)
 }
 
-fn unhealthy_status(url: String) -> WorkerStatus {
+fn status_from_engine(
+    engine: &manager_state::EngineInfo,
+    running: bool,
+    healthy: bool,
+) -> WorkerStatus {
     WorkerStatus {
-        running: true,
-        healthy: false,
-        url,
-        engine: "whisper".to_string(),
+        running,
+        healthy,
+        url: worker_base_url(engine.port),
+        engine: engine.resolved_engine_name(),
         loaded: false,
-        model_id: None,
-        device: None,
+        model_id: engine.initial_model_id.clone(),
+        device: Some(engine.resolved_device()),
         management: false,
     }
 }
@@ -150,7 +145,8 @@ pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String
     let engine = state
         .engines
         .get(engine_id)
-        .ok_or_else(|| format!("Engine {engine_id} not installed"))?;
+        .ok_or_else(|| format!("Engine {engine_id} not installed"))?
+        .clone();
 
     remove_child(engine_id).await;
 
@@ -161,21 +157,31 @@ pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String
     let main_py = worker_dir.join("main.py");
 
     if !main_py.exists() {
-        return Err(format!("worker main.py not found: {}", main_py.to_string_lossy()));
+        return Err(format!(
+            "worker main.py not found: {}",
+            main_py.to_string_lossy()
+        ));
     }
 
     let mut cmd = Command::new(&python);
     cmd.arg(&main_py);
     cmd.current_dir(&worker_dir);
     cmd.env("PORT", engine.port.to_string());
-    cmd.env("ASR_ENGINE", "whisper");
-    cmd.env("ASR_DEVICE", "cpu");
+    cmd.env("ASR_ENGINE", engine.resolved_engine_name());
+    cmd.env("ASR_DEVICE", engine.resolved_device());
     cmd.env(
         "MODEL_BASE_PATH",
         paths::engine_models_dir_from_install_dir(&engine_install_dir)
             .to_string_lossy()
             .to_string(),
     );
+    if let Some(server_url) = engine
+        .server_url
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        cmd.env("SERVER_URL", server_url);
+    }
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
 
@@ -186,7 +192,7 @@ pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String
         map.insert(engine_id.to_string(), child);
     }
 
-    let url = format!("http://127.0.0.1:{}", engine.port);
+    let url = worker_base_url(engine.port);
     let deadline = tokio::time::Instant::now()
         + tokio::time::Duration::from_secs(constants::WORKER_HEALTH_TIMEOUT_SECS);
     let mut last_error: Option<String> = None;
@@ -207,6 +213,11 @@ pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String
         match check_health(engine.port).await {
             Ok(status) if status.healthy => {
                 let _ = app.emit("worker-log", format!("Worker healthy at {}", url));
+                let mut state = manager_state::load_state(app).await?;
+                if let Some(installed_engine) = state.engines.get_mut(engine_id) {
+                    installed_engine.last_started = Some(manager_state::now_iso());
+                    manager_state::save_state(app, &state).await?;
+                }
                 return Ok(());
             }
             Ok(status) => {
@@ -242,32 +253,27 @@ pub async fn get_worker_status(app: &AppHandle, engine_id: &str) -> Result<Worke
     let engine = state
         .engines
         .get(engine_id)
-        .ok_or_else(|| format!("Engine {engine_id} not installed"))?;
+        .ok_or_else(|| format!("Engine {engine_id} not installed"))?
+        .clone();
 
-    let url = format!("http://127.0.0.1:{}", engine.port);
     let running = {
         let map = CHILD.lock().unwrap();
         map.contains_key(engine_id)
     };
 
     if !running {
-        return Ok(default_status(url));
+        return Ok(status_from_engine(&engine, false, false));
     }
 
     check_health(engine.port)
         .await
-        .or_else(|_| Ok(unhealthy_status(url)))
+        .or_else(|_| Ok(status_from_engine(&engine, true, false)))
 }
 
-fn worker_base_url(port: u16) -> String {
-    format!("http://127.0.0.1:{}", port)
-}
-
-fn management_engine_name(engine_id: &str) -> &str {
-    match engine_id {
-        "whisper-openai" => "whisper",
-        other => other,
-    }
+fn management_engine_name(engine_id: &str) -> String {
+    constants::engine_name_for_id(engine_id)
+        .unwrap_or(engine_id)
+        .to_string()
 }
 
 async fn management_request<T: serde::de::DeserializeOwned>(
@@ -304,7 +310,8 @@ async fn management_request<T: serde::de::DeserializeOwned>(
 }
 
 pub async fn list_models(app: &AppHandle, engine_id: &str) -> Result<WorkerModelsResponse, String> {
-    let response: WorkerModelsResponse = management_request(app, engine_id, Method::GET, "/models", None).await?;
+    let response: WorkerModelsResponse =
+        management_request(app, engine_id, Method::GET, "/models", None).await?;
     let expected_engine = management_engine_name(engine_id);
     let models: Vec<WorkerManagedModel> = response
         .models
@@ -321,11 +328,20 @@ pub async fn list_models(app: &AppHandle, engine_id: &str) -> Result<WorkerModel
     })
 }
 
-async fn ensure_model_matches_engine(app: &AppHandle, engine_id: &str, model_id: &str) -> Result<(), String> {
-    let response: WorkerModelsResponse = management_request(app, engine_id, Method::GET, "/models", None).await?;
+async fn ensure_model_matches_engine(
+    app: &AppHandle,
+    engine_id: &str,
+    model_id: &str,
+) -> Result<(), String> {
+    let response: WorkerModelsResponse =
+        management_request(app, engine_id, Method::GET, "/models", None).await?;
     let expected_engine = management_engine_name(engine_id);
 
-    match response.models.into_iter().find(|model| model.id == model_id) {
+    match response
+        .models
+        .into_iter()
+        .find(|model| model.id == model_id)
+    {
         Some(model) if model.engine == expected_engine => Ok(()),
         Some(model) => Err(format!(
             "Model {model_id} belongs to engine {}, not {}",
@@ -389,7 +405,14 @@ pub async fn delete_model(
 }
 
 pub async fn unload_model(app: &AppHandle, engine_id: &str) -> Result<Value, String> {
-    management_request(app, engine_id, Method::POST, "/models/unload", Some(json!({}))).await
+    management_request(
+        app,
+        engine_id,
+        Method::POST,
+        "/models/unload",
+        Some(json!({})),
+    )
+    .await
 }
 
 pub async fn get_operation_status(
@@ -419,7 +442,7 @@ pub async fn check_health(port: u16) -> Result<WorkerStatus, String> {
         running: true,
         healthy,
         url,
-        engine: payload.engine.unwrap_or_else(|| "whisper".to_string()),
+        engine: payload.engine.unwrap_or_else(|| "unknown".to_string()),
         loaded: payload.loaded.unwrap_or(false),
         model_id: payload.model_id,
         device: payload.device,

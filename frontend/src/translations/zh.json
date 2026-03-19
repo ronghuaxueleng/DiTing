@@ -940,7 +940,7 @@
     },
     "workerManager": {
         "title": "DiTing Worker Manager",
-        "subtitle": "Whisper 优先 MVP（CPU）",
+        "subtitle": "用于本地 ASR 引擎的混合式安装与管理界面",
         "language": {
             "zh": "中文",
             "en": "EN"
@@ -962,7 +962,13 @@
             "unloadModel": "卸载模型",
             "unloading": "卸载中…",
             "uninstall": "卸载引擎",
-            "uninstalling": "卸载中…"
+            "uninstalling": "卸载中…",
+            "addEngine": "新增引擎",
+            "addAnotherEngine": "继续新增引擎",
+            "openDashboard": "打开管理面板",
+            "next": "下一步",
+            "back": "上一步",
+            "cancel": "取消"
         },
         "hardware": {
             "title": "硬件信息",
@@ -975,12 +981,32 @@
             "computeKey": "计算类型"
         },
         "engine": {
-            "title": "引擎：Whisper（OpenAI）",
             "installStatus": "安装状态",
             "installedState": "已安装",
             "notInstalledState": "未安装",
             "installDir": "安装目录",
             "noStatus": "暂无状态。"
+        },
+        "dashboard": {
+            "title": "管理面板",
+            "installedEngines": "已安装引擎",
+            "engineDescription": "管理当前引擎的运行状态、模型与安装信息。",
+            "emptySelection": "请选择一个已安装的引擎。"
+        },
+        "wizard": {
+            "title": "新增引擎向导",
+            "steps": {
+                "hardware": "硬件",
+                "engine": "引擎",
+                "install": "安装",
+                "complete": "完成"
+            },
+            "hardwareDescription": "先确认已检测到的硬件信息，随后可按推荐设备继续，也可以在下一步自行调整。",
+            "engineDescription": "选择要安装的引擎、设备、安装目录和初始模型。",
+            "installDescription": "正在安装 {{engine}}。Python 依赖与模型下载可能需要一些时间。",
+            "completeTitle": "引擎安装完成",
+            "completeDescription": "{{engine}} 已可使用。你可以返回管理面板，或继续新增下一个引擎。",
+            "noAvailableEngines": "当前支持的本地引擎均已安装。"
         },
         "status": {
             "details": "URL：{{url}} | model={{model}} | device={{device}}"
@@ -988,17 +1014,21 @@
         "install": {
             "locationTitle": "安装位置",
             "browse": "选择目录…",
-            "browseDialogTitle": "选择 Whisper 安装目录",
+            "browseDialogTitle": "选择引擎安装目录",
             "locationHint": "Worker 文件会直接写入此目录：venv/、models/、asr_worker/、worker_config.yaml。",
             "defaultBase": "默认 worker 根目录：{{path}}",
             "currentTarget": "当前目标目录",
             "port": "端口",
             "initialModel": "初始模型",
+            "device": "设备",
+            "serverUrl": "Server URL",
+            "serverUrlPlaceholder": "http://127.0.0.1:5023",
             "useMirror": "使用国内镜像",
             "proxy": "代理（可选）",
             "proxyPlaceholder": "http://127.0.0.1:7890",
             "install": "安装",
             "installing": "安装中…",
+            "preparing": "正在准备安装…",
             "failed": "安装失败",
             "complete": "安装完成",
             "step": "步骤 {{current}} / {{total}}",

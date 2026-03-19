@@ -926,7 +926,7 @@
     },
     "workerManager": {
         "title": "DiTing Worker Manager",
-        "subtitle": "Whisper-first MVP (CPU)",
+        "subtitle": "Hybrid worker setup and management for local ASR engines",
         "language": {
             "zh": "中文",
             "en": "EN"
@@ -948,7 +948,13 @@
             "unloadModel": "Unload model",
             "unloading": "Unloading…",
             "uninstall": "Uninstall",
-            "uninstalling": "Uninstalling…"
+            "uninstalling": "Uninstalling…",
+            "addEngine": "Add engine",
+            "addAnotherEngine": "Add another engine",
+            "openDashboard": "Open dashboard",
+            "next": "Next",
+            "back": "Back",
+            "cancel": "Cancel"
         },
         "hardware": {
             "title": "Hardware",
@@ -961,12 +967,32 @@
             "computeKey": "Compute key"
         },
         "engine": {
-            "title": "Engine: Whisper (OpenAI)",
             "installStatus": "Install status",
             "installedState": "Installed",
             "notInstalledState": "Not installed",
             "installDir": "Install dir",
             "noStatus": "No status yet."
+        },
+        "dashboard": {
+            "title": "Dashboard",
+            "installedEngines": "Installed engines",
+            "engineDescription": "Manage the selected worker, inspect status, and operate models.",
+            "emptySelection": "Select an installed engine to continue."
+        },
+        "wizard": {
+            "title": "Add engine wizard",
+            "steps": {
+                "hardware": "Hardware",
+                "engine": "Engine",
+                "install": "Install",
+                "complete": "Complete"
+            },
+            "hardwareDescription": "Review the detected hardware and continue with the recommended device, or switch later during engine setup.",
+            "engineDescription": "Choose an engine, install path, device, and initial model.",
+            "installDescription": "Installing {{engine}}. This may take a while depending on Python packages and model downloads.",
+            "completeTitle": "Engine installation complete",
+            "completeDescription": "{{engine}} is ready. You can return to the dashboard or continue adding another engine.",
+            "noAvailableEngines": "All currently supported local engines are already installed."
         },
         "status": {
             "details": "URL: {{url}} | model={{model}} | device={{device}}"
@@ -974,17 +1000,21 @@
         "install": {
             "locationTitle": "Install location",
             "browse": "Browse…",
-            "browseDialogTitle": "Choose Whisper install directory",
+            "browseDialogTitle": "Choose engine install directory",
             "locationHint": "Worker files will be written directly into this folder: venv/, models/, asr_worker/, worker_config.yaml.",
             "defaultBase": "Default worker base: {{path}}",
             "currentTarget": "Current target",
             "port": "Port",
             "initialModel": "Initial model",
+            "device": "Device",
+            "serverUrl": "Server URL",
+            "serverUrlPlaceholder": "http://127.0.0.1:5023",
             "useMirror": "Use China mirrors",
             "proxy": "Proxy (optional)",
             "proxyPlaceholder": "http://127.0.0.1:7890",
             "install": "Install",
             "installing": "Installing…",
+            "preparing": "Preparing installation…",
             "failed": "Install failed",
             "complete": "Install complete",
             "step": "Step {{current}} / {{total}}",

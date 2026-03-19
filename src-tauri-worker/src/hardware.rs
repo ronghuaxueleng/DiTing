@@ -107,9 +107,7 @@ fn detect_ram_gb() -> u32 {
     #[cfg(target_os = "windows")]
     {
         // Use windows-sys GlobalMemoryStatusEx
-        use windows_sys::Win32::System::SystemInformation::{
-            GlobalMemoryStatusEx, MEMORYSTATUSEX,
-        };
+        use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
         unsafe {
             let mut mem: MEMORYSTATUSEX = std::mem::zeroed();
             mem.dwLength = std::mem::size_of::<MEMORYSTATUSEX>() as u32;
@@ -120,9 +118,7 @@ fn detect_ram_gb() -> u32 {
     }
     #[cfg(target_os = "macos")]
     {
-        let output = Command::new("sysctl")
-            .args(["-n", "hw.memsize"])
-            .output();
+        let output = Command::new("sysctl").args(["-n", "hw.memsize"]).output();
         if let Ok(out) = output {
             if let Ok(bytes) = String::from_utf8_lossy(&out.stdout).trim().parse::<u64>() {
                 return (bytes / (1024 * 1024 * 1024)) as u32;

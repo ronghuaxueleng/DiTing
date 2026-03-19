@@ -1,5 +1,6 @@
-use crate::{constants, manager_state, paths, worker};
+use crate::{constants, hardware, manager_state, paths, worker};
 use serde::Serialize;
+use serde_json::json;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::process::Command;
@@ -25,18 +26,43 @@ struct InstallStep {
 }
 
 const INSTALL_STEPS: [InstallStep; 8] = [
-    InstallStep { key: "uv", label: "Prepare uv" },
-    InstallStep { key: "python", label: "Install Python" },
-    InstallStep { key: "venv", label: "Create virtualenv" },
-    InstallStep { key: "deps", label: "Install dependencies" },
-    InstallStep { key: "model", label: "Download model" },
-    InstallStep { key: "worker", label: "Copy worker files" },
-    InstallStep { key: "config", label: "Write configuration" },
-    InstallStep { key: "state", label: "Save manager state" },
+    InstallStep {
+        key: "uv",
+        label: "Prepare uv",
+    },
+    InstallStep {
+        key: "python",
+        label: "Install Python",
+    },
+    InstallStep {
+        key: "venv",
+        label: "Create virtualenv",
+    },
+    InstallStep {
+        key: "deps",
+        label: "Install dependencies",
+    },
+    InstallStep {
+        key: "model",
+        label: "Download model",
+    },
+    InstallStep {
+        key: "worker",
+        label: "Copy worker files",
+    },
+    InstallStep {
+        key: "config",
+        label: "Write configuration",
+    },
+    InstallStep {
+        key: "state",
+        label: "Save manager state",
+    },
 ];
 
 fn emit(
     app: &AppHandle,
+    engine_id: &str,
     step: InstallStep,
     step_index: usize,
     completed_steps: usize,
@@ -46,7 +72,7 @@ fn emit(
     error: Option<String>,
 ) {
     let payload = InstallProgressPayload {
-        engine_id: "whisper-openai".to_string(),
+        engine_id: engine_id.to_string(),
         step_key: step.key.to_string(),
         step_label: step.label.to_string(),
         step_index: (step_index + 1) as u8,
@@ -186,9 +212,12 @@ async fn ensure_uv_ready(app: &AppHandle) -> Result<(), String> {
     tokio::fs::create_dir_all(paths::uv_dir(app))
         .await
         .map_err(|e| e.to_string())?;
-    tokio::fs::copy(&source_uv, &dest_uv)
-        .await
-        .map_err(|e| format!("Failed to copy uv from {}: {e}", source_uv.to_string_lossy()))?;
+    tokio::fs::copy(&source_uv, &dest_uv).await.map_err(|e| {
+        format!(
+            "Failed to copy uv from {}: {e}",
+            source_uv.to_string_lossy()
+        )
+    })?;
 
     #[cfg(unix)]
     {
@@ -206,7 +235,36 @@ async fn ensure_uv_ready(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-async fn run_uv(app: &AppHandle, args: &[&str], envs: Vec<(&str, String)>) -> Result<(), String> {
+fn install_envs(use_mirror: bool, proxy: &str) -> Vec<(String, String)> {
+    let mut envs = Vec::new();
+
+    if use_mirror {
+        envs.push((
+            "UV_PYTHON_INSTALL_MIRROR".to_string(),
+            constants::MIRROR_UV_PYTHON.to_string(),
+        ));
+        envs.push((
+            "UV_INDEX_URL".to_string(),
+            constants::MIRROR_PYPI.to_string(),
+        ));
+        envs.push((
+            "HF_ENDPOINT".to_string(),
+            constants::MIRROR_HF_ENDPOINT.to_string(),
+        ));
+    }
+
+    let trimmed_proxy = proxy.trim();
+    if !trimmed_proxy.is_empty() {
+        let proxy_value = trimmed_proxy.to_string();
+        envs.push(("HTTP_PROXY".to_string(), proxy_value.clone()));
+        envs.push(("HTTPS_PROXY".to_string(), proxy_value.clone()));
+        envs.push(("ALL_PROXY".to_string(), proxy_value));
+    }
+
+    envs
+}
+
+async fn run_uv(app: &AppHandle, args: &[String], envs: &[(String, String)]) -> Result<(), String> {
     let uv = uv_path(app);
     if !uv.is_file() {
         return Err(format!("uv not found at {}", uv.to_string_lossy()));
@@ -228,6 +286,33 @@ async fn run_uv(app: &AppHandle, args: &[&str], envs: Vec<(&str, String)>) -> Re
         let stderr = String::from_utf8_lossy(&out.stderr);
         return Err(format!("uv failed: {}\n{}\n{}", out.status, stdout, stderr));
     }
+    Ok(())
+}
+
+async fn run_python_snippet(
+    python: &Path,
+    snippet: &str,
+    envs: &[(String, String)],
+) -> Result<(), String> {
+    let mut cmd = Command::new(python);
+    cmd.args(["-c", snippet]);
+
+    for (k, v) in envs {
+        if !v.is_empty() {
+            cmd.env(k, v);
+        }
+    }
+
+    let out = cmd.output().await.map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(format!(
+            "Python command failed: {}\n{}\n{}",
+            out.status,
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        ));
+    }
+
     Ok(())
 }
 
@@ -259,24 +344,154 @@ async fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn normalize_device(device: &str) -> String {
+    let trimmed = device.trim();
+    if trimmed.is_empty() {
+        "cpu".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn normalize_optional_string(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+async fn resolve_compute_key(device: &str, compute_key: &str) -> String {
+    let trimmed = compute_key.trim();
+    if !trimmed.is_empty() {
+        return trimmed.to_string();
+    }
+
+    if device == "mps" {
+        return "mps".to_string();
+    }
+
+    if device.starts_with("cuda") {
+        return hardware::detect()
+            .await
+            .map(|info| info.compute_key)
+            .unwrap_or_else(|_| "cpu".to_string());
+    }
+
+    "cpu".to_string()
+}
+
+fn resolve_model(engine_id: &str, model_id: &str) -> Result<&'static constants::ModelDef, String> {
+    let trimmed_model_id = model_id.trim();
+    if trimmed_model_id.is_empty() {
+        return constants::default_model_for_engine(engine_id)
+            .ok_or_else(|| format!("No default model configured for engine {engine_id}"));
+    }
+
+    constants::find_model(engine_id, trimmed_model_id)
+        .ok_or_else(|| format!("Unknown model {trimmed_model_id} for engine {engine_id}"))
+}
+
+async fn install_pytorch(
+    app: &AppHandle,
+    venv_dir: &Path,
+    compute_key: &str,
+    use_mirror: bool,
+    envs: &[(String, String)],
+) -> Result<(), String> {
+    let mut args = vec![
+        "pip".to_string(),
+        "install".to_string(),
+        "torch".to_string(),
+        "torchaudio".to_string(),
+        "--python".to_string(),
+        venv_dir.to_string_lossy().to_string(),
+    ];
+
+    if let Some(url) = constants::pytorch_index_url(compute_key, use_mirror) {
+        args.push("--index-url".to_string());
+        args.push(url.to_string());
+    }
+
+    run_uv(app, &args, envs).await
+}
+
+async fn install_engine_packages(
+    app: &AppHandle,
+    venv_dir: &Path,
+    engine: &constants::EngineDef,
+    envs: &[(String, String)],
+) -> Result<(), String> {
+    let mut args = vec!["pip".to_string(), "install".to_string()];
+    args.extend(
+        constants::BASE_PIP_PACKAGES
+            .iter()
+            .map(|pkg| pkg.to_string()),
+    );
+    args.extend(engine.pip_packages.iter().map(|pkg| pkg.to_string()));
+    args.push("--python".to_string());
+    args.push(venv_dir.to_string_lossy().to_string());
+
+    run_uv(app, &args, envs).await
+}
+
+async fn download_initial_model(
+    python: &Path,
+    model: &constants::ModelDef,
+    models_dir: &Path,
+    envs: &[(String, String)],
+) -> Result<(), String> {
+    let models_dir_str = models_dir.to_string_lossy().to_string();
+
+    let snippet = match model.engine_name {
+        "whisper" => format!(
+            "import whisper\nwhisper.load_model({:?}, download_root={:?})",
+            model.whisper_model_name.unwrap_or(model.model_id),
+            models_dir_str
+        ),
+        "sensevoice" => format!(
+            "import os\nos.environ['MODELSCOPE_CACHE'] = {:?}\nfrom modelscope import snapshot_download\nsnapshot_download({:?}, cache_dir={:?})\nsnapshot_download('iic/speech_fsmn_vad_zh-cn-16k-common-pytorch', cache_dir={:?})",
+            models_dir_str,
+            model.model_id,
+            models_dir_str,
+            models_dir_str
+        ),
+        other => return Err(format!("Initial model download is not implemented for engine {other}")),
+    };
+
+    run_python_snippet(python, &snippet, envs).await
+}
+
+fn build_models_config(model: &constants::ModelDef) -> serde_json::Value {
+    match model.engine_name {
+        "whisper" => json!({
+            "whisper": {
+                "model_name": model.whisper_model_name.unwrap_or(model.model_id),
+                "download_root": null
+            }
+        }),
+        "sensevoice" => json!({
+            "sensevoice": {
+                "model_id": model.model_id,
+                "vad_model": "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
+                "vad_max_segment_time": 30000,
+                "cache_dir": null
+            }
+        }),
+        _ => json!({}),
+    }
+}
+
 fn write_worker_config(
     worker_dir: &Path,
+    engine_name: &str,
     port: u16,
     device: &str,
     model_base_path: &Path,
-    model_name: &str,
+    server_url: Option<&str>,
+    model: &constants::ModelDef,
 ) -> Result<(), String> {
-    #[derive(Serialize)]
-    struct ModelsWhisper {
-        model_name: String,
-        download_root: Option<String>,
-    }
-
-    #[derive(Serialize)]
-    struct Models {
-        whisper: ModelsWhisper,
-    }
-
     #[derive(Serialize)]
     struct WorkerConfig {
         engine: String,
@@ -288,50 +503,59 @@ fn write_worker_config(
         shared_paths: Vec<String>,
         temp_upload_dir: String,
         model_base_path: String,
-        models: Models,
+        models: serde_json::Value,
     }
 
     let cfg = WorkerConfig {
-        engine: "whisper".to_string(),
+        engine: engine_name.to_string(),
         port,
         device: device.to_string(),
         max_concurrency: 1,
-        server_url: None,
+        server_url: server_url.map(|value| value.to_string()),
         advertise_url: None,
         shared_paths: vec![],
         temp_upload_dir: "temp_uploads".to_string(),
         model_base_path: paths::normalize_yaml_path(model_base_path),
-        models: Models {
-            whisper: ModelsWhisper {
-                model_name: model_name.to_string(),
-                download_root: None,
-            },
-        },
+        models: build_models_config(model),
     };
 
     let yaml = serde_yaml::to_string(&cfg).map_err(|e| e.to_string())?;
     let header = "# DiTing ASR Worker Configuration\n# Generated by DiTing Worker Manager\n\n";
-    std::fs::write(worker_dir.join("worker_config.yaml"), format!("{}{}", header, yaml))
-        .map_err(|e| e.to_string())?;
+    std::fs::write(
+        worker_dir.join("worker_config.yaml"),
+        format!("{}{}", header, yaml),
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
-pub async fn install_whisper_engine(
+pub async fn install_engine(
     app: &AppHandle,
+    engine_id: &str,
     port: u16,
     model_id: &str,
+    device: &str,
+    compute_key: &str,
     use_mirror: bool,
     proxy: &str,
+    server_url: &str,
     install_dir: &str,
 ) -> Result<(), String> {
-    let engine_id = "whisper-openai";
+    let engine =
+        constants::find_engine(engine_id).ok_or_else(|| format!("Unknown engine: {engine_id}"))?;
+    let model = resolve_model(engine_id, model_id)?;
+    let resolved_device = normalize_device(device);
+    let resolved_compute_key = resolve_compute_key(&resolved_device, compute_key).await;
+    let normalized_server_url = normalize_optional_string(server_url);
+
     let engine_dir = paths::resolve_engine_install_dir(app, engine_id, install_dir);
     let venv_dir = paths::engine_venv_dir_from_install_dir(&engine_dir);
     let models_dir = paths::engine_models_dir_from_install_dir(&engine_dir);
     let worker_dir = paths::engine_worker_src_dir_from_install_dir(&engine_dir);
-    let whisper_model_name = constants::find_model(model_id)
-        .map(|m| m.whisper_model_name)
-        .unwrap_or(model_id);
+    let install_envs = install_envs(use_mirror, proxy);
+
+    let mut current_step_index = 0usize;
+    let mut completed_steps = 0usize;
 
     let result: Result<(), String> = async {
         let _ = worker::stop_worker(app, engine_id).await;
@@ -343,38 +567,53 @@ pub async fn install_whisper_engine(
             .await
             .map_err(|e| e.to_string())?;
 
-        emit(app, INSTALL_STEPS[0], 0, 0, "Preparing uv...", &engine_dir, false, None);
-        ensure_uv_ready(app).await?;
-
-        let mut envs: Vec<(&str, String)> = vec![];
-        if use_mirror {
-            envs.push(("UV_PYTHON_INSTALL_MIRROR", constants::MIRROR_UV_PYTHON.to_string()));
-            envs.push(("UV_INDEX_URL", constants::MIRROR_PYPI.to_string()));
-            envs.push(("HF_ENDPOINT", constants::MIRROR_HF_ENDPOINT.to_string()));
-        }
-        if !proxy.is_empty() {
-            envs.push(("HTTP_PROXY", proxy.to_string()));
-            envs.push(("HTTPS_PROXY", proxy.to_string()));
-            envs.push(("ALL_PROXY", proxy.to_string()));
-        }
-
+        current_step_index = 0;
+        completed_steps = 0;
         emit(
             app,
-            INSTALL_STEPS[1],
-            1,
-            1,
-            "Installing Python 3.11 via uv...",
+            engine_id,
+            INSTALL_STEPS[0],
+            current_step_index,
+            completed_steps,
+            "Preparing uv...",
             &engine_dir,
             false,
             None,
         );
-        run_uv(app, &["python", "install", constants::PYTHON_VERSION], envs.clone()).await?;
+        ensure_uv_ready(app).await?;
 
+        current_step_index = 1;
+        completed_steps = 1;
         emit(
             app,
+            engine_id,
+            INSTALL_STEPS[1],
+            current_step_index,
+            completed_steps,
+            &format!("Installing Python {} via uv...", constants::PYTHON_VERSION),
+            &engine_dir,
+            false,
+            None,
+        );
+        run_uv(
+            app,
+            &[
+                "python".to_string(),
+                "install".to_string(),
+                constants::PYTHON_VERSION.to_string(),
+            ],
+            &install_envs,
+        )
+        .await?;
+
+        current_step_index = 2;
+        completed_steps = 2;
+        emit(
+            app,
+            engine_id,
             INSTALL_STEPS[2],
-            2,
-            2,
+            current_step_index,
+            completed_steps,
             "Creating virtualenv...",
             &engine_dir,
             false,
@@ -383,113 +622,65 @@ pub async fn install_whisper_engine(
         run_uv(
             app,
             &[
-                "venv",
-                venv_dir.to_string_lossy().as_ref(),
-                "--python",
-                constants::PYTHON_VERSION,
+                "venv".to_string(),
+                venv_dir.to_string_lossy().to_string(),
+                "--python".to_string(),
+                constants::PYTHON_VERSION.to_string(),
             ],
-            envs.clone(),
+            &install_envs,
         )
         .await?;
 
+        current_step_index = 3;
+        completed_steps = 3;
         emit(
             app,
+            engine_id,
             INSTALL_STEPS[3],
-            3,
-            3,
-            "Installing dependencies (torch + whisper + fastapi)...",
+            current_step_index,
+            completed_steps,
+            &format!(
+                "Installing dependencies (torch + {})...",
+                engine.display_name
+            ),
             &engine_dir,
             false,
             None,
         );
-        if let Some(url) = constants::pytorch_index_url("cpu", use_mirror) {
-            run_uv(
-                app,
-                &[
-                    "pip",
-                    "install",
-                    "torch",
-                    "torchaudio",
-                    "--python",
-                    venv_dir.to_string_lossy().as_ref(),
-                    "--index-url",
-                    url,
-                ],
-                envs.clone(),
-            )
-            .await?;
-        } else {
-            run_uv(
-                app,
-                &[
-                    "pip",
-                    "install",
-                    "torch",
-                    "torchaudio",
-                    "--python",
-                    venv_dir.to_string_lossy().as_ref(),
-                ],
-                envs.clone(),
-            )
-            .await?;
-        }
-
-        run_uv(
+        install_pytorch(
             app,
-            &[
-                "pip",
-                "install",
-                "openai-whisper>=20250625",
-                "fastapi>=0.128.0",
-                "uvicorn>=0.40.0",
-                "python-multipart>=0.0.21",
-                "pyyaml",
-                "numpy",
-                "pydantic>=2",
-                "starlette>=0.47.0",
-                "httpx>=0.28.0",
-                "--python",
-                venv_dir.to_string_lossy().as_ref(),
-            ],
-            envs.clone(),
+            &venv_dir,
+            &resolved_compute_key,
+            use_mirror,
+            &install_envs,
         )
         .await?;
+        install_engine_packages(app, &venv_dir, engine, &install_envs).await?;
 
+        current_step_index = 4;
+        completed_steps = 4;
         emit(
             app,
+            engine_id,
             INSTALL_STEPS[4],
-            4,
-            4,
-            "Downloading whisper model...",
+            current_step_index,
+            completed_steps,
+            &format!("Downloading initial model: {}...", model.display_name),
             &engine_dir,
             false,
             None,
         );
         let venv_python = constants::venv_python(&venv_dir);
-        let snippet = format!(
-            "import whisper; whisper.load_model('{}', download_root=r'{}')",
-            whisper_model_name,
-            models_dir.to_string_lossy()
-        );
-        let out = Command::new(&venv_python)
-            .args(["-c", &snippet])
-            .output()
-            .await
-            .map_err(|e| e.to_string())?;
-        if !out.status.success() {
-            return Err(format!(
-                "model download failed: {}\n{}\n{}",
-                out.status,
-                String::from_utf8_lossy(&out.stdout),
-                String::from_utf8_lossy(&out.stderr)
-            ));
-        }
+        download_initial_model(&venv_python, model, &models_dir, &install_envs).await?;
 
+        current_step_index = 5;
+        completed_steps = 5;
         emit(
             app,
+            engine_id,
             INSTALL_STEPS[5],
-            5,
-            5,
+            current_step_index,
+            completed_steps,
             "Copying asr_worker sources...",
             &engine_dir,
             false,
@@ -501,23 +692,37 @@ pub async fn install_whisper_engine(
         }
         copy_dir_recursive(&worker_source, &worker_dir).await?;
 
+        current_step_index = 6;
+        completed_steps = 6;
         emit(
             app,
+            engine_id,
             INSTALL_STEPS[6],
-            6,
-            6,
+            current_step_index,
+            completed_steps,
             "Writing worker_config.yaml...",
             &engine_dir,
             false,
             None,
         );
-        write_worker_config(&worker_dir, port, "cpu", &models_dir, whisper_model_name)?;
+        write_worker_config(
+            &worker_dir,
+            engine.engine_name,
+            port,
+            &resolved_device,
+            &models_dir,
+            normalized_server_url.as_deref(),
+            model,
+        )?;
 
+        current_step_index = 7;
+        completed_steps = 7;
         emit(
             app,
+            engine_id,
             INSTALL_STEPS[7],
-            7,
-            7,
+            current_step_index,
+            completed_steps,
             "Saving manager state...",
             &engine_dir,
             false,
@@ -528,17 +733,22 @@ pub async fn install_whisper_engine(
             engine_id.to_string(),
             manager_state::EngineInfo {
                 engine_id: engine_id.to_string(),
-                display_name: "Whisper (OpenAI)".to_string(),
+                display_name: engine.display_name.to_string(),
                 install_dir: engine_dir.to_string_lossy().to_string(),
                 port,
                 installed_at: manager_state::now_iso(),
                 last_started: None,
+                engine_name: engine.engine_name.to_string(),
+                device: resolved_device.clone(),
+                server_url: normalized_server_url.clone(),
+                initial_model_id: Some(model.id.to_string()),
             },
         );
         manager_state::save_state(app, &state).await?;
 
         emit(
             app,
+            engine_id,
             INSTALL_STEPS[7],
             7,
             INSTALL_STEPS.len(),
@@ -552,21 +762,11 @@ pub async fn install_whisper_engine(
     .await;
 
     if let Err(error) = &result {
-        let (step, step_index, completed_steps) = match INSTALL_STEPS.last() {
-            Some(step) => (*step, INSTALL_STEPS.len() - 1, 0),
-            None => (
-                InstallStep {
-                    key: "failed",
-                    label: "Install failed",
-                },
-                0,
-                0,
-            ),
-        };
         emit(
             app,
-            step,
-            step_index,
+            engine_id,
+            INSTALL_STEPS[current_step_index],
+            current_step_index,
             completed_steps,
             error,
             &engine_dir,
@@ -576,6 +776,29 @@ pub async fn install_whisper_engine(
     }
 
     result
+}
+
+pub async fn install_whisper_engine(
+    app: &AppHandle,
+    port: u16,
+    model_id: &str,
+    use_mirror: bool,
+    proxy: &str,
+    install_dir: &str,
+) -> Result<(), String> {
+    install_engine(
+        app,
+        "whisper-openai",
+        port,
+        model_id,
+        "cpu",
+        "cpu",
+        use_mirror,
+        proxy,
+        "",
+        install_dir,
+    )
+    .await
 }
 
 pub async fn uninstall_engine(app: &AppHandle, engine_id: &str) -> Result<(), String> {

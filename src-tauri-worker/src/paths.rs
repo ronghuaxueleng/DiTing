@@ -4,10 +4,12 @@ use tauri::AppHandle;
 pub fn default_install_dir() -> PathBuf {
     // match worker_manager/constants.py
     if cfg!(target_os = "windows") {
-        dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
             .join("DiTing-Worker")
     } else {
-        dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
             .join(".diting-worker")
     }
 }
@@ -59,9 +61,15 @@ pub async fn ensure_base_dirs(app: &AppHandle) -> Result<(), String> {
     let base = base_dir(app);
     let engines = engines_dir(app);
     let uv = uv_dir(app);
-    tokio::fs::create_dir_all(&base).await.map_err(|e| e.to_string())?;
-    tokio::fs::create_dir_all(&engines).await.map_err(|e| e.to_string())?;
-    tokio::fs::create_dir_all(&uv).await.map_err(|e| e.to_string())?;
+    tokio::fs::create_dir_all(&base)
+        .await
+        .map_err(|e| e.to_string())?;
+    tokio::fs::create_dir_all(&engines)
+        .await
+        .map_err(|e| e.to_string())?;
+    tokio::fs::create_dir_all(&uv)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
