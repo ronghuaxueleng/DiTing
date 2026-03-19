@@ -937,5 +937,122 @@
         "deleteCategoryConfirm": "确定要删除分类 \"{{name}}\" 吗？",
         "deleteCategoryAndClean": "删除分类并清理",
         "selectWarning": "请选择要覆盖的版本"
+    },
+    "workerManager": {
+        "title": "DiTing Worker Manager",
+        "subtitle": "Whisper 优先 MVP（CPU）",
+        "language": {
+            "zh": "中文",
+            "en": "EN"
+        },
+        "common": {
+            "yes": "是",
+            "no": "否",
+            "na": "n/a",
+            "notSet": "未设置"
+        },
+        "actions": {
+            "refresh": "刷新",
+            "start": "启动",
+            "starting": "启动中…",
+            "stop": "停止",
+            "stopping": "停止中…",
+            "check": "检查",
+            "checking": "检查中…",
+            "unloadModel": "卸载模型",
+            "unloading": "卸载中…",
+            "uninstall": "卸载引擎",
+            "uninstalling": "卸载中…"
+        },
+        "hardware": {
+            "title": "硬件信息",
+            "detecting": "检测中…",
+            "cpu": "CPU",
+            "ram": "内存",
+            "cuda": "CUDA",
+            "mps": "MPS",
+            "recommended": "推荐设备",
+            "computeKey": "计算类型"
+        },
+        "engine": {
+            "title": "引擎：Whisper（OpenAI）",
+            "installStatus": "安装状态",
+            "installedState": "已安装",
+            "notInstalledState": "未安装",
+            "installDir": "安装目录",
+            "noStatus": "暂无状态。"
+        },
+        "status": {
+            "details": "URL：{{url}} | model={{model}} | device={{device}}"
+        },
+        "install": {
+            "locationTitle": "安装位置",
+            "browse": "选择目录…",
+            "browseDialogTitle": "选择 Whisper 安装目录",
+            "locationHint": "Worker 文件会直接写入此目录：venv/、models/、asr_worker/、worker_config.yaml。",
+            "defaultBase": "默认 worker 根目录：{{path}}",
+            "currentTarget": "当前目标目录",
+            "port": "端口",
+            "initialModel": "初始模型",
+            "useMirror": "使用国内镜像",
+            "proxy": "代理（可选）",
+            "proxyPlaceholder": "http://127.0.0.1:7890",
+            "install": "安装",
+            "installing": "安装中…",
+            "failed": "安装失败",
+            "complete": "安装完成",
+            "step": "步骤 {{current}} / {{total}}",
+            "targetDirectory": "目标目录：{{path}}",
+            "steps": {
+                "uv": "准备 uv",
+                "python": "安装 Python",
+                "venv": "创建虚拟环境",
+                "deps": "安装依赖",
+                "model": "下载模型",
+                "worker": "复制 worker 文件",
+                "config": "写入配置",
+                "state": "保存管理状态",
+                "failed": "安装失败"
+            }
+        },
+        "modelManagement": {
+            "title": "模型管理",
+            "summary": "已安装 {{installed}} / {{total}} 个模型",
+            "refresh": "刷新模型",
+            "refreshing": "刷新中…",
+            "collapse": "折叠",
+            "expand": "展开",
+            "startWorkerHint": "请先启动 worker，再管理模型。",
+            "noManagementHint": "当前 worker 还未报告管理 API 支持。",
+            "operation": "操作：{{type}}（{{status}}）",
+            "idMeta": "id={{id}}",
+            "sizeMeta": "大小≈{{size}}MB",
+            "accuracy": "准确度",
+            "accuracyAriaLabel": "准确度 {{value}} 星（满分 5 星）",
+            "speed": "速度",
+            "speedAriaLabel": "速度 {{value}} 级（满分 5 级）",
+            "installed": "已安装",
+            "active": "当前激活",
+            "notCompatible": "不兼容",
+            "download": "下载",
+            "downloading": "下载中…",
+            "activate": "激活",
+            "activating": "激活中…",
+            "delete": "删除",
+            "deleting": "删除中…",
+            "empty": "暂无可用模型。",
+            "messages": {
+                "pollingFailed": "轮询操作状态失败：{{error}}",
+                "downloading": "正在下载 {{modelId}}...",
+                "downloadFailed": "下载失败：{{error}}",
+                "activating": "正在激活 {{modelId}}...",
+                "activateFailed": "激活失败：{{error}}",
+                "deleted": "已删除 {{modelId}}。",
+                "deleteFailed": "删除失败：{{error}}",
+                "unloaded": "模型已卸载。",
+                "unloadFailed": "卸载失败：{{error}}"
+            }
+        },
+        "footer": "开发环境下会从 src-tauri-worker/resources/uv 解析 bundled uv，运行时则使用打包后的资源。"
     }
 }

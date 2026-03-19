@@ -923,5 +923,122 @@
         "deleteCategoryConfirm": "Are you sure you want to delete category \"{{name}}\"?",
         "deleteCategoryAndClean": "Delete Category & Clean",
         "selectWarning": "Please select a version to overwrite"
+    },
+    "workerManager": {
+        "title": "DiTing Worker Manager",
+        "subtitle": "Whisper-first MVP (CPU)",
+        "language": {
+            "zh": "中文",
+            "en": "EN"
+        },
+        "common": {
+            "yes": "Yes",
+            "no": "No",
+            "na": "n/a",
+            "notSet": "Not set"
+        },
+        "actions": {
+            "refresh": "Refresh",
+            "start": "Start",
+            "starting": "Starting…",
+            "stop": "Stop",
+            "stopping": "Stopping…",
+            "check": "Check",
+            "checking": "Checking…",
+            "unloadModel": "Unload model",
+            "unloading": "Unloading…",
+            "uninstall": "Uninstall",
+            "uninstalling": "Uninstalling…"
+        },
+        "hardware": {
+            "title": "Hardware",
+            "detecting": "Detecting…",
+            "cpu": "CPU",
+            "ram": "RAM",
+            "cuda": "CUDA",
+            "mps": "MPS",
+            "recommended": "Recommended",
+            "computeKey": "Compute key"
+        },
+        "engine": {
+            "title": "Engine: Whisper (OpenAI)",
+            "installStatus": "Install status",
+            "installedState": "Installed",
+            "notInstalledState": "Not installed",
+            "installDir": "Install dir",
+            "noStatus": "No status yet."
+        },
+        "status": {
+            "details": "URL: {{url}} | model={{model}} | device={{device}}"
+        },
+        "install": {
+            "locationTitle": "Install location",
+            "browse": "Browse…",
+            "browseDialogTitle": "Choose Whisper install directory",
+            "locationHint": "Worker files will be written directly into this folder: venv/, models/, asr_worker/, worker_config.yaml.",
+            "defaultBase": "Default worker base: {{path}}",
+            "currentTarget": "Current target",
+            "port": "Port",
+            "initialModel": "Initial model",
+            "useMirror": "Use China mirrors",
+            "proxy": "Proxy (optional)",
+            "proxyPlaceholder": "http://127.0.0.1:7890",
+            "install": "Install",
+            "installing": "Installing…",
+            "failed": "Install failed",
+            "complete": "Install complete",
+            "step": "Step {{current}} / {{total}}",
+            "targetDirectory": "Target directory: {{path}}",
+            "steps": {
+                "uv": "Prepare uv",
+                "python": "Install Python",
+                "venv": "Create virtualenv",
+                "deps": "Install dependencies",
+                "model": "Download model",
+                "worker": "Copy worker files",
+                "config": "Write configuration",
+                "state": "Save manager state",
+                "failed": "Install failed"
+            }
+        },
+        "modelManagement": {
+            "title": "Model management",
+            "summary": "{{installed}} / {{total}} models installed",
+            "refresh": "Refresh models",
+            "refreshing": "Refreshing…",
+            "collapse": "Collapse",
+            "expand": "Expand",
+            "startWorkerHint": "Start the worker to manage models.",
+            "noManagementHint": "This worker did not report management API support yet.",
+            "operation": "Operation: {{type}} ({{status}})",
+            "idMeta": "id={{id}}",
+            "sizeMeta": "size≈{{size}}MB",
+            "accuracy": "Accuracy",
+            "accuracyAriaLabel": "Accuracy {{value}} stars out of 5",
+            "speed": "Speed",
+            "speedAriaLabel": "Speed {{value}} bars out of 5",
+            "installed": "Installed",
+            "active": "Active",
+            "notCompatible": "Not compatible",
+            "download": "Download",
+            "downloading": "Downloading…",
+            "activate": "Activate",
+            "activating": "Activating…",
+            "delete": "Delete",
+            "deleting": "Deleting…",
+            "empty": "No models available.",
+            "messages": {
+                "pollingFailed": "Operation polling failed: {{error}}",
+                "downloading": "Downloading {{modelId}}...",
+                "downloadFailed": "Download failed: {{error}}",
+                "activating": "Activating {{modelId}}...",
+                "activateFailed": "Activate failed: {{error}}",
+                "deleted": "Deleted {{modelId}}.",
+                "deleteFailed": "Delete failed: {{error}}",
+                "unloaded": "Model unloaded.",
+                "unloadFailed": "Unload failed: {{error}}"
+            }
+        },
+        "footer": "Bundled uv is resolved from src-tauri-worker/resources/uv during development and packaged resources at runtime."
     }
 }

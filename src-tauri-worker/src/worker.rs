@@ -263,6 +263,13 @@ fn worker_base_url(port: u16) -> String {
     format!("http://127.0.0.1:{}", port)
 }
 
+fn management_engine_name(engine_id: &str) -> &str {
+    match engine_id {
+        "whisper-openai" => "whisper",
+        other => other,
+    }
+}
+
 async fn management_request<T: serde::de::DeserializeOwned>(
     app: &AppHandle,
     engine_id: &str,
@@ -297,7 +304,35 @@ async fn management_request<T: serde::de::DeserializeOwned>(
 }
 
 pub async fn list_models(app: &AppHandle, engine_id: &str) -> Result<WorkerModelsResponse, String> {
-    management_request(app, engine_id, Method::GET, "/models", None).await
+    let response: WorkerModelsResponse = management_request(app, engine_id, Method::GET, "/models", None).await?;
+    let expected_engine = management_engine_name(engine_id);
+    let models: Vec<WorkerManagedModel> = response
+        .models
+        .into_iter()
+        .filter(|model| model.engine == expected_engine)
+        .collect();
+    let active_model_id = response
+        .active_model_id
+        .filter(|active_id| models.iter().any(|model| model.id == *active_id));
+
+    Ok(WorkerModelsResponse {
+        active_model_id,
+        models,
+    })
+}
+
+async fn ensure_model_matches_engine(app: &AppHandle, engine_id: &str, model_id: &str) -> Result<(), String> {
+    let response: WorkerModelsResponse = management_request(app, engine_id, Method::GET, "/models", None).await?;
+    let expected_engine = management_engine_name(engine_id);
+
+    match response.models.into_iter().find(|model| model.id == model_id) {
+        Some(model) if model.engine == expected_engine => Ok(()),
+        Some(model) => Err(format!(
+            "Model {model_id} belongs to engine {}, not {}",
+            model.engine, expected_engine
+        )),
+        None => Err(format!("Unknown model: {model_id}")),
+    }
 }
 
 pub async fn download_model(
@@ -307,6 +342,7 @@ pub async fn download_model(
     use_mirror: bool,
     proxy: &str,
 ) -> Result<WorkerOperationResponse, String> {
+    ensure_model_matches_engine(app, engine_id, model_id).await?;
     management_request(
         app,
         engine_id,
@@ -325,6 +361,7 @@ pub async fn activate_model(
     engine_id: &str,
     model_id: &str,
 ) -> Result<WorkerOperationResponse, String> {
+    ensure_model_matches_engine(app, engine_id, model_id).await?;
     management_request(
         app,
         engine_id,
@@ -340,6 +377,7 @@ pub async fn delete_model(
     engine_id: &str,
     model_id: &str,
 ) -> Result<Value, String> {
+    ensure_model_matches_engine(app, engine_id, model_id).await?;
     management_request(
         app,
         engine_id,

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
+import { useTranslation } from 'react-i18next'
 
 type HardwareInfo = {
     cpu_name: string
@@ -55,6 +56,14 @@ type InstallProgressPayload = {
     message: string
     install_dir: string
     done: boolean
+    error?: string | null
+}
+
+type InstallLogEntry = {
+    step_key: string
+    step_index: number
+    step_total: number
+    message: string
     error?: string | null
 }
 
@@ -132,13 +141,14 @@ const dangerOutlineButtonStyle = {
 }
 
 export default function WorkerManagerApp() {
+    const { t, i18n } = useTranslation()
     const [hardware, setHardware] = useState<HardwareInfo | null>(null)
     const [state, setState] = useState<ManagerState | null>(null)
     const [installPathInfo, setInstallPathInfo] = useState<InstallPathInfo | null>(null)
     const [installing, setInstalling] = useState(false)
     const [installDir, setInstallDir] = useState('')
     const [installProgress, setInstallProgress] = useState<InstallProgressPayload | null>(null)
-    const [installLog, setInstallLog] = useState<string[]>([])
+    const [installLog, setInstallLog] = useState<InstallLogEntry[]>([])
     const [modelId, setModelId] = useState('tiny')
     const [useMirror, setUseMirror] = useState(false)
     const [proxy, setProxy] = useState('')
@@ -151,6 +161,7 @@ export default function WorkerManagerApp() {
     const [operationStatus, setOperationStatus] = useState<WorkerOperationStatus | null>(null)
     const [operationPolling, setOperationPolling] = useState<string | null>(null)
     const [actionPending, setActionPending] = useState<string | null>(null)
+    const [modelsExpanded, setModelsExpanded] = useState(true)
 
     const engineId = 'whisper-openai'
     const installedEngine = state?.engines?.[engineId] ?? null
@@ -170,7 +181,104 @@ export default function WorkerManagerApp() {
         return Math.max(0, Math.min(100, Math.round((installProgress.step_index / installProgress.step_total) * 100)))
     }, [installProgress])
 
+    const installStepLabel = useMemo(() => {
+        if (!installProgress) {
+            return ''
+        }
+        return t(`workerManager.install.steps.${installProgress.step_key}`, {
+            defaultValue: installProgress.step_label,
+        })
+    }, [installProgress, t, i18n.language])
+
+    const installLogText = useMemo(() => {
+        return installLog
+            .map((entry) => {
+                const stepLabel = t(`workerManager.install.steps.${entry.step_key}`, {
+                    defaultValue: entry.step_key,
+                })
+                const prefix = `[${entry.step_index}/${entry.step_total}] ${stepLabel}`
+                const suffix = entry.error ? ` ${t('common.error')}: ${entry.error}` : ''
+                return `${prefix}: ${entry.message}${suffix}`
+            })
+            .join('\n')
+    }, [installLog, t, i18n.language])
+
+    const installedModelCount = useMemo(() => models.filter((model) => model.installed).length, [models])
+    const currentLanguage = i18n.resolvedLanguage || i18n.language || 'zh'
     const hasBusyOperation = !!operationPolling || !!actionPending
+
+    const yesNoLabel = (value: boolean) => (value ? 'Yes' : 'No')
+
+    function renderStars(value: number) {
+        const count = Math.max(0, Math.min(5, Math.round(value)))
+        return (
+            <span
+                className="inline-flex items-center gap-0.5"
+                aria-label={t('workerManager.modelManagement.accuracyAriaLabel', { value: count })}
+            >
+                {Array.from({ length: 5 }, (_, index) => (
+                    <span
+                        key={index}
+                        style={{ color: index < count ? '#f59e0b' : 'var(--color-text-muted)' }}
+                    >
+                        {index < count ? '★' : '☆'}
+                    </span>
+                ))}
+            </span>
+        )
+    }
+
+    function renderSpeedBars(value: number) {
+        const count = Math.max(0, Math.min(5, Math.round(value)))
+        const heights = ['0.5rem', '0.65rem', '0.8rem', '0.95rem', '1.1rem']
+
+        return (
+            <span
+                className="inline-flex items-end gap-0.5"
+                aria-label={t('workerManager.modelManagement.speedAriaLabel', { value: count })}
+            >
+                {heights.map((height, index) => (
+                    <span
+                        key={index}
+                        className="w-1 rounded-sm"
+                        style={{
+                            height,
+                            background: index < count ? 'var(--color-primary)' : 'rgba(148, 163, 184, 0.35)',
+                        }}
+                    />
+                ))}
+            </span>
+        )
+    }
+
+    function renderBooleanBadge(label: string, value: boolean) {
+        return (
+            <span
+                className="px-2.5 py-1 rounded-full border inline-flex items-center gap-1.5 text-xs"
+                style={
+                    value
+                        ? {
+                              borderColor: 'rgba(16,185,129,0.28)',
+                              background: 'rgba(16,185,129,0.10)',
+                              color: 'var(--color-success)',
+                          }
+                        : {
+                              borderColor: 'rgba(148,163,184,0.28)',
+                              background: 'rgba(148,163,184,0.10)',
+                              color: 'var(--color-text-muted)',
+                          }
+                }
+            >
+                <span>{label}</span>
+                <span>{yesNoLabel(value)}</span>
+            </span>
+        )
+    }
+
+    async function changeLanguage(language: 'zh' | 'en') {
+        await i18n.changeLanguage(language)
+        localStorage.setItem('language', language)
+    }
 
     async function refreshState() {
         const s = await invoke<ManagerState>('get_manager_state')
@@ -212,12 +320,12 @@ export default function WorkerManagerApp() {
     }
 
     useEffect(() => {
+        document.title = t('workerManager.title')
+    }, [t, i18n.language])
+
+    useEffect(() => {
         void (async () => {
-            const [hw] = await Promise.all([
-                invoke<HardwareInfo>('detect_hardware'),
-                refreshState(),
-                refreshInstallPathInfo(),
-            ])
+            const [hw] = await Promise.all([invoke<HardwareInfo>('detect_hardware'), refreshState(), refreshInstallPathInfo()])
             setHardware(hw)
         })()
     }, [])
@@ -277,26 +385,35 @@ export default function WorkerManagerApp() {
                     setOperationStatus(null)
                     setOperationPolling(null)
                     setActionPending(null)
-                    setModelActionMessage(`Operation polling failed: ${String(e)}`)
+                    setModelActionMessage(
+                        t('workerManager.modelManagement.messages.pollingFailed', { error: String(e) }),
+                    )
                     window.clearInterval(timer)
                 }
             })()
         }, 1000)
 
         return () => window.clearInterval(timer)
-    }, [operationPolling])
+    }, [operationPolling, t, i18n.language])
 
     useEffect(() => {
         let unlisten: null | (() => void) = null
         void (async () => {
             const u = await listen<InstallProgressPayload>('install-progress', (e) => {
                 const payload = e.payload
-                const prefix = `[${payload.step_index}/${payload.step_total}] ${payload.step_label}`
-                const suffix = payload.error ? ` ERROR: ${payload.error}` : ''
 
                 setInstallProgress(payload)
                 setInstallDir(payload.install_dir)
-                setInstallLog((prev) => [...prev, `${prefix}: ${payload.message}${suffix}`])
+                setInstallLog((prev) => [
+                    ...prev,
+                    {
+                        step_key: payload.step_key,
+                        step_index: payload.step_index,
+                        step_total: payload.step_total,
+                        message: payload.message,
+                        error: payload.error,
+                    },
+                ])
 
                 if (payload.done) {
                     setInstalling(false)
@@ -316,7 +433,7 @@ export default function WorkerManagerApp() {
         const selected = await open({
             directory: true,
             multiple: false,
-            title: 'Choose Whisper install directory',
+            title: t('workerManager.install.browseDialogTitle'),
             defaultPath: effectiveInstallDir || installPathInfo?.default_base_install_dir,
         })
         const path = Array.isArray(selected) ? selected[0] : selected
@@ -345,7 +462,7 @@ export default function WorkerManagerApp() {
                 prev ?? {
                     engine_id: engineId,
                     step_key: 'failed',
-                    step_label: 'Installation failed',
+                    step_label: t('workerManager.install.failed'),
                     step_index: 1,
                     step_total: 1,
                     completed_steps: 0,
@@ -355,7 +472,16 @@ export default function WorkerManagerApp() {
                     error: message,
                 },
             )
-            setInstallLog((prev) => [...prev, `ERROR: ${message}`])
+            setInstallLog((prev) => [
+                ...prev,
+                {
+                    step_key: 'failed',
+                    step_index: 1,
+                    step_total: 1,
+                    message,
+                    error: message,
+                },
+            ])
         }
     }
 
@@ -432,10 +558,15 @@ export default function WorkerManagerApp() {
                 useMirror,
                 proxy,
             })
-            await trackOperation(response, `Downloading ${managedModelId}...`)
+            await trackOperation(
+                response,
+                t('workerManager.modelManagement.messages.downloading', { modelId: managedModelId }),
+            )
         } catch (e) {
             setActionPending(null)
-            setModelActionMessage(`Download failed: ${String(e)}`)
+            setModelActionMessage(
+                t('workerManager.modelManagement.messages.downloadFailed', { error: String(e) }),
+            )
         }
     }
 
@@ -446,10 +577,15 @@ export default function WorkerManagerApp() {
                 engineId,
                 modelId: managedModelId,
             })
-            await trackOperation(response, `Activating ${managedModelId}...`)
+            await trackOperation(
+                response,
+                t('workerManager.modelManagement.messages.activating', { modelId: managedModelId }),
+            )
         } catch (e) {
             setActionPending(null)
-            setModelActionMessage(`Activate failed: ${String(e)}`)
+            setModelActionMessage(
+                t('workerManager.modelManagement.messages.activateFailed', { error: String(e) }),
+            )
         }
     }
 
@@ -460,11 +596,11 @@ export default function WorkerManagerApp() {
                 engineId,
                 modelId: managedModelId,
             })
-            setModelActionMessage(`Deleted ${managedModelId}.`)
+            setModelActionMessage(t('workerManager.modelManagement.messages.deleted', { modelId: managedModelId }))
             void refreshWorkerStatus()
             void refreshModels()
         } catch (e) {
-            setModelActionMessage(`Delete failed: ${String(e)}`)
+            setModelActionMessage(t('workerManager.modelManagement.messages.deleteFailed', { error: String(e) }))
         } finally {
             setActionPending(null)
         }
@@ -474,11 +610,11 @@ export default function WorkerManagerApp() {
         setActionPending('unload')
         try {
             await invoke('unload_worker_model', { engineId })
-            setModelActionMessage('Model unloaded.')
+            setModelActionMessage(t('workerManager.modelManagement.messages.unloaded'))
             void refreshWorkerStatus()
             void refreshModels()
         } catch (e) {
-            setModelActionMessage(`Unload failed: ${String(e)}`)
+            setModelActionMessage(t('workerManager.modelManagement.messages.unloadFailed', { error: String(e) }))
         } finally {
             setActionPending(null)
         }
@@ -487,55 +623,101 @@ export default function WorkerManagerApp() {
     return (
         <div className="min-h-screen p-6" style={{ background: 'var(--color-bg)', color: 'var(--color-text)' }}>
             <div className="max-w-5xl mx-auto flex flex-col gap-4">
-                <header className="flex items-center justify-between">
+                <header className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
-                        <h1 className="text-xl font-semibold">DiTing Worker Manager</h1>
+                        <h1 className="text-xl font-semibold">{t('workerManager.title')}</h1>
                         <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                            Whisper-first MVP (CPU)
+                            {t('workerManager.subtitle')}
                         </p>
                     </div>
-                    <button
-                        className={buttonBaseClass}
-                        style={secondaryButtonStyle}
-                        onClick={refreshState}
-                    >
-                        Refresh
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <div
+                            className="inline-flex rounded-md overflow-hidden border"
+                            style={{ borderColor: 'var(--color-border)', background: 'var(--color-card)' }}
+                        >
+                            {(['zh', 'en'] as const).map((language) => {
+                                const active = currentLanguage === language
+                                return (
+                                    <button
+                                        key={language}
+                                        className="px-3 py-1.5 text-sm transition-colors"
+                                        style={
+                                            active
+                                                ? {
+                                                      background: 'var(--color-primary)',
+                                                      color: 'white',
+                                                  }
+                                                : {
+                                                      background: 'transparent',
+                                                      color: 'var(--color-text)',
+                                                  }
+                                        }
+                                        onClick={() => void changeLanguage(language)}
+                                    >
+                                        {t(`workerManager.language.${language}`)}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                        <button
+                            className={buttonBaseClass}
+                            style={secondaryButtonStyle}
+                            onClick={() => void refreshState()}
+                        >
+                            {t('workerManager.actions.refresh')}
+                        </button>
+                    </div>
                 </header>
 
-                <section className="rounded-lg border p-4" style={{ borderColor: 'var(--color-border)', background: 'var(--color-card)' }}>
-                    <h2 className="font-semibold">Hardware</h2>
+                <section
+                    className="rounded-lg border p-4"
+                    style={{ borderColor: 'var(--color-border)', background: 'var(--color-card)' }}
+                >
+                    <h2 className="font-semibold">{t('workerManager.hardware.title')}</h2>
                     {!hardware ? (
                         <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                            Detecting...
+                            {t('workerManager.hardware.detecting')}
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 gap-2 text-sm mt-2">
                             <div>
-                                CPU: {hardware.cpu_name} ({hardware.cpu_cores} cores)
+                                {t('workerManager.hardware.cpu')}: {hardware.cpu_name} ({hardware.cpu_cores} cores)
                             </div>
-                            <div>RAM: {hardware.ram_gb} GB</div>
                             <div>
-                                CUDA: {hardware.has_cuda ? 'Yes' : 'No'}{' '}
-                                {hardware.gpu_name ? `(${hardware.gpu_name}, ${hardware.vram_mb}MB)` : ''}
+                                {t('workerManager.hardware.ram')}: {hardware.ram_gb} GB
                             </div>
-                            <div>MPS: {hardware.has_mps ? 'Yes' : 'No'}</div>
-                            <div>Recommended: {hardware.recommended_device}</div>
-                            <div>Compute key: {hardware.compute_key}</div>
+                            <div>
+                                {t('workerManager.hardware.cuda')}: {yesNoLabel(hardware.has_cuda)}
+                                {hardware.gpu_name ? ` (${hardware.gpu_name}, ${hardware.vram_mb}MB)` : ''}
+                            </div>
+                            <div>
+                                {t('workerManager.hardware.mps')}: {yesNoLabel(hardware.has_mps)}
+                            </div>
+                            <div>
+                                {t('workerManager.hardware.recommended')}: {hardware.recommended_device}
+                            </div>
+                            <div>
+                                {t('workerManager.hardware.computeKey')}: {hardware.compute_key}
+                            </div>
                         </div>
                     )}
                 </section>
 
-                <section className="rounded-lg border p-4" style={{ borderColor: 'var(--color-border)', background: 'var(--color-card)' }}>
-                    <h2 className="font-semibold">Engine: Whisper (OpenAI)</h2>
+                <section
+                    className="rounded-lg border p-4"
+                    style={{ borderColor: 'var(--color-border)', background: 'var(--color-card)' }}
+                >
+                    <h2 className="font-semibold">{t('workerManager.engine.title')}</h2>
                     <div className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                        Installed: {installed ? 'Yes' : 'No'}
+                        {t('workerManager.engine.installStatus')}: {installed
+                            ? t('workerManager.engine.installedState')
+                            : t('workerManager.engine.notInstalledState')}
                     </div>
 
                     {!installed ? (
                         <div className="mt-3 flex flex-col gap-3">
                             <div className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--color-border)' }}>
-                                <div className="font-medium">Install location</div>
+                                <div className="font-medium">{t('workerManager.install.locationTitle')}</div>
                                 <div className="mt-2 flex gap-2">
                                     <input
                                         className="border rounded px-2 py-1 flex-1"
@@ -548,27 +730,32 @@ export default function WorkerManagerApp() {
                                         className={buttonBaseClass}
                                         style={secondaryButtonStyle}
                                         disabled={installing}
-                                        onClick={doBrowseInstallDir}
+                                        onClick={() => void doBrowseInstallDir()}
                                     >
-                                        Browse…
+                                        {t('workerManager.install.browse')}
                                     </button>
                                 </div>
                                 <div className="mt-2 text-xs break-all" style={{ color: 'var(--color-text-muted)' }}>
-                                    Worker files will be written directly into this folder: venv/, models/, asr_worker/, worker_config.yaml.
+                                    {t('workerManager.install.locationHint')}
                                 </div>
                                 {installPathInfo ? (
                                     <div className="mt-2 text-xs break-all" style={{ color: 'var(--color-text-muted)' }}>
-                                        Default worker base: {installPathInfo.default_base_install_dir}
+                                        {t('workerManager.install.defaultBase', {
+                                            path: installPathInfo.default_base_install_dir,
+                                        })}
                                     </div>
                                 ) : null}
                                 <div className="mt-2 text-sm break-all">
-                                    <span style={{ color: 'var(--color-text-muted)' }}>Current target:</span> {effectiveInstallDir || 'Not set'}
+                                    <span style={{ color: 'var(--color-text-muted)' }}>
+                                        {t('workerManager.install.currentTarget')}:
+                                    </span>{' '}
+                                    {effectiveInstallDir || t('workerManager.common.notSet')}
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <label className="text-sm flex flex-col gap-1">
-                                    Port
+                                    {t('workerManager.install.port')}
                                     <input
                                         type="number"
                                         className="border rounded px-2 py-1"
@@ -579,7 +766,7 @@ export default function WorkerManagerApp() {
                                     />
                                 </label>
                                 <label className="text-sm flex flex-col gap-1">
-                                    Initial model
+                                    {t('workerManager.install.initialModel')}
                                     <select
                                         className="border rounded px-2 py-1"
                                         style={{ borderColor: 'var(--color-border)', background: 'transparent' }}
@@ -596,16 +783,21 @@ export default function WorkerManagerApp() {
                             </div>
 
                             <label className="text-sm flex items-center gap-2">
-                                <input type="checkbox" checked={useMirror} disabled={installing} onChange={(e) => setUseMirror(e.target.checked)} />
-                                Use China mirrors
+                                <input
+                                    type="checkbox"
+                                    checked={useMirror}
+                                    disabled={installing}
+                                    onChange={(e) => setUseMirror(e.target.checked)}
+                                />
+                                {t('workerManager.install.useMirror')}
                             </label>
 
                             <label className="text-sm flex flex-col gap-1">
-                                Proxy (optional)
+                                {t('workerManager.install.proxy')}
                                 <input
                                     className="border rounded px-2 py-1"
                                     style={{ borderColor: 'var(--color-border)', background: 'transparent' }}
-                                    placeholder="http://127.0.0.1:7890"
+                                    placeholder={t('workerManager.install.proxyPlaceholder')}
                                     value={proxy}
                                     disabled={installing}
                                     onChange={(e) => setProxy(e.target.value)}
@@ -617,16 +809,19 @@ export default function WorkerManagerApp() {
                                     className={buttonBaseClass}
                                     style={primaryButtonStyle}
                                     disabled={installing || !effectiveInstallDir}
-                                    onClick={doInstall}
+                                    onClick={() => void doInstall()}
                                 >
-                                    {installing ? 'Installing…' : 'Install'}
+                                    {installing ? t('workerManager.install.installing') : t('workerManager.install.install')}
                                 </button>
                             </div>
                         </div>
                     ) : (
                         <div className="mt-3 flex flex-col gap-3">
                             <div className="text-sm break-all">
-                                <span style={{ color: 'var(--color-text-muted)' }}>Install dir:</span> {installedEngine.install_dir}
+                                <span style={{ color: 'var(--color-text-muted)' }}>
+                                    {t('workerManager.engine.installDir')}:
+                                </span>{' '}
+                                {installedEngine.install_dir}
                             </div>
 
                             <div className="flex flex-wrap gap-2">
@@ -634,213 +829,301 @@ export default function WorkerManagerApp() {
                                     className={buttonBaseClass}
                                     style={primaryButtonStyle}
                                     disabled={hasBusyOperation}
-                                    onClick={doStart}
+                                    onClick={() => void doStart()}
                                 >
-                                    {actionPending === 'start' ? 'Starting…' : 'Start'}
+                                    {actionPending === 'start'
+                                        ? t('workerManager.actions.starting')
+                                        : t('workerManager.actions.start')}
                                 </button>
                                 <button
                                     className={buttonBaseClass}
                                     style={secondaryButtonStyle}
                                     disabled={hasBusyOperation}
-                                    onClick={doStop}
+                                    onClick={() => void doStop()}
                                 >
-                                    {actionPending === 'stop' ? 'Stopping…' : 'Stop'}
+                                    {actionPending === 'stop'
+                                        ? t('workerManager.actions.stopping')
+                                        : t('workerManager.actions.stop')}
                                 </button>
                                 <button
                                     className={buttonBaseClass}
                                     style={secondaryButtonStyle}
                                     disabled={hasBusyOperation}
-                                    onClick={doCheck}
+                                    onClick={() => void doCheck()}
                                 >
-                                    {actionPending === 'check' ? 'Checking…' : 'Check'}
+                                    {actionPending === 'check'
+                                        ? t('workerManager.actions.checking')
+                                        : t('workerManager.actions.check')}
                                 </button>
                                 <button
                                     className={buttonBaseClass}
                                     style={secondaryButtonStyle}
                                     disabled={!status?.running || !status?.loaded || hasBusyOperation}
-                                    onClick={doUnloadModel}
+                                    onClick={() => void doUnloadModel()}
                                 >
-                                    {actionPending === 'unload' ? 'Unloading…' : 'Unload model'}
+                                    {actionPending === 'unload'
+                                        ? t('workerManager.actions.unloading')
+                                        : t('workerManager.actions.unloadModel')}
                                 </button>
                                 <button
                                     className={buttonBaseClass}
                                     style={dangerButtonStyle}
                                     disabled={hasBusyOperation}
-                                    onClick={doUninstall}
+                                    onClick={() => void doUninstall()}
                                 >
-                                    {actionPending === 'uninstall' ? 'Uninstalling…' : 'Uninstall'}
+                                    {actionPending === 'uninstall'
+                                        ? t('workerManager.actions.uninstalling')
+                                        : t('workerManager.actions.uninstall')}
                                 </button>
                             </div>
 
                             {status ? (
-                                <div className="text-sm flex flex-col gap-1">
-                                    <div>
-                                        Status: running={String(status.running)} healthy={String(status.healthy)} loaded={String(status.loaded)}
+                                <div className="text-sm flex flex-col gap-3">
+                                    <div className="flex flex-wrap gap-2">
+                                        {renderBooleanBadge('Running', status.running)}
+                                        {renderBooleanBadge('Healthy', status.healthy)}
+                                        {renderBooleanBadge('Loaded', status.loaded)}
+                                        {renderBooleanBadge('Management', status.management)}
                                     </div>
                                     <div>
-                                        URL: {status.url} | model={status.model_id ?? 'n/a'} | device={status.device ?? 'n/a'} | management={String(status.management)}
+                                        {t('workerManager.status.details', {
+                                            url: status.url,
+                                            model: status.model_id ?? t('workerManager.common.na'),
+                                            device: status.device ?? t('workerManager.common.na'),
+                                        })}
                                     </div>
                                 </div>
                             ) : (
                                 <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                                    No status yet.
+                                    {t('workerManager.engine.noStatus')}
                                 </div>
                             )}
 
                             <div className="rounded-lg border p-3" style={{ borderColor: 'var(--color-border)' }}>
-                                <div className="flex items-center justify-between gap-4">
-                                    <div className="font-medium">Model management</div>
-                                    <button
-                                        className={buttonBaseClass}
-                                        style={secondaryButtonStyle}
-                                        disabled={!status?.running || !status?.management || loadingModels || hasBusyOperation}
-                                        onClick={() => void refreshModels()}
-                                    >
-                                        {loadingModels ? 'Refreshing…' : 'Refresh models'}
-                                    </button>
+                                <div className="flex items-center justify-between gap-4 flex-wrap">
+                                    <div>
+                                        <div className="font-medium">{t('workerManager.modelManagement.title')}</div>
+                                        <div className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                                            {t('workerManager.modelManagement.summary', {
+                                                installed: installedModelCount,
+                                                total: models.length,
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                                        {modelsExpanded ? (
+                                            <button
+                                                className={buttonBaseClass}
+                                                style={secondaryButtonStyle}
+                                                disabled={!status?.running || !status?.management || loadingModels || hasBusyOperation}
+                                                onClick={() => void refreshModels()}
+                                            >
+                                                {loadingModels
+                                                    ? t('workerManager.modelManagement.refreshing')
+                                                    : t('workerManager.modelManagement.refresh')}
+                                            </button>
+                                        ) : null}
+                                        <button
+                                            className={buttonBaseClass}
+                                            style={secondaryButtonStyle}
+                                            aria-expanded={modelsExpanded}
+                                            onClick={() => setModelsExpanded((prev) => !prev)}
+                                        >
+                                            {modelsExpanded
+                                                ? t('workerManager.modelManagement.collapse')
+                                                : t('workerManager.modelManagement.expand')}
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {!status?.running ? (
-                                    <div className="mt-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                                        Start the worker to manage models.
-                                    </div>
-                                ) : !status.management ? (
-                                    <div className="mt-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                                        This worker did not report management API support yet.
-                                    </div>
-                                ) : null}
-
-                                {modelActionMessage ? (
-                                    <div className="mt-3 text-sm">{modelActionMessage}</div>
-                                ) : null}
-
-                                {operationStatus ? (
-                                    <div className="mt-3 rounded border p-3 text-sm" style={{ borderColor: 'var(--color-border)' }}>
-                                        <div className="font-medium">
-                                            Operation: {operationStatus.type} ({operationStatus.status})
-                                        </div>
-                                        <div className="mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                                            {operationStatus.detail}
-                                        </div>
-                                        {operationStatus.error ? (
-                                            <div className="mt-2" style={{ color: 'var(--color-error)' }}>
-                                                {operationStatus.error}
+                                {modelsExpanded ? (
+                                    <div>
+                                        {!status?.running ? (
+                                            <div className="mt-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                                                {t('workerManager.modelManagement.startWorkerHint')}
+                                            </div>
+                                        ) : !status.management ? (
+                                            <div className="mt-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                                                {t('workerManager.modelManagement.noManagementHint')}
                                             </div>
                                         ) : null}
-                                        {operationStatus.progress.length > 0 ? (
-                                            <ul className="mt-2 text-xs list-disc pl-5 space-y-1">
-                                                {operationStatus.progress.slice(-6).map((line, idx) => (
-                                                    <li key={`${idx}-${line}`}>{line}</li>
-                                                ))}
-                                            </ul>
-                                        ) : null}
-                                    </div>
-                                ) : null}
 
-                                {modelsError ? (
-                                    <div className="mt-3 text-sm" style={{ color: 'var(--color-error)' }}>
-                                        {modelsError}
-                                    </div>
-                                ) : null}
+                                        {modelActionMessage ? <div className="mt-3 text-sm">{modelActionMessage}</div> : null}
 
-                                {status?.running && status.management && models.length > 0 ? (
-                                    <div className="mt-3 grid grid-cols-1 gap-3">
-                                        {models.map((managedModel) => (
+                                        {operationStatus ? (
                                             <div
-                                                key={managedModel.id}
-                                                className="rounded border p-3 text-sm"
+                                                className="mt-3 rounded border p-3 text-sm"
                                                 style={{ borderColor: 'var(--color-border)' }}
                                             >
-                                                <div className="flex items-start justify-between gap-4">
-                                                    <div>
-                                                        <div className="font-medium">{managedModel.display_name}</div>
-                                                        <div className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                                                            id={managedModel.id} | size≈{managedModel.download_size_mb}MB | accuracy={managedModel.accuracy}/5 | speed={managedModel.speed}/5
-                                                        </div>
-                                                        <div className="mt-2">{managedModel.description}</div>
-                                                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                                                            {managedModel.tags.map((tag) => (
-                                                                <span
-                                                                    key={tag}
-                                                                    className="px-2 py-0.5 rounded"
-                                                                    style={{ background: 'rgba(0,0,0,0.06)' }}
-                                                                >
-                                                                    {tag}
-                                                                </span>
-                                                            ))}
-                                                            {managedModel.installed ? (
-                                                                <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.12)' }}>
-                                                                    Installed
-                                                                </span>
-                                                            ) : null}
-                                                            {managedModel.active ? (
-                                                                <span
-                                                                    className="px-2 py-0.5 rounded inline-flex items-center gap-1"
-                                                                    style={{
-                                                                        background: 'rgba(16,185,129,0.12)',
-                                                                        color: 'var(--color-success)',
-                                                                    }}
-                                                                >
-                                                                    <span aria-hidden="true">●</span>
-                                                                    Active
-                                                                </span>
-                                                            ) : null}
-                                                            {!managedModel.compatible ? (
-                                                                <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.12)' }}>
-                                                                    Not compatible
-                                                                </span>
-                                                            ) : null}
-                                                        </div>
-                                                        {!managedModel.compatible && managedModel.reason ? (
-                                                            <div className="mt-2 text-xs" style={{ color: 'var(--color-error)' }}>
-                                                                {managedModel.reason}
-                                                            </div>
-                                                        ) : null}
-                                                    </div>
-
-                                                    <div className="flex flex-col gap-2 min-w-[120px]">
-                                                        {!managedModel.installed ? (
-                                                            <button
-                                                                className={buttonBaseClass}
-                                                                style={secondaryButtonStyle}
-                                                                disabled={hasBusyOperation}
-                                                                onClick={() => void doDownloadModel(managedModel.id)}
-                                                            >
-                                                                {actionPending === `download:${managedModel.id}` ? 'Downloading…' : 'Download'}
-                                                            </button>
-                                                        ) : !managedModel.active ? (
-                                                            <button
-                                                                className={buttonBaseClass}
-                                                                style={primaryButtonStyle}
-                                                                disabled={!status?.running || hasBusyOperation}
-                                                                onClick={() => void doActivateModel(managedModel.id)}
-                                                            >
-                                                                {actionPending === `activate:${managedModel.id}` ? 'Activating…' : 'Activate'}
-                                                            </button>
-                                                        ) : (
-                                                            <button
-                                                                className={buttonBaseClass}
-                                                                style={activeButtonStyle}
-                                                                disabled
-                                                            >
-                                                                Active
-                                                            </button>
-                                                        )}
-
-                                                        {managedModel.installed && !managedModel.active ? (
-                                                            <button
-                                                                className={buttonBaseClass}
-                                                                style={dangerOutlineButtonStyle}
-                                                                disabled={hasBusyOperation}
-                                                                onClick={() => void doDeleteModel(managedModel.id)}
-                                                            >
-                                                                {actionPending === `delete:${managedModel.id}` ? 'Deleting…' : 'Delete'}
-                                                            </button>
-                                                        ) : null}
-                                                    </div>
+                                                <div className="font-medium">
+                                                    {t('workerManager.modelManagement.operation', {
+                                                        type: operationStatus.type,
+                                                        status: operationStatus.status,
+                                                    })}
                                                 </div>
+                                                <div className="mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                                                    {operationStatus.detail}
+                                                </div>
+                                                {operationStatus.error ? (
+                                                    <div className="mt-2" style={{ color: 'var(--color-error)' }}>
+                                                        {operationStatus.error}
+                                                    </div>
+                                                ) : null}
+                                                {operationStatus.progress.length > 0 ? (
+                                                    <ul className="mt-2 text-xs list-disc pl-5 space-y-1">
+                                                        {operationStatus.progress.slice(-6).map((line, idx) => (
+                                                            <li key={`${idx}-${line}`}>{line}</li>
+                                                        ))}
+                                                    </ul>
+                                                ) : null}
                                             </div>
-                                        ))}
+                                        ) : null}
+
+                                        {modelsError ? (
+                                            <div className="mt-3 text-sm" style={{ color: 'var(--color-error)' }}>
+                                                {modelsError}
+                                            </div>
+                                        ) : null}
+
+                                        {status?.running && status.management && models.length > 0 ? (
+                                            <div className="mt-3 grid grid-cols-1 gap-3">
+                                                {models.map((managedModel) => (
+                                                    <div
+                                                        key={managedModel.id}
+                                                        className="rounded border p-3 text-sm"
+                                                        style={{ borderColor: 'var(--color-border)' }}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-4">
+                                                            <div>
+                                                                <div className="font-medium">{managedModel.display_name}</div>
+                                                                <div
+                                                                    className="mt-1 text-xs flex flex-wrap items-center gap-x-3 gap-y-1"
+                                                                    style={{ color: 'var(--color-text-muted)' }}
+                                                                >
+                                                                    <span>
+                                                                        {t('workerManager.modelManagement.idMeta', {
+                                                                            id: managedModel.id,
+                                                                        })}
+                                                                    </span>
+                                                                    <span>
+                                                                        {t('workerManager.modelManagement.sizeMeta', {
+                                                                            size: managedModel.download_size_mb,
+                                                                        })}
+                                                                    </span>
+                                                                    <span className="inline-flex items-center gap-1">
+                                                                        <span>{t('workerManager.modelManagement.accuracy')}:</span>
+                                                                        {renderStars(managedModel.accuracy)}
+                                                                    </span>
+                                                                    <span className="inline-flex items-center gap-1">
+                                                                        <span>{t('workerManager.modelManagement.speed')}:</span>
+                                                                        {renderSpeedBars(managedModel.speed)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="mt-2">{managedModel.description}</div>
+                                                                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                                                                    {managedModel.tags.map((tag) => (
+                                                                        <span
+                                                                            key={tag}
+                                                                            className="px-2 py-0.5 rounded"
+                                                                            style={{ background: 'rgba(0,0,0,0.06)' }}
+                                                                        >
+                                                                            {tag}
+                                                                        </span>
+                                                                    ))}
+                                                                    {managedModel.installed ? (
+                                                                        <span
+                                                                            className="px-2 py-0.5 rounded"
+                                                                            style={{ background: 'rgba(16,185,129,0.12)' }}
+                                                                        >
+                                                                            {t('workerManager.modelManagement.installed')}
+                                                                        </span>
+                                                                    ) : null}
+                                                                    {managedModel.active ? (
+                                                                        <span
+                                                                            className="px-2 py-0.5 rounded inline-flex items-center gap-1"
+                                                                            style={{
+                                                                                background: 'rgba(16,185,129,0.12)',
+                                                                                color: 'var(--color-success)',
+                                                                            }}
+                                                                        >
+                                                                            <span aria-hidden="true">●</span>
+                                                                            {t('workerManager.modelManagement.active')}
+                                                                        </span>
+                                                                    ) : null}
+                                                                    {!managedModel.compatible ? (
+                                                                        <span
+                                                                            className="px-2 py-0.5 rounded"
+                                                                            style={{ background: 'rgba(239,68,68,0.12)' }}
+                                                                        >
+                                                                            {t('workerManager.modelManagement.notCompatible')}
+                                                                        </span>
+                                                                    ) : null}
+                                                                </div>
+                                                                {!managedModel.compatible && managedModel.reason ? (
+                                                                    <div
+                                                                        className="mt-2 text-xs"
+                                                                        style={{ color: 'var(--color-error)' }}
+                                                                    >
+                                                                        {managedModel.reason}
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+
+                                                            <div className="flex flex-col gap-2 min-w-[120px]">
+                                                                {!managedModel.installed ? (
+                                                                    <button
+                                                                        className={buttonBaseClass}
+                                                                        style={secondaryButtonStyle}
+                                                                        disabled={hasBusyOperation}
+                                                                        onClick={() => void doDownloadModel(managedModel.id)}
+                                                                    >
+                                                                        {actionPending === `download:${managedModel.id}`
+                                                                            ? t('workerManager.modelManagement.downloading')
+                                                                            : t('workerManager.modelManagement.download')}
+                                                                    </button>
+                                                                ) : !managedModel.active ? (
+                                                                    <button
+                                                                        className={buttonBaseClass}
+                                                                        style={primaryButtonStyle}
+                                                                        disabled={!status?.running || hasBusyOperation}
+                                                                        onClick={() => void doActivateModel(managedModel.id)}
+                                                                    >
+                                                                        {actionPending === `activate:${managedModel.id}`
+                                                                            ? t('workerManager.modelManagement.activating')
+                                                                            : t('workerManager.modelManagement.activate')}
+                                                                    </button>
+                                                                ) : (
+                                                                    <button
+                                                                        className={buttonBaseClass}
+                                                                        style={activeButtonStyle}
+                                                                        disabled
+                                                                    >
+                                                                        {t('workerManager.modelManagement.active')}
+                                                                    </button>
+                                                                )}
+
+                                                                {managedModel.installed && !managedModel.active ? (
+                                                                    <button
+                                                                        className={buttonBaseClass}
+                                                                        style={dangerOutlineButtonStyle}
+                                                                        disabled={hasBusyOperation}
+                                                                        onClick={() => void doDeleteModel(managedModel.id)}
+                                                                    >
+                                                                        {actionPending === `delete:${managedModel.id}`
+                                                                            ? t('workerManager.modelManagement.deleting')
+                                                                            : t('workerManager.modelManagement.delete')}
+                                                                    </button>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : status?.running && status.management && !loadingModels && !modelsError ? (
+                                            <div className="mt-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                                                {t('workerManager.modelManagement.empty')}
+                                            </div>
+                                        ) : null}
                                     </div>
                                 ) : null}
                             </div>
@@ -850,9 +1133,18 @@ export default function WorkerManagerApp() {
                     {installProgress ? (
                         <div className="mt-4 rounded-lg border p-3" style={{ borderColor: 'var(--color-border)' }}>
                             <div className="flex items-center justify-between gap-4 text-sm">
-                                <div className="font-medium">{installProgress.error ? 'Install failed' : installProgress.done ? 'Install complete' : installProgress.step_label}</div>
+                                <div className="font-medium">
+                                    {installProgress.error
+                                        ? t('workerManager.install.failed')
+                                        : installProgress.done
+                                          ? t('workerManager.install.complete')
+                                          : installStepLabel}
+                                </div>
                                 <div style={{ color: 'var(--color-text-muted)' }}>
-                                    Step {installProgress.step_index} / {installProgress.step_total}
+                                    {t('workerManager.install.step', {
+                                        current: installProgress.step_index,
+                                        total: installProgress.step_total,
+                                    })}
                                 </div>
                             </div>
                             <div className="mt-2 h-2 rounded" style={{ background: 'rgba(0,0,0,0.08)' }}>
@@ -860,13 +1152,17 @@ export default function WorkerManagerApp() {
                                     className="h-2 rounded"
                                     style={{
                                         width: `${progressPercent}%`,
-                                        background: installProgress.error ? 'var(--color-error)' : 'var(--color-primary)',
+                                        background: installProgress.error
+                                            ? 'var(--color-error)'
+                                            : 'var(--color-primary)',
                                     }}
                                 />
                             </div>
                             <div className="mt-2 text-sm">{installProgress.message}</div>
                             <div className="mt-2 text-xs break-all" style={{ color: 'var(--color-text-muted)' }}>
-                                Target directory: {installProgress.install_dir}
+                                {t('workerManager.install.targetDirectory', {
+                                    path: installProgress.install_dir,
+                                })}
                             </div>
                             {installProgress.error ? (
                                 <div className="mt-2 text-sm" style={{ color: 'var(--color-error)' }}>
@@ -881,13 +1177,13 @@ export default function WorkerManagerApp() {
                             className="mt-4 text-xs rounded border p-2 overflow-auto max-h-64"
                             style={{ borderColor: 'var(--color-border)', background: 'rgba(0,0,0,0.03)' }}
                         >
-                            {installLog.join('\n')}
+                            {installLogText}
                         </pre>
                     ) : null}
                 </section>
 
                 <footer className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    Bundled uv is resolved from src-tauri-worker/resources/uv during development and packaged resources at runtime.
+                    {t('workerManager.footer')}
                 </footer>
             </div>
         </div>
