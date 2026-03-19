@@ -21,8 +21,19 @@ const TRAY_TOOLTIP_PREFIX: &str = "DiTing Worker Manager";
 
 #[derive(Debug, Clone, Serialize)]
 struct InstallPathInfo {
-    default_base_install_dir: String,
+    default_runtime_root: String,
     default_engine_install_dir: String,
+    default_uv_path: String,
+    default_manager_state_path: String,
+    app_install_dir: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct InstallPathPreview {
+    runtime_root: String,
+    engine_install_dir: String,
+    uv_path: String,
+    manager_state_path: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -36,12 +47,28 @@ struct InstallEngineRequest {
     use_mirror: bool,
     proxy: String,
     server_url: Option<String>,
+    advertise_url: Option<String>,
     install_dir: String,
 }
 
-#[derive(Default)]
-struct AppLifecycleState {
-    exiting: std::sync::atomic::AtomicBool,
+fn resolve_app_install_dir(app: &AppHandle) -> String {
+    let path = paths::default_runtime_root_for_app(app);
+
+    paths::display_path(&path)
+}
+
+fn build_install_path_preview(app: &AppHandle, engine_id: &str, install_dir: &str) -> InstallPathPreview {
+    let runtime_root = paths::resolve_runtime_root(app, install_dir);
+    let engine_install_dir = paths::runtime_engine_dir(&runtime_root, engine_id);
+    let uv_path = paths::runtime_uv_dir(&runtime_root).join(constants::uv_binary_name());
+    let manager_state_path = paths::manager_state_path_for_runtime_root(&runtime_root);
+
+    InstallPathPreview {
+        runtime_root: paths::display_path(&runtime_root),
+        engine_install_dir: paths::display_path(&engine_install_dir),
+        uv_path: paths::display_path(&uv_path),
+        manager_state_path: paths::display_path(&manager_state_path),
+    }
 }
 
 #[tauri::command]
@@ -75,12 +102,26 @@ async fn get_install_path_info(
     engine_id: Option<String>,
 ) -> Result<InstallPathInfo, String> {
     let requested_engine_id = engine_id.unwrap_or_else(|| "whisper-openai".to_string());
-    let base = paths::default_install_dir();
-    let engine = paths::engine_dir(&app, &requested_engine_id);
+    let default_preview = build_install_path_preview(&app, &requested_engine_id, "");
     Ok(InstallPathInfo {
-        default_base_install_dir: base.to_string_lossy().to_string(),
-        default_engine_install_dir: engine.to_string_lossy().to_string(),
+        default_runtime_root: default_preview.runtime_root,
+        default_engine_install_dir: default_preview.engine_install_dir,
+        default_uv_path: default_preview.uv_path,
+        default_manager_state_path: default_preview.manager_state_path,
+        app_install_dir: resolve_app_install_dir(&app),
     })
+}
+
+#[tauri::command]
+async fn preview_install_paths(
+    app: AppHandle,
+    request: InstallPathPreviewRequest,
+) -> Result<InstallPathPreview, String> {
+    Ok(build_install_path_preview(
+        &app,
+        &request.engine_id,
+        &request.install_dir,
+    ))
 }
 
 #[tauri::command]
@@ -95,6 +136,7 @@ async fn install_engine(app: AppHandle, request: InstallEngineRequest) -> Result
         request.use_mirror,
         &request.proxy,
         request.server_url.as_deref().unwrap_or(""),
+        request.advertise_url.as_deref().unwrap_or(""),
         &request.install_dir,
     )
     .await;
@@ -105,6 +147,31 @@ async fn install_engine(app: AppHandle, request: InstallEngineRequest) -> Result
         }
     });
     result
+}
+
+#[tauri::command]
+async fn update_engine_network_settings(
+    app: AppHandle,
+    engine_id: String,
+    port: u16,
+    server_url: Option<String>,
+    advertise_url: Option<String>,
+) -> Result<manager_state::ManagerState, String> {
+    let state = installer::update_engine_network_settings(
+        &app,
+        &engine_id,
+        port,
+        server_url.as_deref().unwrap_or(""),
+        advertise_url.as_deref().unwrap_or(""),
+    )
+    .await?;
+    tauri::async_runtime::spawn({
+        let app = app.clone();
+        async move {
+            let _ = update_tray_state(&app).await;
+        }
+    });
+    Ok(state)
 }
 
 #[tauri::command]
@@ -357,6 +424,18 @@ fn handle_tray_action(app: &AppHandle, action_id: &str) {
     }
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallPathPreviewRequest {
+    engine_id: String,
+    install_dir: String,
+}
+
+#[derive(Default)]
+struct AppLifecycleState {
+    exiting: std::sync::atomic::AtomicBool,
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -367,7 +446,9 @@ pub fn run() {
             get_manager_state,
             set_selected_engine,
             get_install_path_info,
+            preview_install_paths,
             install_engine,
+            update_engine_network_settings,
             install_whisper_engine,
             uninstall_engine,
             start_worker,
@@ -381,11 +462,6 @@ pub fn run() {
             get_worker_operation_status,
         ])
         .setup(|app| {
-            let handle = app.handle();
-            tauri::async_runtime::block_on(async move {
-                let _ = paths::ensure_base_dirs(&handle).await;
-            });
-
             let show_item =
                 MenuItem::with_id(app, TRAY_SHOW_ID, "Show Worker Manager", true, None::<&str>)?;
             let start_item =

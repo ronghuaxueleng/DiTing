@@ -98,6 +98,21 @@ _register(ModelInfo(
 ))
 
 _register(ModelInfo(
+    id="whisper_large_v3",
+    engine="whisper",
+    model_id="large-v3",
+    display_name="Whisper Large v3",
+    download_size_mb=3100,
+    vram_required_mb=6000,
+    accuracy=5,
+    speed=2,
+    supports_mps=True,
+    whisper_model_name="large-v3",
+    description="Highest-accuracy Whisper Large v3 model for users who prefer the standard non-turbo variant.",
+    pip_extras=["openai-whisper>=20250625"],
+))
+
+_register(ModelInfo(
     id="whisper_large_v3_turbo",
     engine="whisper",
     model_id="large-v3-turbo",

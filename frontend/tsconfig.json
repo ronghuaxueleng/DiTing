@@ -30,6 +30,7 @@
     },
     "include": [
         "src",
-        "src-wizard"
+        "src-wizard",
+        "src-worker-manager"
     ]
 }

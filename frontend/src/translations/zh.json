@@ -970,15 +970,27 @@
             "back": "上一步",
             "cancel": "取消"
         },
+        "theme": {
+            "toggle": "切换主题（当前：{{theme}}）",
+            "options": {
+                "auto": "跟随系统",
+                "light": "浅色",
+                "dark": "深色"
+            }
+        },
         "hardware": {
             "title": "硬件信息",
+            "summaryDescription": "当前设备检测结果会影响推荐的引擎、设备和初始模型默认值。",
             "detecting": "检测中…",
             "cpu": "CPU",
             "ram": "内存",
             "cuda": "CUDA",
             "mps": "MPS",
             "recommended": "推荐设备",
-            "computeKey": "计算类型"
+            "computeKey": "计算类型",
+            "cores": "核",
+            "cpuOnly": "仅 CPU",
+            "appleSilicon": "Apple Silicon"
         },
         "engine": {
             "installStatus": "安装状态",
@@ -987,10 +999,126 @@
             "installDir": "安装目录",
             "noStatus": "暂无状态。"
         },
+        "catalog": {
+            "engines": {
+                "whisper-openai": {
+                    "description": "OpenAI Whisper 本地 worker，提供灵活的模型选择。"
+                },
+                "sensevoice": {
+                    "description": "FunASR SenseVoice，内置 VAD，并提供快速的多语言语音识别。"
+                },
+                "qwen3asr": {
+                    "description": "Qwen3-ASR 语音识别，支持强制对齐器，可生成高质量时间戳。"
+                }
+            },
+            "models": {
+                "whisper_tiny": {
+                    "label": "Tiny",
+                    "description": "Whisper 中体量最小、速度最快的选项，适合轻量级或以 CPU 为主的环境。"
+                },
+                "whisper_small": {
+                    "label": "Small",
+                    "description": "更适合轻量硬件的 Whisper 平衡模型，可提供更快的本地转录速度。"
+                },
+                "whisper_medium": {
+                    "label": "Medium",
+                    "description": "中等体量的 Whisper 模型，在准确度与速度之间提供更稳健的平衡。"
+                },
+                "whisper_large_v3": {
+                    "label": "Large V3",
+                    "description": "标准版 Whisper Large V3，适合更看重最高准确度而非 turbo 变体的场景。"
+                },
+                "whisper_large_v3_turbo": {
+                    "label": "Large V3 Turbo",
+                    "description": "推荐的 Whisper Large V3 Turbo，在保持较强准确度的同时提供更快的本地推理速度。"
+                },
+                "sensevoice_small": {
+                    "label": "SenseVoice Small",
+                    "description": "紧凑的多语言 SenseVoice 模型，内置 VAD，并具备快速识别能力。"
+                },
+                "qwen3_asr": {
+                    "label": "Qwen3-ASR 1.7B",
+                    "description": "Qwen3-ASR 1.7B 模型，搭配强制对齐器，适合需要精确时间戳的场景。"
+                },
+                "__none__": {
+                    "label": "跳过下载（稍后手动放置）"
+                }
+            }
+        },
+        "tags": {
+            "recommended": "推荐",
+            "multilingual": "多语言",
+            "fast": "快速",
+            "balanced": "均衡",
+            "accurate": "高准确度",
+            "lightweight": "轻量"
+        },
         "dashboard": {
             "title": "管理面板",
+            "description": "查看和管理已安装的语音识别引擎。",
             "installedEngines": "已安装引擎",
-            "engineDescription": "管理当前引擎的运行状态、模型与安装信息。",
+            "listDescription": "已安装 {{count}} 个引擎。",
+            "selected": "当前查看",
+            "overviewTitle": "概览",
+            "summaryTitle": "引擎摘要",
+            "summaryDescription": "当前引擎的运行状态一览。",
+            "engineDescription": "查看引擎状态、管理模型与设置。",
+            "sidebarHint": "点击切换不同引擎。",
+            "commandCenterTitle": "命令栏",
+            "commandCenterDescription": "引擎的配置与状态信息。",
+            "recentActivityTitle": "最近活动",
+            "installRuntimeTitle": "安装与运行信息",
+            "installRuntimeDescription": "引擎的安装位置、运行设备和服务配置。",
+            "engineId": "引擎 ID",
+            "workerStatusTitle": "Worker 状态",
+            "workerStatusDescription": "Worker 当前的运行状态。",
+            "workerUrl": "Worker URL",
+            "loadedModel": "已加载模型",
+            "loadedDevice": "实际运行设备",
+            "installedModelsLabel": "已安装模型",
+            "configuredPortLabel": "配置端口",
+            "quickFactsTitle": "快速信息",
+            "lastStartedLabel": "上次启动",
+            "neverStarted": "从未启动",
+            "tabs": {
+                "overview": "概览",
+                "models": "模型",
+                "network": "网络",
+                "advanced": "高级"
+            },
+            "advancedTitle": "高级信息",
+            "advancedDescription": "查看引擎详细信息或执行卸载操作。",
+            "networkSettingsTitle": "网络设置",
+            "networkSettingsDescription": "配置 Worker 的端口和网络地址。",
+            "networkSaving": "保存中…",
+            "networkSaved": "网络设置已保存。",
+            "networkSaveFailed": "保存网络设置失败：{{error}}",
+            "modelManagementDescription": "查看和管理可用的语音识别模型。",
+            "inventoryHint": "以紧凑列表形式管理所有模型。",
+            "inventoryReady": "当前运行中的托管 worker 已可执行模型操作。",
+            "inventoryColumns": {
+                "model": "模型",
+                "footprint": "体量",
+                "status": "状态",
+                "actions": "操作"
+            },
+            "modelMeta": {
+                "size": "大小",
+                "vram": "显存"
+            },
+            "modelState": {
+                "compatibility": "兼容性",
+                "mps": "MPS",
+                "dependencies": "依赖"
+            },
+            "dangerZoneTitle": "危险操作",
+            "uninstallHint": "卸载会移除当前引擎的本地安装目录与管理记录。",
+            "badges": {
+                "running": "运行中",
+                "healthy": "健康",
+                "loaded": "已加载",
+                "management": "可管理"
+            },
             "emptySelection": "请选择一个已安装的引擎。"
         },
         "wizard": {
@@ -1001,30 +1129,98 @@
                 "install": "安装",
                 "complete": "完成"
             },
+            "stepStates": {
+                "current": "当前步骤",
+                "done": "已完成",
+                "upcoming": "待进行"
+            },
+            "stepRailTitle": "安装流程",
+            "summaryTitle": "上下文摘要",
+            "summaryDescription": "安装过程中的配置信息一览。",
+            "summary": {
+                "currentEngine": "引擎",
+                "model": "初始模型",
+                "device": "设备",
+                "port": "端口",
+                "workerUrl": "Worker URL",
+                "serverUrl": "Server URL",
+                "target": "目标目录",
+                "installedEngines": "已装引擎数",
+                "stage": "阶段监控",
+                "logCount": "最近 {{count}} 条更新"
+            },
             "hardwareDescription": "先确认已检测到的硬件信息，随后可按推荐设备继续，也可以在下一步自行调整。",
+            "hardwareSummaryTitle": "硬件摘要",
+            "hardwareSummaryDescription": "已检测到的 CPU、内存和 GPU 信息。",
+            "hardwareLead": "请确认硬件信息，下一步将根据检测结果推荐合适的引擎和设备。",
+            "hardwareRecommendationTitle": "建议起点",
+            "hardwareRecommendationDescription": "基于硬件检测推荐的配置。如需自定义，可在下一步调整。",
             "engineDescription": "选择要安装的引擎、设备、安装目录和初始模型。",
+            "engineFitTitle": "引擎与硬件匹配",
+            "engineFitDescription": "选择引擎后，系统将推荐匹配的设备和模型。",
+            "enginePrimaryTitle": "1. 选择引擎",
+            "enginePrimaryDescription": "选择要安装的引擎，并设置首次启动的模型和设备。",
+            "engineSecondaryTitle": "2. 配置运行与下载",
+            "engineSecondaryDescription": "配置端口、网络地址、安装目录和下载选项。",
+            "runtimeConfigTitle": "运行时配置",
+            "runtimeConfigDescription": "配置 worker 对外端口与回连主服务的 Server URL。",
+            "downloadInstallTitle": "下载与安装",
+            "downloadInstallDescription": "设置安装目录、镜像与代理，决定依赖和模型从哪里下载。",
             "installDescription": "正在安装 {{engine}}。Python 依赖与模型下载可能需要一些时间。",
+            "installLead": "安装进度和最近日志显示在下方。",
+            "installRecentLogsTitle": "最近安装日志",
             "completeTitle": "引擎安装完成",
             "completeDescription": "{{engine}} 已可使用。你可以返回管理面板，或继续新增下一个引擎。",
+            "completeNextTitle": "下一步",
+            "completeNextDescription": "返回管理面板查看引擎，或继续安装下一个。",
+            "completePrimaryAction": "打开管理面板",
+            "completeSecondaryAction": "继续安装下一个引擎",
+            "selected": "已选择",
             "noAvailableEngines": "当前支持的本地引擎均已安装。"
         },
         "status": {
             "details": "URL：{{url}} | model={{model}} | device={{device}}"
         },
         "install": {
-            "locationTitle": "安装位置",
+            "locationTitle": "安装根目录",
             "browse": "选择目录…",
-            "browseDialogTitle": "选择引擎安装目录",
-            "locationHint": "Worker 文件会直接写入此目录：venv/、models/、asr_worker/、worker_config.yaml。",
-            "defaultBase": "默认 worker 根目录：{{path}}",
-            "currentTarget": "当前目标目录",
+            "browseDialogTitle": "选择运行时根目录",
+            "locationHint": "这里表示整个 Worker runtime 的根目录。若手动指定，uv、引擎、模型下载与 manager_state.json 都会放在这个目录下；应用安装位置与运行时目录彼此独立。",
+            "protectedLocationWarning": "该目录位于 Windows 常见受保护位置下。安装时可能需要管理员权限；如果当前应用无法在此创建文件，写入可能会失败。",
+            "protectedLocationExamples": "常见受保护目录包括 Program Files 和 Windows 目录。",
+            "defaultBase": "默认运行时根目录：{{path}}",
+            "appInstallDir": "应用安装位置：{{path}}",
+            "currentTarget": "当前运行时根目录",
+            "runtimeRoot": "运行时根目录",
+            "engineInstallDir": "引擎目录",
+            "uvPath": "uv 路径",
+            "managerStatePath": "管理状态文件",
+            "latestStage": "当前阶段",
+            "phaseLabel": "阶段",
+            "progressLabel": "进度",
+            "targetLabel": "目标目录",
+            "logTitle": "安装日志",
+            "logHint": "原始日志保留在次级详情区，便于排查失败原因。",
+            "logEntries": "条日志",
             "port": "端口",
             "initialModel": "初始模型",
             "device": "设备",
             "serverUrl": "Server URL",
             "serverUrlPlaceholder": "http://127.0.0.1:5023",
+            "workerUrl": "Worker URL",
+            "workerUrlPlaceholder": "http://localhost:8001",
+            "workerUrlHint": "Server 访问该 Worker 的 HTTP 地址。本机运行填 localhost，远程 GPU 服务器填对应 IP 或主机名。",
+            "effectiveWorkerUrl": "实际 Worker URL",
             "useMirror": "使用国内镜像",
-            "proxy": "代理（可选）",
+            "mirrorDetailsTitle": "镜像明细",
+            "mirrorDetailsHint": "勾选后会在安装与模型下载阶段使用以下镜像地址。",
+            "mirrorPython": "Python / uv 镜像",
+            "mirrorPyPI": "PyPI 镜像",
+            "mirrorHuggingFace": "Hugging Face 镜像",
+            "mirrorPyTorch": "PyTorch wheel 索引",
+            "mirrorPyTorchDefault": "默认官方源",
+            "useProxy": "使用代理（可选）",
+            "proxy": "代理地址",
             "proxyPlaceholder": "http://127.0.0.1:7890",
             "install": "安装",
             "installing": "安装中…",
@@ -1082,7 +1278,6 @@
                 "unloaded": "模型已卸载。",
                 "unloadFailed": "卸载失败：{{error}}"
             }
-        },
-        "footer": "开发环境下会从 src-tauri-worker/resources/uv 解析 bundled uv，运行时则使用打包后的资源。"
+        }
     }
 }

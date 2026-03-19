@@ -9,6 +9,16 @@ use tokio::process::{Child, Command};
 static CHILD: once_cell::sync::Lazy<Mutex<HashMap<String, Child>>> =
     once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
 
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+#[cfg(windows)]
+fn hide_console_window(cmd: &mut Command) {
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn hide_console_window(_: &mut Command) {}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HealthPayload {
     pub status: Option<String>,
@@ -83,6 +93,15 @@ fn worker_base_url(port: u16) -> String {
     format!("http://127.0.0.1:{}", port)
 }
 
+fn advertised_worker_url(engine: &manager_state::EngineInfo) -> String {
+    engine
+        .advertise_url
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| worker_base_url(engine.port))
+}
+
 fn status_from_engine(
     engine: &manager_state::EngineInfo,
     running: bool,
@@ -91,7 +110,7 @@ fn status_from_engine(
     WorkerStatus {
         running,
         healthy,
-        url: worker_base_url(engine.port),
+        url: advertised_worker_url(engine),
         engine: engine.resolved_engine_name(),
         loaded: false,
         model_id: engine.initial_model_id.clone(),
@@ -141,7 +160,7 @@ async fn read_child_stderr(child: &mut Child) -> String {
 }
 
 pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String> {
-    let state = manager_state::load_state(app).await?;
+    let (runtime_root, state) = manager_state::load_state_for_engine(app, engine_id).await?;
     let engine = state
         .engines
         .get(engine_id)
@@ -159,11 +178,12 @@ pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String
     if !main_py.exists() {
         return Err(format!(
             "worker main.py not found: {}",
-            main_py.to_string_lossy()
+            paths::display_path(&main_py)
         ));
     }
 
     let mut cmd = Command::new(&python);
+    hide_console_window(&mut cmd);
     cmd.arg(&main_py);
     cmd.current_dir(&worker_dir);
     cmd.env("PORT", engine.port.to_string());
@@ -181,6 +201,13 @@ pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String
         .filter(|value| !value.trim().is_empty())
     {
         cmd.env("SERVER_URL", server_url);
+    }
+    if let Some(advertise_url) = engine
+        .advertise_url
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        cmd.env("ADVERTISE_URL", advertise_url);
     }
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
@@ -213,10 +240,10 @@ pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String
         match check_health(engine.port).await {
             Ok(status) if status.healthy => {
                 let _ = app.emit("worker-log", format!("Worker healthy at {}", url));
-                let mut state = manager_state::load_state(app).await?;
+                let mut state = manager_state::load_state_for_runtime_root(app, &runtime_root).await?;
                 if let Some(installed_engine) = state.engines.get_mut(engine_id) {
                     installed_engine.last_started = Some(manager_state::now_iso());
-                    manager_state::save_state(app, &state).await?;
+                    manager_state::save_state_for_runtime_root(app, &runtime_root, &state).await?;
                 }
                 return Ok(());
             }
@@ -249,7 +276,7 @@ pub async fn stop_worker(_app: &AppHandle, engine_id: &str) -> Result<(), String
 }
 
 pub async fn get_worker_status(app: &AppHandle, engine_id: &str) -> Result<WorkerStatus, String> {
-    let state = manager_state::load_state(app).await?;
+    let (_, state) = manager_state::load_state_for_engine(app, engine_id).await?;
     let engine = state
         .engines
         .get(engine_id)
@@ -283,7 +310,7 @@ async fn management_request<T: serde::de::DeserializeOwned>(
     path: &str,
     body: Option<Value>,
 ) -> Result<T, String> {
-    let state = manager_state::load_state(app).await?;
+    let (_, state) = manager_state::load_state_for_engine(app, engine_id).await?;
     let engine = state
         .engines
         .get(engine_id)

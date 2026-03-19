@@ -956,15 +956,27 @@
             "back": "Back",
             "cancel": "Cancel"
         },
+        "theme": {
+            "toggle": "Toggle theme (current: {{theme}})",
+            "options": {
+                "auto": "Auto",
+                "light": "Light",
+                "dark": "Dark"
+            }
+        },
         "hardware": {
             "title": "Hardware",
+            "summaryDescription": "Detected hardware drives the recommended engine, device, and initial model defaults.",
             "detecting": "Detecting…",
             "cpu": "CPU",
             "ram": "RAM",
             "cuda": "CUDA",
             "mps": "MPS",
             "recommended": "Recommended",
-            "computeKey": "Compute key"
+            "computeKey": "Compute key",
+            "cores": "cores",
+            "cpuOnly": "CPU only",
+            "appleSilicon": "Apple Silicon"
         },
         "engine": {
             "installStatus": "Install status",
@@ -973,10 +985,126 @@
             "installDir": "Install dir",
             "noStatus": "No status yet."
         },
+        "catalog": {
+            "engines": {
+                "whisper-openai": {
+                    "description": "OpenAI Whisper local worker with flexible model choices."
+                },
+                "sensevoice": {
+                    "description": "FunASR SenseVoice with built-in VAD and fast multilingual speech recognition."
+                },
+                "qwen3asr": {
+                    "description": "Qwen3-ASR speech recognition with forced aligner for high-quality timestamps."
+                }
+            },
+            "models": {
+                "whisper_tiny": {
+                    "label": "Tiny",
+                    "description": "Fastest Whisper option with the smallest footprint for lightweight or CPU-first setups."
+                },
+                "whisper_small": {
+                    "label": "Small",
+                    "description": "Balanced Whisper model for lighter hardware and faster local transcription."
+                },
+                "whisper_medium": {
+                    "label": "Medium",
+                    "description": "Mid-sized Whisper model with a stronger accuracy / speed trade-off."
+                },
+                "whisper_large_v3": {
+                    "label": "Large V3",
+                    "description": "Highest-accuracy Whisper Large V3 model for users who prefer the standard non-turbo variant."
+                },
+                "whisper_large_v3_turbo": {
+                    "label": "Large V3 Turbo",
+                    "description": "Recommended Whisper Large V3 Turbo model for strong accuracy with faster local inference."
+                },
+                "sensevoice_small": {
+                    "label": "SenseVoice Small",
+                    "description": "Compact multilingual SenseVoice model with built-in VAD and fast recognition."
+                },
+                "qwen3_asr": {
+                    "label": "Qwen3-ASR 1.7B",
+                    "description": "Qwen3-ASR 1.7B model with forced aligner for precise timestamp generation."
+                },
+                "__none__": {
+                    "label": "Skip download (place manually)"
+                }
+            }
+        },
+        "tags": {
+            "recommended": "Recommended",
+            "multilingual": "Multilingual",
+            "fast": "Fast",
+            "balanced": "Balanced",
+            "accurate": "Accurate",
+            "lightweight": "Lightweight"
+        },
         "dashboard": {
             "title": "Dashboard",
+            "description": "View and manage installed speech recognition engines.",
             "installedEngines": "Installed engines",
-            "engineDescription": "Manage the selected worker, inspect status, and operate models.",
+            "listDescription": "{{count}} engines installed.",
+            "selected": "Selected",
+            "overviewTitle": "Overview",
+            "summaryTitle": "Engine summary",
+            "summaryDescription": "Overview of the current engine.",
+            "engineDescription": "View engine status, manage models and settings.",
+            "sidebarHint": "Click to switch between engines.",
+            "commandCenterTitle": "Command bar",
+            "commandCenterDescription": "Engine configuration and status.",
+            "recentActivityTitle": "Recent activity",
+            "installRuntimeTitle": "Install & runtime info",
+            "installRuntimeDescription": "Installation location, runtime device, and service configuration.",
+            "engineId": "Engine ID",
+            "workerStatusTitle": "Worker status",
+            "workerStatusDescription": "Current worker runtime status.",
+            "workerUrl": "Worker URL",
+            "loadedModel": "Loaded model",
+            "loadedDevice": "Runtime device",
+            "installedModelsLabel": "Installed models",
+            "configuredPortLabel": "Configured port",
+            "quickFactsTitle": "Quick facts",
+            "lastStartedLabel": "Last started",
+            "neverStarted": "Never started",
+            "tabs": {
+                "overview": "Overview",
+                "models": "Models",
+                "network": "Network",
+                "advanced": "Advanced"
+            },
+            "advancedTitle": "Advanced details",
+            "advancedDescription": "View engine details or perform operations like uninstall.",
+            "networkSettingsTitle": "Network settings",
+            "networkSettingsDescription": "Configure the worker's port and network addresses.",
+            "networkSaving": "Saving…",
+            "networkSaved": "Network settings saved.",
+            "networkSaveFailed": "Failed to save network settings: {{error}}",
+            "modelManagementDescription": "View and manage available speech recognition models.",
+            "inventoryHint": "Manage all models in a compact list.",
+            "inventoryReady": "Model operations are available for this running managed worker.",
+            "inventoryColumns": {
+                "model": "Model",
+                "footprint": "Footprint",
+                "status": "Status",
+                "actions": "Actions"
+            },
+            "modelMeta": {
+                "size": "Size",
+                "vram": "VRAM"
+            },
+            "modelState": {
+                "compatibility": "Compatibility",
+                "mps": "MPS",
+                "dependencies": "Dependencies"
+            },
+            "dangerZoneTitle": "Danger zone",
+            "uninstallHint": "Uninstall removes the local engine installation and its manager record.",
+            "badges": {
+                "running": "Running",
+                "healthy": "Healthy",
+                "loaded": "Loaded",
+                "management": "Management"
+            },
             "emptySelection": "Select an installed engine to continue."
         },
         "wizard": {
@@ -987,30 +1115,98 @@
                 "install": "Install",
                 "complete": "Complete"
             },
-            "hardwareDescription": "Review the detected hardware and continue with the recommended device, or switch later during engine setup.",
+            "stepStates": {
+                "current": "Current step",
+                "done": "Done",
+                "upcoming": "Upcoming"
+            },
+            "stepRailTitle": "Setup flow",
+            "summaryTitle": "Context summary",
+            "summaryDescription": "Configuration overview during installation.",
+            "summary": {
+                "currentEngine": "Engine",
+                "model": "Initial model",
+                "device": "Device",
+                "port": "Port",
+                "workerUrl": "Worker URL",
+                "serverUrl": "Server URL",
+                "target": "Target folder",
+                "installedEngines": "Installed engines",
+                "stage": "Stage monitor",
+                "logCount": "Latest {{count}} updates"
+            },
+            "hardwareDescription": "Review the detected hardware first, then continue with the recommended device or adjust it on the next step.",
+            "hardwareSummaryTitle": "Hardware summary",
+            "hardwareSummaryDescription": "Detected CPU, memory, and GPU information.",
+            "hardwareLead": "Review your hardware. The next step will recommend an engine and device based on these results.",
+            "hardwareRecommendationTitle": "Recommended starting point",
+            "hardwareRecommendationDescription": "Recommended configuration based on your hardware. You can adjust in the next step.",
             "engineDescription": "Choose an engine, install path, device, and initial model.",
+            "engineFitTitle": "Engine & hardware fit",
+            "engineFitDescription": "Select an engine and a matching device and model will be recommended.",
+            "enginePrimaryTitle": "1. Pick the engine",
+            "enginePrimaryDescription": "Choose the engine to install, then set the initial model and device.",
+            "engineSecondaryTitle": "2. Configure runtime and downloads",
+            "engineSecondaryDescription": "Configure port, network addresses, install location, and download options.",
+            "runtimeConfigTitle": "Runtime config",
+            "runtimeConfigDescription": "Configure the worker port and the Server URL it should talk back to.",
+            "downloadInstallTitle": "Download & install",
+            "downloadInstallDescription": "Choose install location, mirrors, and proxy settings for dependency and model downloads.",
             "installDescription": "Installing {{engine}}. This may take a while depending on Python packages and model downloads.",
+            "installLead": "Progress and recent logs are shown below.",
+            "installRecentLogsTitle": "Recent install log",
             "completeTitle": "Engine installation complete",
             "completeDescription": "{{engine}} is ready. You can return to the dashboard or continue adding another engine.",
+            "completeNextTitle": "Next actions",
+            "completeNextDescription": "Return to the dashboard to manage your engines, or continue installing another.",
+            "completePrimaryAction": "Open dashboard",
+            "completeSecondaryAction": "Install another engine",
+            "selected": "Selected",
             "noAvailableEngines": "All currently supported local engines are already installed."
         },
         "status": {
             "details": "URL: {{url}} | model={{model}} | device={{device}}"
         },
         "install": {
-            "locationTitle": "Install location",
+            "locationTitle": "Runtime root",
             "browse": "Browse…",
-            "browseDialogTitle": "Choose engine install directory",
-            "locationHint": "Worker files will be written directly into this folder: venv/, models/, asr_worker/, worker_config.yaml.",
-            "defaultBase": "Default worker base: {{path}}",
-            "currentTarget": "Current target",
+            "browseDialogTitle": "Choose runtime root",
+            "locationHint": "This path is the root for the whole worker runtime. If you set it manually, uv, engines, downloaded models, and manager_state.json all live under this directory; the app install location stays separate.",
+            "protectedLocationWarning": "This folder is under a Windows protected location. Installation may require administrator permission, and writes can fail if the app cannot create files there.",
+            "protectedLocationExamples": "Common protected locations include Program Files and the Windows directory.",
+            "defaultBase": "Default runtime root: {{path}}",
+            "appInstallDir": "App install location: {{path}}",
+            "currentTarget": "Current runtime root",
+            "runtimeRoot": "Runtime root",
+            "engineInstallDir": "Engine directory",
+            "uvPath": "uv path",
+            "managerStatePath": "Manager state file",
+            "latestStage": "Current stage",
+            "phaseLabel": "Phase",
+            "progressLabel": "Progress",
+            "targetLabel": "Target directory",
+            "logTitle": "Install log",
+            "logHint": "Raw log output stays in a secondary details area for troubleshooting.",
+            "logEntries": "log entries",
             "port": "Port",
             "initialModel": "Initial model",
             "device": "Device",
             "serverUrl": "Server URL",
             "serverUrlPlaceholder": "http://127.0.0.1:5023",
+            "workerUrl": "Worker URL",
+            "workerUrlPlaceholder": "http://localhost:8001",
+            "workerUrlHint": "HTTP address the server uses to reach this worker. Use localhost for local workers, or IP/hostname for remote GPU servers.",
+            "effectiveWorkerUrl": "Effective worker URL",
             "useMirror": "Use China mirrors",
-            "proxy": "Proxy (optional)",
+            "mirrorDetailsTitle": "Mirror details",
+            "mirrorDetailsHint": "When enabled, installs and model downloads will use the mirror endpoints below.",
+            "mirrorPython": "Python / uv mirror",
+            "mirrorPyPI": "PyPI mirror",
+            "mirrorHuggingFace": "Hugging Face mirror",
+            "mirrorPyTorch": "PyTorch wheel index",
+            "mirrorPyTorchDefault": "Default upstream",
+            "useProxy": "Use proxy (optional)",
+            "proxy": "Proxy URL",
             "proxyPlaceholder": "http://127.0.0.1:7890",
             "install": "Install",
             "installing": "Installing…",
@@ -1068,7 +1264,6 @@
                 "unloaded": "Model unloaded.",
                 "unloadFailed": "Unload failed: {{error}}"
             }
-        },
-        "footer": "Bundled uv is resolved from src-tauri-worker/resources/uv during development and packaged resources at runtime."
+        }
     }
 }

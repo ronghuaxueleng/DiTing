@@ -1,11 +1,11 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
   "productName": "DiTing Worker Manager",
-  "version": "0.1.0",
+  "version": "0.13.0",
   "identifier": "com.diting.worker-manager",
   "build": {
-    "beforeBuildCommand": "cd frontend && npm run build",
-    "beforeDevCommand": "cd frontend && npm run dev -- --port 5173",
+    "beforeBuildCommand": "npm --prefix frontend run build",
+    "beforeDevCommand": "npm --prefix frontend run dev -- --port 5173",
     "devUrl": "http://localhost:5173/worker-manager.html",
     "frontendDist": "../frontend/dist"
   },
@@ -16,10 +16,10 @@
         "label": "main",
         "title": "DiTing Worker Manager",
         "url": "/worker-manager.html",
-        "width": 900,
-        "height": 640,
-        "minWidth": 800,
-        "minHeight": 560,
+        "width": 1360,
+        "height": 780,
+        "minWidth": 1120,
+        "minHeight": 640,
         "center": true,
         "decorations": true
       }
@@ -38,7 +38,6 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "./resources/**/*",
       "../asr_worker/**/*"
     ]
   }
