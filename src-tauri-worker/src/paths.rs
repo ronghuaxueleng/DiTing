@@ -30,18 +30,6 @@ pub fn engine_dir(app: &AppHandle, engine_id: &str) -> PathBuf {
     engines_dir(app).join(engine_id)
 }
 
-pub fn engine_venv_dir(app: &AppHandle, engine_id: &str) -> PathBuf {
-    engine_venv_dir_from_install_dir(&engine_dir(app, engine_id))
-}
-
-pub fn engine_worker_src_dir(app: &AppHandle, engine_id: &str) -> PathBuf {
-    engine_worker_src_dir_from_install_dir(&engine_dir(app, engine_id))
-}
-
-pub fn engine_models_dir(app: &AppHandle, engine_id: &str) -> PathBuf {
-    engine_models_dir_from_install_dir(&engine_dir(app, engine_id))
-}
-
 pub fn resolve_engine_install_dir(app: &AppHandle, engine_id: &str, install_dir: &str) -> PathBuf {
     let trimmed = install_dir.trim();
     if trimmed.is_empty() {

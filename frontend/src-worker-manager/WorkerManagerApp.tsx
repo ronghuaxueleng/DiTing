@@ -103,6 +103,33 @@ type WorkerOperationStatus = {
 }
 
 const DEFAULT_PORT = 8001
+const buttonBaseClass =
+    'px-3 py-1.5 rounded text-sm border transition-all duration-150 shadow-sm hover:shadow-md active:translate-y-px active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-sm disabled:active:translate-y-0 disabled:active:scale-100'
+const primaryButtonStyle = {
+    borderColor: 'transparent',
+    background: 'var(--color-primary)',
+    color: 'white',
+}
+const secondaryButtonStyle = {
+    borderColor: 'var(--color-border)',
+    background: 'var(--color-card)',
+    color: 'var(--color-text)',
+}
+const dangerButtonStyle = {
+    borderColor: 'transparent',
+    background: 'var(--color-error)',
+    color: 'white',
+}
+const activeButtonStyle = {
+    borderColor: 'rgba(16,185,129,0.35)',
+    background: 'rgba(16,185,129,0.08)',
+    color: 'var(--color-success)',
+}
+const dangerOutlineButtonStyle = {
+    borderColor: 'rgba(239,68,68,0.35)',
+    background: 'var(--color-card)',
+    color: 'var(--color-error)',
+}
 
 export default function WorkerManagerApp() {
     const [hardware, setHardware] = useState<HardwareInfo | null>(null)
@@ -123,6 +150,7 @@ export default function WorkerManagerApp() {
     const [modelActionMessage, setModelActionMessage] = useState<string | null>(null)
     const [operationStatus, setOperationStatus] = useState<WorkerOperationStatus | null>(null)
     const [operationPolling, setOperationPolling] = useState<string | null>(null)
+    const [actionPending, setActionPending] = useState<string | null>(null)
 
     const engineId = 'whisper-openai'
     const installedEngine = state?.engines?.[engineId] ?? null
@@ -141,6 +169,8 @@ export default function WorkerManagerApp() {
         }
         return Math.max(0, Math.min(100, Math.round((installProgress.step_index / installProgress.step_total) * 100)))
     }, [installProgress])
+
+    const hasBusyOperation = !!operationPolling || !!actionPending
 
     async function refreshState() {
         const s = await invoke<ManagerState>('get_manager_state')
@@ -237,6 +267,7 @@ export default function WorkerManagerApp() {
                     if (op.status === 'completed' || op.status === 'failed') {
                         window.clearInterval(timer)
                         setOperationPolling(null)
+                        setActionPending(null)
                         void refreshWorkerStatus()
                         if (op.status === 'completed') {
                             void refreshModels()
@@ -245,6 +276,7 @@ export default function WorkerManagerApp() {
                 } catch (e) {
                     setOperationStatus(null)
                     setOperationPolling(null)
+                    setActionPending(null)
                     setModelActionMessage(`Operation polling failed: ${String(e)}`)
                     window.clearInterval(timer)
                 }
@@ -328,36 +360,58 @@ export default function WorkerManagerApp() {
     }
 
     async function doUninstall() {
-        await invoke('uninstall_engine', { engineId })
-        await refreshState()
-        setStatus(null)
-        setModels([])
-        setOperationStatus(null)
+        setActionPending('uninstall')
         setModelActionMessage(null)
+        try {
+            await invoke('uninstall_engine', { engineId })
+            await refreshState()
+            setStatus(null)
+            setModels([])
+            setOperationStatus(null)
+            setModelActionMessage(null)
+        } finally {
+            setActionPending(null)
+        }
     }
 
     async function doStart() {
+        setActionPending('start')
         setModelActionMessage(null)
-        await invoke('start_worker', { engineId })
-        const s = await invoke<WorkerStatus>('get_worker_status', { engineId })
-        setStatus(s)
+        try {
+            await invoke('start_worker', { engineId })
+            const s = await invoke<WorkerStatus>('get_worker_status', { engineId })
+            setStatus(s)
+        } finally {
+            setActionPending(null)
+        }
     }
 
     async function doStop() {
+        setActionPending('stop')
         setModelActionMessage(null)
-        await invoke('stop_worker', { engineId })
-        const s = await invoke<WorkerStatus>('get_worker_status', { engineId })
-        setStatus(s)
-        setModels([])
+        try {
+            await invoke('stop_worker', { engineId })
+            const s = await invoke<WorkerStatus>('get_worker_status', { engineId })
+            setStatus(s)
+            setModels([])
+        } finally {
+            setActionPending(null)
+        }
     }
 
     async function doCheck() {
+        setActionPending('check')
         setModelActionMessage(null)
-        const s = await invoke<WorkerStatus>('get_worker_status', { engineId })
-        setStatus(s)
+        try {
+            const s = await invoke<WorkerStatus>('get_worker_status', { engineId })
+            setStatus(s)
+        } finally {
+            setActionPending(null)
+        }
     }
 
     async function trackOperation(response: WorkerOperationResponse, fallbackMessage: string) {
+        setActionPending(null)
         if (response.operation_id) {
             setModelActionMessage(fallbackMessage)
             setOperationStatus(null)
@@ -370,6 +424,7 @@ export default function WorkerManagerApp() {
     }
 
     async function doDownloadModel(managedModelId: string) {
+        setActionPending(`download:${managedModelId}`)
         try {
             const response = await invoke<WorkerOperationResponse>('download_worker_model', {
                 engineId,
@@ -379,11 +434,13 @@ export default function WorkerManagerApp() {
             })
             await trackOperation(response, `Downloading ${managedModelId}...`)
         } catch (e) {
+            setActionPending(null)
             setModelActionMessage(`Download failed: ${String(e)}`)
         }
     }
 
     async function doActivateModel(managedModelId: string) {
+        setActionPending(`activate:${managedModelId}`)
         try {
             const response = await invoke<WorkerOperationResponse>('activate_worker_model', {
                 engineId,
@@ -391,11 +448,13 @@ export default function WorkerManagerApp() {
             })
             await trackOperation(response, `Activating ${managedModelId}...`)
         } catch (e) {
+            setActionPending(null)
             setModelActionMessage(`Activate failed: ${String(e)}`)
         }
     }
 
     async function doDeleteModel(managedModelId: string) {
+        setActionPending(`delete:${managedModelId}`)
         try {
             await invoke('delete_worker_model', {
                 engineId,
@@ -406,10 +465,13 @@ export default function WorkerManagerApp() {
             void refreshModels()
         } catch (e) {
             setModelActionMessage(`Delete failed: ${String(e)}`)
+        } finally {
+            setActionPending(null)
         }
     }
 
     async function doUnloadModel() {
+        setActionPending('unload')
         try {
             await invoke('unload_worker_model', { engineId })
             setModelActionMessage('Model unloaded.')
@@ -417,6 +479,8 @@ export default function WorkerManagerApp() {
             void refreshModels()
         } catch (e) {
             setModelActionMessage(`Unload failed: ${String(e)}`)
+        } finally {
+            setActionPending(null)
         }
     }
 
@@ -431,8 +495,8 @@ export default function WorkerManagerApp() {
                         </p>
                     </div>
                     <button
-                        className="text-sm px-3 py-1.5 rounded border"
-                        style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
+                        className={buttonBaseClass}
+                        style={secondaryButtonStyle}
                         onClick={refreshState}
                     >
                         Refresh
@@ -481,8 +545,8 @@ export default function WorkerManagerApp() {
                                         onChange={(e) => setInstallDir(e.target.value)}
                                     />
                                     <button
-                                        className="px-3 py-1.5 rounded text-sm border"
-                                        style={{ borderColor: 'var(--color-border)' }}
+                                        className={buttonBaseClass}
+                                        style={secondaryButtonStyle}
                                         disabled={installing}
                                         onClick={doBrowseInstallDir}
                                     >
@@ -550,8 +614,8 @@ export default function WorkerManagerApp() {
 
                             <div className="flex gap-2">
                                 <button
-                                    className="px-3 py-1.5 rounded text-sm"
-                                    style={{ background: 'var(--color-primary)', color: 'white' }}
+                                    className={buttonBaseClass}
+                                    style={primaryButtonStyle}
                                     disabled={installing || !effectiveInstallDir}
                                     onClick={doInstall}
                                 >
@@ -567,40 +631,44 @@ export default function WorkerManagerApp() {
 
                             <div className="flex flex-wrap gap-2">
                                 <button
-                                    className="px-3 py-1.5 rounded text-sm"
-                                    style={{ background: 'var(--color-primary)', color: 'white' }}
+                                    className={buttonBaseClass}
+                                    style={primaryButtonStyle}
+                                    disabled={hasBusyOperation}
                                     onClick={doStart}
                                 >
-                                    Start
+                                    {actionPending === 'start' ? 'Starting…' : 'Start'}
                                 </button>
                                 <button
-                                    className="px-3 py-1.5 rounded text-sm border"
-                                    style={{ borderColor: 'var(--color-border)' }}
+                                    className={buttonBaseClass}
+                                    style={secondaryButtonStyle}
+                                    disabled={hasBusyOperation}
                                     onClick={doStop}
                                 >
-                                    Stop
+                                    {actionPending === 'stop' ? 'Stopping…' : 'Stop'}
                                 </button>
                                 <button
-                                    className="px-3 py-1.5 rounded text-sm border"
-                                    style={{ borderColor: 'var(--color-border)' }}
+                                    className={buttonBaseClass}
+                                    style={secondaryButtonStyle}
+                                    disabled={hasBusyOperation}
                                     onClick={doCheck}
                                 >
-                                    Check
+                                    {actionPending === 'check' ? 'Checking…' : 'Check'}
                                 </button>
                                 <button
-                                    className="px-3 py-1.5 rounded text-sm border"
-                                    style={{ borderColor: 'var(--color-border)' }}
-                                    disabled={!status?.running || !status?.loaded}
+                                    className={buttonBaseClass}
+                                    style={secondaryButtonStyle}
+                                    disabled={!status?.running || !status?.loaded || hasBusyOperation}
                                     onClick={doUnloadModel}
                                 >
-                                    Unload model
+                                    {actionPending === 'unload' ? 'Unloading…' : 'Unload model'}
                                 </button>
                                 <button
-                                    className="px-3 py-1.5 rounded text-sm"
-                                    style={{ background: 'var(--color-error)', color: 'white' }}
+                                    className={buttonBaseClass}
+                                    style={dangerButtonStyle}
+                                    disabled={hasBusyOperation}
                                     onClick={doUninstall}
                                 >
-                                    Uninstall
+                                    {actionPending === 'uninstall' ? 'Uninstalling…' : 'Uninstall'}
                                 </button>
                             </div>
 
@@ -623,9 +691,9 @@ export default function WorkerManagerApp() {
                                 <div className="flex items-center justify-between gap-4">
                                     <div className="font-medium">Model management</div>
                                     <button
-                                        className="px-3 py-1.5 rounded text-sm border"
-                                        style={{ borderColor: 'var(--color-border)' }}
-                                        disabled={!status?.running || !status?.management || loadingModels}
+                                        className={buttonBaseClass}
+                                        style={secondaryButtonStyle}
+                                        disabled={!status?.running || !status?.management || loadingModels || hasBusyOperation}
                                         onClick={() => void refreshModels()}
                                     >
                                         {loadingModels ? 'Refreshing…' : 'Refresh models'}
@@ -706,7 +774,14 @@ export default function WorkerManagerApp() {
                                                                 </span>
                                                             ) : null}
                                                             {managedModel.active ? (
-                                                                <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(59,130,246,0.12)' }}>
+                                                                <span
+                                                                    className="px-2 py-0.5 rounded inline-flex items-center gap-1"
+                                                                    style={{
+                                                                        background: 'rgba(16,185,129,0.12)',
+                                                                        color: 'var(--color-success)',
+                                                                    }}
+                                                                >
+                                                                    <span aria-hidden="true">●</span>
                                                                     Active
                                                                 </span>
                                                             ) : null}
@@ -726,26 +801,26 @@ export default function WorkerManagerApp() {
                                                     <div className="flex flex-col gap-2 min-w-[120px]">
                                                         {!managedModel.installed ? (
                                                             <button
-                                                                className="px-3 py-1.5 rounded text-sm"
-                                                                style={{ background: 'var(--color-primary)', color: 'white' }}
-                                                                disabled={!!operationPolling}
+                                                                className={buttonBaseClass}
+                                                                style={secondaryButtonStyle}
+                                                                disabled={hasBusyOperation}
                                                                 onClick={() => void doDownloadModel(managedModel.id)}
                                                             >
-                                                                Download
+                                                                {actionPending === `download:${managedModel.id}` ? 'Downloading…' : 'Download'}
                                                             </button>
                                                         ) : !managedModel.active ? (
                                                             <button
-                                                                className="px-3 py-1.5 rounded text-sm"
-                                                                style={{ background: 'var(--color-primary)', color: 'white' }}
-                                                                disabled={!status?.running || !!operationPolling}
+                                                                className={buttonBaseClass}
+                                                                style={primaryButtonStyle}
+                                                                disabled={!status?.running || hasBusyOperation}
                                                                 onClick={() => void doActivateModel(managedModel.id)}
                                                             >
-                                                                Activate
+                                                                {actionPending === `activate:${managedModel.id}` ? 'Activating…' : 'Activate'}
                                                             </button>
                                                         ) : (
                                                             <button
-                                                                className="px-3 py-1.5 rounded text-sm border"
-                                                                style={{ borderColor: 'var(--color-border)' }}
+                                                                className={buttonBaseClass}
+                                                                style={activeButtonStyle}
                                                                 disabled
                                                             >
                                                                 Active
@@ -754,12 +829,12 @@ export default function WorkerManagerApp() {
 
                                                         {managedModel.installed && !managedModel.active ? (
                                                             <button
-                                                                className="px-3 py-1.5 rounded text-sm border"
-                                                                style={{ borderColor: 'var(--color-border)' }}
-                                                                disabled={!!operationPolling}
+                                                                className={buttonBaseClass}
+                                                                style={dangerOutlineButtonStyle}
+                                                                disabled={hasBusyOperation}
                                                                 onClick={() => void doDeleteModel(managedModel.id)}
                                                             >
-                                                                Delete
+                                                                {actionPending === `delete:${managedModel.id}` ? 'Deleting…' : 'Delete'}
                                                             </button>
                                                         ) : null}
                                                     </div>
