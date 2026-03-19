@@ -36,3 +36,6 @@ CLAUDE.md
 src-tauri/target/
 src-tauri/binaries/
 src-tauri/diting-server-*
+src-tauri-worker/target/
+src-tauri-worker/gen/
+frontend/tsconfig.tsbuildinfo
