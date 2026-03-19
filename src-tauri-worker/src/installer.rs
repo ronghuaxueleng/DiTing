@@ -7,15 +7,55 @@ use tokio::process::Command;
 #[derive(Debug, Clone, Serialize)]
 pub struct InstallProgressPayload {
     pub engine_id: String,
-    pub step: String,
+    pub step_key: String,
+    pub step_label: String,
+    pub step_index: u8,
+    pub step_total: u8,
+    pub completed_steps: u8,
     pub message: String,
+    pub install_dir: String,
+    pub done: bool,
+    pub error: Option<String>,
 }
 
-fn emit(app: &AppHandle, step: &str, message: &str) {
+#[derive(Debug, Clone, Copy)]
+struct InstallStep {
+    key: &'static str,
+    label: &'static str,
+}
+
+const INSTALL_STEPS: [InstallStep; 8] = [
+    InstallStep { key: "uv", label: "Prepare uv" },
+    InstallStep { key: "python", label: "Install Python" },
+    InstallStep { key: "venv", label: "Create virtualenv" },
+    InstallStep { key: "deps", label: "Install dependencies" },
+    InstallStep { key: "model", label: "Download model" },
+    InstallStep { key: "worker", label: "Copy worker files" },
+    InstallStep { key: "config", label: "Write configuration" },
+    InstallStep { key: "state", label: "Save manager state" },
+];
+
+fn emit(
+    app: &AppHandle,
+    step: InstallStep,
+    step_index: usize,
+    completed_steps: usize,
+    message: &str,
+    install_dir: &Path,
+    done: bool,
+    error: Option<String>,
+) {
     let payload = InstallProgressPayload {
         engine_id: "whisper-openai".to_string(),
-        step: step.to_string(),
+        step_key: step.key.to_string(),
+        step_label: step.label.to_string(),
+        step_index: (step_index + 1) as u8,
+        step_total: INSTALL_STEPS.len() as u8,
+        completed_steps: completed_steps as u8,
         message: message.to_string(),
+        install_dir: install_dir.to_string_lossy().to_string(),
+        done,
+        error,
     };
     let _ = app.emit("install-progress", payload);
 }
@@ -282,171 +322,278 @@ pub async fn install_whisper_engine(
     model_id: &str,
     use_mirror: bool,
     proxy: &str,
+    install_dir: &str,
 ) -> Result<(), String> {
     let engine_id = "whisper-openai";
-    let engine_dir = paths::engine_dir(app, engine_id);
-    let venv_dir = paths::engine_venv_dir(app, engine_id);
-    let models_dir = paths::engine_models_dir(app, engine_id);
-    let worker_dir = paths::engine_worker_src_dir(app, engine_id);
+    let engine_dir = paths::resolve_engine_install_dir(app, engine_id, install_dir);
+    let venv_dir = paths::engine_venv_dir_from_install_dir(&engine_dir);
+    let models_dir = paths::engine_models_dir_from_install_dir(&engine_dir);
+    let worker_dir = paths::engine_worker_src_dir_from_install_dir(&engine_dir);
     let whisper_model_name = constants::find_model(model_id)
         .map(|m| m.whisper_model_name)
         .unwrap_or(model_id);
 
-    let _ = worker::stop_worker(app, engine_id).await;
+    let result: Result<(), String> = async {
+        let _ = worker::stop_worker(app, engine_id).await;
 
-    tokio::fs::create_dir_all(&engine_dir)
-        .await
-        .map_err(|e| e.to_string())?;
-    tokio::fs::create_dir_all(&models_dir)
-        .await
-        .map_err(|e| e.to_string())?;
+        tokio::fs::create_dir_all(&engine_dir)
+            .await
+            .map_err(|e| e.to_string())?;
+        tokio::fs::create_dir_all(&models_dir)
+            .await
+            .map_err(|e| e.to_string())?;
 
-    emit(app, "uv", "Preparing uv...");
-    ensure_uv_ready(app).await?;
+        emit(app, INSTALL_STEPS[0], 0, 0, "Preparing uv...", &engine_dir, false, None);
+        ensure_uv_ready(app).await?;
 
-    let mut envs: Vec<(&str, String)> = vec![];
-    if use_mirror {
-        envs.push(("UV_PYTHON_INSTALL_MIRROR", constants::MIRROR_UV_PYTHON.to_string()));
-        envs.push(("UV_INDEX_URL", constants::MIRROR_PYPI.to_string()));
-        envs.push(("HF_ENDPOINT", constants::MIRROR_HF_ENDPOINT.to_string()));
-    }
-    if !proxy.is_empty() {
-        envs.push(("HTTP_PROXY", proxy.to_string()));
-        envs.push(("HTTPS_PROXY", proxy.to_string()));
-        envs.push(("ALL_PROXY", proxy.to_string()));
-    }
+        let mut envs: Vec<(&str, String)> = vec![];
+        if use_mirror {
+            envs.push(("UV_PYTHON_INSTALL_MIRROR", constants::MIRROR_UV_PYTHON.to_string()));
+            envs.push(("UV_INDEX_URL", constants::MIRROR_PYPI.to_string()));
+            envs.push(("HF_ENDPOINT", constants::MIRROR_HF_ENDPOINT.to_string()));
+        }
+        if !proxy.is_empty() {
+            envs.push(("HTTP_PROXY", proxy.to_string()));
+            envs.push(("HTTPS_PROXY", proxy.to_string()));
+            envs.push(("ALL_PROXY", proxy.to_string()));
+        }
 
-    emit(app, "python", "Installing Python 3.11 via uv...");
-    run_uv(app, &["python", "install", constants::PYTHON_VERSION], envs.clone()).await?;
+        emit(
+            app,
+            INSTALL_STEPS[1],
+            1,
+            1,
+            "Installing Python 3.11 via uv...",
+            &engine_dir,
+            false,
+            None,
+        );
+        run_uv(app, &["python", "install", constants::PYTHON_VERSION], envs.clone()).await?;
 
-    emit(app, "venv", "Creating virtualenv...");
-    run_uv(
-        app,
-        &[
-            "venv",
-            venv_dir.to_string_lossy().as_ref(),
-            "--python",
-            constants::PYTHON_VERSION,
-        ],
-        envs.clone(),
-    )
-    .await?;
+        emit(
+            app,
+            INSTALL_STEPS[2],
+            2,
+            2,
+            "Creating virtualenv...",
+            &engine_dir,
+            false,
+            None,
+        );
+        run_uv(
+            app,
+            &[
+                "venv",
+                venv_dir.to_string_lossy().as_ref(),
+                "--python",
+                constants::PYTHON_VERSION,
+            ],
+            envs.clone(),
+        )
+        .await?;
 
-    emit(app, "deps", "Installing dependencies (torch + whisper + fastapi)...");
-    if let Some(url) = constants::pytorch_index_url("cpu", use_mirror) {
+        emit(
+            app,
+            INSTALL_STEPS[3],
+            3,
+            3,
+            "Installing dependencies (torch + whisper + fastapi)...",
+            &engine_dir,
+            false,
+            None,
+        );
+        if let Some(url) = constants::pytorch_index_url("cpu", use_mirror) {
+            run_uv(
+                app,
+                &[
+                    "pip",
+                    "install",
+                    "torch",
+                    "torchaudio",
+                    "--python",
+                    venv_dir.to_string_lossy().as_ref(),
+                    "--index-url",
+                    url,
+                ],
+                envs.clone(),
+            )
+            .await?;
+        } else {
+            run_uv(
+                app,
+                &[
+                    "pip",
+                    "install",
+                    "torch",
+                    "torchaudio",
+                    "--python",
+                    venv_dir.to_string_lossy().as_ref(),
+                ],
+                envs.clone(),
+            )
+            .await?;
+        }
+
         run_uv(
             app,
             &[
                 "pip",
                 "install",
-                "torch",
-                "torchaudio",
+                "openai-whisper>=20250625",
+                "fastapi>=0.128.0",
+                "uvicorn>=0.40.0",
+                "python-multipart>=0.0.21",
+                "pyyaml",
+                "numpy",
+                "pydantic>=2",
+                "starlette>=0.47.0",
+                "httpx>=0.28.0",
                 "--python",
                 venv_dir.to_string_lossy().as_ref(),
-                "--index-url",
-                url,
             ],
             envs.clone(),
         )
         .await?;
-    } else {
-        run_uv(
+
+        emit(
             app,
-            &[
-                "pip",
-                "install",
-                "torch",
-                "torchaudio",
-                "--python",
-                venv_dir.to_string_lossy().as_ref(),
-            ],
-            envs.clone(),
-        )
-        .await?;
+            INSTALL_STEPS[4],
+            4,
+            4,
+            "Downloading whisper model...",
+            &engine_dir,
+            false,
+            None,
+        );
+        let venv_python = constants::venv_python(&venv_dir);
+        let snippet = format!(
+            "import whisper; whisper.load_model('{}', download_root=r'{}')",
+            whisper_model_name,
+            models_dir.to_string_lossy()
+        );
+        let out = Command::new(&venv_python)
+            .args(["-c", &snippet])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            return Err(format!(
+                "model download failed: {}\n{}\n{}",
+                out.status,
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            ));
+        }
+
+        emit(
+            app,
+            INSTALL_STEPS[5],
+            5,
+            5,
+            "Copying asr_worker sources...",
+            &engine_dir,
+            false,
+            None,
+        );
+        let worker_source = resolve_worker_source(app)?;
+        if worker_dir.exists() {
+            let _ = tokio::fs::remove_dir_all(&worker_dir).await;
+        }
+        copy_dir_recursive(&worker_source, &worker_dir).await?;
+
+        emit(
+            app,
+            INSTALL_STEPS[6],
+            6,
+            6,
+            "Writing worker_config.yaml...",
+            &engine_dir,
+            false,
+            None,
+        );
+        write_worker_config(&worker_dir, port, "cpu", &models_dir, whisper_model_name)?;
+
+        emit(
+            app,
+            INSTALL_STEPS[7],
+            7,
+            7,
+            "Saving manager state...",
+            &engine_dir,
+            false,
+            None,
+        );
+        let mut state = manager_state::load_state(app).await?;
+        state.engines.insert(
+            engine_id.to_string(),
+            manager_state::EngineInfo {
+                engine_id: engine_id.to_string(),
+                display_name: "Whisper (OpenAI)".to_string(),
+                install_dir: engine_dir.to_string_lossy().to_string(),
+                port,
+                installed_at: manager_state::now_iso(),
+                last_started: None,
+            },
+        );
+        manager_state::save_state(app, &state).await?;
+
+        emit(
+            app,
+            INSTALL_STEPS[7],
+            7,
+            INSTALL_STEPS.len(),
+            "Installation complete.",
+            &engine_dir,
+            true,
+            None,
+        );
+        Ok(())
+    }
+    .await;
+
+    if let Err(error) = &result {
+        let (step, step_index, completed_steps) = match INSTALL_STEPS.last() {
+            Some(step) => (*step, INSTALL_STEPS.len() - 1, 0),
+            None => (
+                InstallStep {
+                    key: "failed",
+                    label: "Install failed",
+                },
+                0,
+                0,
+            ),
+        };
+        emit(
+            app,
+            step,
+            step_index,
+            completed_steps,
+            error,
+            &engine_dir,
+            true,
+            Some(error.clone()),
+        );
     }
 
-    run_uv(
-        app,
-        &[
-            "pip",
-            "install",
-            "openai-whisper>=20250625",
-            "fastapi>=0.128.0",
-            "uvicorn>=0.40.0",
-            "python-multipart>=0.0.21",
-            "pyyaml",
-            "numpy",
-            "pydantic>=2",
-            "starlette>=0.47.0",
-            "httpx>=0.28.0",
-            "--python",
-            venv_dir.to_string_lossy().as_ref(),
-        ],
-        envs.clone(),
-    )
-    .await?;
-
-    emit(app, "model", "Downloading whisper model...");
-    let venv_python = constants::venv_python(&venv_dir);
-    let snippet = format!(
-        "import os, whisper; os.environ['WHISPER_MODEL_PATH']=r'{}'; whisper.load_model('{}')",
-        models_dir.to_string_lossy(),
-        whisper_model_name
-    );
-    let out = Command::new(&venv_python)
-        .args(["-c", &snippet])
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !out.status.success() {
-        return Err(format!(
-            "model download failed: {}\n{}\n{}",
-            out.status,
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        ));
-    }
-
-    emit(app, "worker", "Copying asr_worker sources...");
-    let worker_source = resolve_worker_source(app)?;
-    if worker_dir.exists() {
-        let _ = tokio::fs::remove_dir_all(&worker_dir).await;
-    }
-    copy_dir_recursive(&worker_source, &worker_dir).await?;
-
-    emit(app, "config", "Writing worker_config.yaml...");
-    write_worker_config(&worker_dir, port, "cpu", &models_dir, whisper_model_name)?;
-
-    emit(app, "state", "Saving manager state...");
-    let mut state = manager_state::load_state(app).await?;
-    state.engines.insert(
-        engine_id.to_string(),
-        manager_state::EngineInfo {
-            engine_id: engine_id.to_string(),
-            display_name: "Whisper (OpenAI)".to_string(),
-            install_dir: engine_dir.to_string_lossy().to_string(),
-            port,
-            installed_at: manager_state::now_iso(),
-            last_started: None,
-        },
-    );
-    manager_state::save_state(app, &state).await?;
-
-    emit(app, "done", "Installation complete.");
-    Ok(())
+    result
 }
 
 pub async fn uninstall_engine(app: &AppHandle, engine_id: &str) -> Result<(), String> {
     let _ = worker::stop_worker(app, engine_id).await;
 
-    let engine_dir = paths::engine_dir(app, engine_id);
+    let mut state = manager_state::load_state(app).await?;
+    let engine_dir = state
+        .engines
+        .get(engine_id)
+        .map(|engine| PathBuf::from(&engine.install_dir))
+        .unwrap_or_else(|| paths::engine_dir(app, engine_id));
+
     if engine_dir.exists() {
         tokio::fs::remove_dir_all(&engine_dir)
             .await
             .map_err(|e| format!("Failed to remove engine directory: {e}"))?;
     }
 
-    let mut state = manager_state::load_state(app).await?;
     state.engines.remove(engine_id);
     manager_state::save_state(app, &state).await?;
     Ok(())

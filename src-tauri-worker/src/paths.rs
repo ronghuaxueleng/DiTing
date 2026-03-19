@@ -31,15 +31,36 @@ pub fn engine_dir(app: &AppHandle, engine_id: &str) -> PathBuf {
 }
 
 pub fn engine_venv_dir(app: &AppHandle, engine_id: &str) -> PathBuf {
-    engine_dir(app, engine_id).join("venv")
+    engine_venv_dir_from_install_dir(&engine_dir(app, engine_id))
 }
 
 pub fn engine_worker_src_dir(app: &AppHandle, engine_id: &str) -> PathBuf {
-    engine_dir(app, engine_id).join("asr_worker")
+    engine_worker_src_dir_from_install_dir(&engine_dir(app, engine_id))
 }
 
 pub fn engine_models_dir(app: &AppHandle, engine_id: &str) -> PathBuf {
-    engine_dir(app, engine_id).join("models")
+    engine_models_dir_from_install_dir(&engine_dir(app, engine_id))
+}
+
+pub fn resolve_engine_install_dir(app: &AppHandle, engine_id: &str, install_dir: &str) -> PathBuf {
+    let trimmed = install_dir.trim();
+    if trimmed.is_empty() {
+        engine_dir(app, engine_id)
+    } else {
+        PathBuf::from(trimmed)
+    }
+}
+
+pub fn engine_venv_dir_from_install_dir(install_dir: &Path) -> PathBuf {
+    install_dir.join("venv")
+}
+
+pub fn engine_worker_src_dir_from_install_dir(install_dir: &Path) -> PathBuf {
+    install_dir.join("asr_worker")
+}
+
+pub fn engine_models_dir_from_install_dir(install_dir: &Path) -> PathBuf {
+    install_dir.join("models")
 }
 
 pub fn manager_state_path(app: &AppHandle) -> PathBuf {

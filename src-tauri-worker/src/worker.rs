@@ -1,6 +1,8 @@
 use crate::{constants, manager_state, paths};
+use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, process::ExitStatus, sync::Mutex};
+use serde_json::{json, Value};
+use std::{collections::HashMap, path::PathBuf, process::ExitStatus, sync::Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::process::{Child, Command};
 
@@ -27,6 +29,54 @@ pub struct WorkerStatus {
     pub model_id: Option<String>,
     pub device: Option<String>,
     pub management: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerManagedModel {
+    pub id: String,
+    pub engine: String,
+    pub model_id: String,
+    pub display_name: String,
+    pub download_size_mb: u32,
+    pub vram_required_mb: u32,
+    pub accuracy: u8,
+    pub speed: u8,
+    pub supports_mps: bool,
+    pub description: String,
+    pub tags: Vec<String>,
+    pub compatible: bool,
+    pub reason: String,
+    pub installed: bool,
+    pub active: bool,
+    pub deps_installed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerModelsResponse {
+    pub models: Vec<WorkerManagedModel>,
+    pub active_model_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerOperationResponse {
+    pub operation_id: Option<String>,
+    pub status: Option<String>,
+    pub model_id: Option<String>,
+    pub from: Option<String>,
+    pub to: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerOperationStatus {
+    pub id: String,
+    pub r#type: String,
+    pub status: String,
+    pub detail: String,
+    pub progress: Vec<String>,
+    pub result: Option<Value>,
+    pub error: Option<String>,
+    pub created_at: f64,
+    pub completed_at: Option<f64>,
 }
 
 fn default_status(url: String) -> WorkerStatus {
@@ -104,9 +154,10 @@ pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String
 
     remove_child(engine_id).await;
 
-    let venv_dir = paths::engine_venv_dir(app, engine_id);
+    let engine_install_dir = PathBuf::from(&engine.install_dir);
+    let venv_dir = paths::engine_venv_dir_from_install_dir(&engine_install_dir);
     let python = constants::venv_python(&venv_dir);
-    let worker_dir = paths::engine_worker_src_dir(app, engine_id);
+    let worker_dir = paths::engine_worker_src_dir_from_install_dir(&engine_install_dir);
     let main_py = worker_dir.join("main.py");
 
     if !main_py.exists() {
@@ -121,7 +172,7 @@ pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String
     cmd.env("ASR_DEVICE", "cpu");
     cmd.env(
         "MODEL_BASE_PATH",
-        paths::engine_models_dir(app, engine_id)
+        paths::engine_models_dir_from_install_dir(&engine_install_dir)
             .to_string_lossy()
             .to_string(),
     );
@@ -208,8 +259,118 @@ pub async fn get_worker_status(app: &AppHandle, engine_id: &str) -> Result<Worke
         .or_else(|_| Ok(unhealthy_status(url)))
 }
 
+fn worker_base_url(port: u16) -> String {
+    format!("http://127.0.0.1:{}", port)
+}
+
+async fn management_request<T: serde::de::DeserializeOwned>(
+    app: &AppHandle,
+    engine_id: &str,
+    method: Method,
+    path: &str,
+    body: Option<Value>,
+) -> Result<T, String> {
+    let state = manager_state::load_state(app).await?;
+    let engine = state
+        .engines
+        .get(engine_id)
+        .ok_or_else(|| format!("Engine {engine_id} not installed"))?;
+
+    let status = get_worker_status(app, engine_id).await?;
+    if !status.running {
+        return Err(format!("Worker {engine_id} is not running"));
+    }
+    if !status.management {
+        return Err(format!("Worker {engine_id} does not expose management API"));
+    }
+
+    let client = Client::new();
+    let url = format!("{}/management{}", worker_base_url(engine.port), path);
+    let mut request = client.request(method, url);
+    if let Some(body) = body {
+        request = request.json(&body);
+    }
+
+    let response = request.send().await.map_err(|e| e.to_string())?;
+    let response = response.error_for_status().map_err(|e| e.to_string())?;
+    response.json::<T>().await.map_err(|e| e.to_string())
+}
+
+pub async fn list_models(app: &AppHandle, engine_id: &str) -> Result<WorkerModelsResponse, String> {
+    management_request(app, engine_id, Method::GET, "/models", None).await
+}
+
+pub async fn download_model(
+    app: &AppHandle,
+    engine_id: &str,
+    model_id: &str,
+    use_mirror: bool,
+    proxy: &str,
+) -> Result<WorkerOperationResponse, String> {
+    management_request(
+        app,
+        engine_id,
+        Method::POST,
+        &format!("/models/{model_id}/download"),
+        Some(json!({
+            "use_mirror": use_mirror,
+            "proxy": proxy,
+        })),
+    )
+    .await
+}
+
+pub async fn activate_model(
+    app: &AppHandle,
+    engine_id: &str,
+    model_id: &str,
+) -> Result<WorkerOperationResponse, String> {
+    management_request(
+        app,
+        engine_id,
+        Method::POST,
+        &format!("/models/{model_id}/activate"),
+        Some(json!({})),
+    )
+    .await
+}
+
+pub async fn delete_model(
+    app: &AppHandle,
+    engine_id: &str,
+    model_id: &str,
+) -> Result<Value, String> {
+    management_request(
+        app,
+        engine_id,
+        Method::DELETE,
+        &format!("/models/{model_id}"),
+        None,
+    )
+    .await
+}
+
+pub async fn unload_model(app: &AppHandle, engine_id: &str) -> Result<Value, String> {
+    management_request(app, engine_id, Method::POST, "/models/unload", Some(json!({}))).await
+}
+
+pub async fn get_operation_status(
+    app: &AppHandle,
+    engine_id: &str,
+    operation_id: &str,
+) -> Result<WorkerOperationStatus, String> {
+    management_request(
+        app,
+        engine_id,
+        Method::GET,
+        &format!("/operations/{operation_id}"),
+        None,
+    )
+    .await
+}
+
 pub async fn check_health(port: u16) -> Result<WorkerStatus, String> {
-    let url = format!("http://127.0.0.1:{}", port);
+    let url = worker_base_url(port);
     let resp = reqwest::get(format!("{}/health", url))
         .await
         .map_err(|e| e.to_string())?;

@@ -177,12 +177,8 @@ def _get_gpu_info() -> dict | None:
 
 
 def _get_model_id() -> str | None:
-    """Get current model ID — prefer EngineManager, fallback to config."""
-    if engine_manager.active_model_id:
-        return engine_manager.active_model_id
-    models = _cfg.get("models", {})
-    engine_cfg = models.get(ASR_ENGINE_TYPE, {})
-    return engine_cfg.get("model_id") or engine_cfg.get("model_name")
+    """Get the currently loaded model ID, if any."""
+    return engine_manager.active_model_id
 
 app = FastAPI(lifespan=lifespan)
 

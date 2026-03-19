@@ -91,6 +91,8 @@ class EngineManager:
             self._active_engine_name = engine_type
             # Try to find matching catalog model id
             self._active_model_id = self._find_catalog_id_for_engine(engine_type)
+            if self._active_model_id and self._model_state.is_installed(self._active_model_id):
+                self._model_state.set_active(self._active_model_id)
             logger.info(f"Engine loaded from config: {engine_type}")
         except Exception as e:
             logger.error(f"Failed to load engine {engine_type}: {e}")
