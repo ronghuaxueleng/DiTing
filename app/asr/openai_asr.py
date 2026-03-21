@@ -82,7 +82,14 @@ class OpenAIASREngine(ASREngine):
     def predict(self, audio_path: str, language: str = "zh",
                 initial_prompt: str = None, check_cancel_func=None) -> str:
         resp = self._request(audio_path, language, initial_prompt, "text", check_cancel_func)
-        return resp.text
+        text = resp.text
+        # Some providers return JSON even when "text" format is requested
+        if text.startswith("{"):
+            try:
+                return resp.json().get("text", text)
+            except Exception:
+                pass
+        return text
 
     def generate_srt(self, audio_path: str, language: str = "zh",
                      initial_prompt: str = None, check_cancel_func=None) -> str:

@@ -34,25 +34,26 @@ def get_current_asr_info():
     try:
         _worker_id, engine_key = asr_client.select_worker()
         display_name = f"{engine_key.capitalize()}"
-        if engine_key in ["bailian", "paraformer"]:
-            if engine_key == "bailian":
-                try:
-                    from app.db.asr_config import get_active_model_for_engine
-                    import json
-                    db_config = get_active_model_for_engine("bailian")
-                    if db_config:
-                        cfg = json.loads(db_config["config"])
-                        model_name = cfg.get("model_name", "paraformer-realtime-v2")
+        if engine_key in ["bailian", "paraformer", "openai_asr"]:
+            try:
+                from app.db.asr_config import get_active_model_for_engine
+                import json
+                db_config = get_active_model_for_engine(engine_key)
+                if db_config:
+                    cfg = json.loads(db_config["config"])
+                    badge = cfg.get("badge", "") or db_config.get("name", "")
+                    if badge:
+                        display_name = badge
+                    else:
+                        model_name = cfg.get("model_name", "")
                         if model_name:
-                            display_name = f"Bailian ({model_name})"
+                            display_name = f"{engine_key.capitalize()} ({model_name})"
                         else:
                             display_name += " (Cloud)"
-                    else:
-                        display_name += " (Cloud)"
-                except Exception as e:
-                    logger.warning(f"Error getting Bailian model name: {e}")
+                else:
                     display_name += " (Cloud)"
-            else:
+            except Exception as e:
+                logger.warning(f"Error getting cloud ASR display name: {e}")
                 display_name += " (Cloud)"
         return engine_key, display_name
     except Exception:
