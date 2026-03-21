@@ -60,11 +60,7 @@ class Settings(BaseSettings):
     # ASR Workers — accepts both old {engine: url} and new {url: {}} or {worker_id: {url}} formats.
     # Old format is auto-migrated on first load.
     # In .env, you can also use a comma-separated list: ASR_WORKERS=http://localhost:8001,http://gpu:8001
-    ASR_WORKERS: dict = {
-        "sensevoice": "http://localhost:8001",
-        "whisper": "http://localhost:8002",
-        "qwen3asr": "http://localhost:8003"
-    }
+    ASR_WORKERS: dict = {}
 
     WIZARD_COMPLETED: bool = False  # Persisted wizard completion flag
 
