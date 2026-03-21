@@ -215,7 +215,7 @@
             "openaiConfigNamePlaceholder": "e.g. Groq Whisper / SiliconFlow",
             "engineType": "Engine Type",
             "badge": "Badge",
-            "badgePlaceholder": "e.g. Groq, SiliconFlow, InfiniteAI",
+            "badgePlaceholder": "e.g. Groq, SiliconFlow",
             "badgeHint": "Custom label shown in the engine priority list. Defaults to config name if empty.",
             "dashscopeKey": "DashScope API Key",
             "leaveBlank": "Leave blank to keep unchanged",

@@ -8,7 +8,7 @@ Supports any provider that implements the OpenAI Audio Transcriptions API:
     - language: ISO-639-1 code
     - response_format: "text", "srt", "vtt", "json", "verbose_json"
 
-Compatible providers: OpenAI, Groq, Deepgram, SiliconFlow, InfiniteAI, etc.
+Compatible providers: OpenAI, Groq, Deepgram, SiliconFlow, etc.
 
 Config (stored in asr_models.config as JSON):
     {
@@ -22,7 +22,7 @@ import os
 import httpx
 from typing import Optional
 
-from app.asr.wrapper import ASREngine
+from app.asr.wrapper import ASREngine, format_timestamp
 from app.core.logger import logger
 
 
@@ -35,10 +35,11 @@ class OpenAIASREngine(ASREngine):
     def _get_url(self) -> str:
         return f"{self.base_url}/audio/transcriptions"
 
-    def _call_api(self, audio_path: str, language: str = "zh",
-                  initial_prompt: Optional[str] = None,
-                  response_format: str = "text",
-                  check_cancel_func=None) -> str:
+    def _request(self, audio_path: str, language: str = "zh",
+                 initial_prompt: Optional[str] = None,
+                 response_format: str = "text",
+                 check_cancel_func=None) -> httpx.Response:
+        """Make the HTTP request to the transcription API and return the raw response."""
         if check_cancel_func:
             check_cancel_func()
 
@@ -76,15 +77,48 @@ class OpenAIASREngine(ASREngine):
             logger.error(f"☁️ [OpenAI ASR] Error {resp.status_code}: {resp.text}")
             raise RuntimeError(f"OpenAI ASR Error {resp.status_code}: {resp.text}")
 
-        # text/srt formats return plain text; json returns object
-        if response_format in ("json", "verbose_json"):
-            return resp.json().get("text", "")
-        return resp.text
+        return resp
 
     def predict(self, audio_path: str, language: str = "zh",
                 initial_prompt: str = None, check_cancel_func=None) -> str:
-        return self._call_api(audio_path, language, initial_prompt, "text", check_cancel_func)
+        resp = self._request(audio_path, language, initial_prompt, "text", check_cancel_func)
+        return resp.text
 
     def generate_srt(self, audio_path: str, language: str = "zh",
                      initial_prompt: str = None, check_cancel_func=None) -> str:
-        return self._call_api(audio_path, language, initial_prompt, "srt", check_cancel_func)
+        """Generate SRT by requesting verbose_json and converting segments to SRT format.
+
+        Uses verbose_json instead of srt response_format for broader provider compatibility.
+        Providers that don't support verbose_json will fall back to json → single-entry SRT.
+        """
+        resp = self._request(audio_path, language, initial_prompt, "verbose_json", check_cancel_func)
+
+        try:
+            result = resp.json()
+        except Exception:
+            # Response is not JSON (provider may have returned plain text)
+            text = resp.text.strip()
+            if text:
+                return f"1\n{format_timestamp(0)} --> {format_timestamp(9999)}\n{text}\n"
+            return ""
+
+        segments = result.get("segments", [])
+
+        if segments:
+            srt_lines = []
+            for idx, seg in enumerate(segments, 1):
+                start = seg.get("start", 0)
+                end = seg.get("end", 0)
+                text = seg.get("text", "").strip()
+                if text:
+                    srt_lines.append(
+                        f"{idx}\n{format_timestamp(start)} --> {format_timestamp(end)}\n{text}\n"
+                    )
+            return "\n".join(srt_lines)
+
+        # No segments — fall back to full text as single-entry SRT
+        text = result.get("text", "").strip()
+        if text:
+            duration = result.get("duration", 9999)
+            return f"1\n{format_timestamp(0)} --> {format_timestamp(duration)}\n{text}\n"
+        return ""

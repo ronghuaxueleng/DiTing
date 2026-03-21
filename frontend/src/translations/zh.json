@@ -220,7 +220,7 @@
             "openaiConfigNamePlaceholder": "例如: Groq Whisper / 硅基流动",
             "engineType": "引擎类型",
             "badge": "标签",
-            "badgePlaceholder": "例如: Groq、硅基流动、InfiniteAI",
+            "badgePlaceholder": "例如: Groq、硅基流动",
             "badgeHint": "在引擎优先级列表中显示的自定义标签，留空则使用配置名称。",
             "dashscopeKey": "DashScope API Key",
             "leaveBlank": "留空则不修改",
