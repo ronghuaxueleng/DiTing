@@ -735,7 +735,7 @@ class ASRClient:
             if resolved_path != audio_path:
                 logger.info(f"   Path mapped: {audio_path} -> {resolved_path}")
 
-            async with httpx.AsyncClient(timeout=300.0) as client:
+            async with httpx.AsyncClient(timeout=7200.0) as client:
                 resp = await client.post(f"{url}/transcribe", json=payload)
                 if resp.status_code != 200:
                     raise RuntimeError(f"Worker Error {resp.status_code}: {resp.text}")
@@ -747,7 +747,7 @@ class ASRClient:
             filename = os.path.basename(audio_path)
             logger.info(f"📤 Uploading to Worker [{selected_id}] -> {url}/transcribe (upload mode, file={filename})")
 
-            async with httpx.AsyncClient(timeout=600.0) as client:
+            async with httpx.AsyncClient(timeout=7200.0) as client:
                 with open(audio_path, "rb") as f:
                     resp = await client.post(
                         f"{url}/transcribe",

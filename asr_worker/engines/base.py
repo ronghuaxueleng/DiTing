@@ -30,6 +30,18 @@ class ASREngine(ABC):
         """Release model resources and free VRAM. Override to delete model references."""
         pass
 
+    def chunk_audio(self, audio_data, sr=16000, chunk_minutes=30):
+        """将音频数组按固定时长切片，返回 [(start_seconds, chunk_array), ...]"""
+        chunk_samples = chunk_minutes * 60 * sr
+        chunks = []
+        total = len(audio_data)
+        offset = 0
+        while offset < total:
+            end = min(offset + chunk_samples, total)
+            chunks.append((offset / sr, audio_data[offset:end]))
+            offset = end
+        return chunks
+
     def load_audio(self, file: str, sr: int = 16000):
         """
         Safe audio loading ensuring no black window pops up on Windows.
