@@ -418,7 +418,11 @@ fn handle_tray_action(app: &AppHandle, action_id: &str) {
             lifecycle
                 .exiting
                 .store(true, std::sync::atomic::Ordering::Relaxed);
-            app.exit(0);
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                worker::stop_all_workers().await;
+                app_handle.exit(0);
+            });
         }
         _ => {}
     }

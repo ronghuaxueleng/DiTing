@@ -131,6 +131,18 @@ async fn remove_child(engine_id: &str) {
     }
 }
 
+pub async fn stop_all_workers() {
+    let children: Vec<(String, Child)> = {
+        let mut map = CHILD.lock().unwrap();
+        map.drain().collect()
+    };
+
+    for (_, mut child) in children {
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+    }
+}
+
 fn take_exited_child(engine_id: &str) -> Result<Option<(Child, ExitStatus)>, String> {
     let mut map = CHILD.lock().unwrap();
     let Some(mut child) = map.remove(engine_id) else {
