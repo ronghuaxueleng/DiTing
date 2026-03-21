@@ -948,6 +948,7 @@
             "unloadModel": "Unload model",
             "unloading": "Unloading…",
             "uninstall": "Uninstall",
+            "confirmUninstall": "Confirm uninstall?",
             "uninstalling": "Uninstalling…",
             "addEngine": "Add engine",
             "addAnotherEngine": "Add another engine",

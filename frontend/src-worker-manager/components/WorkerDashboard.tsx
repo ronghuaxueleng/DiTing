@@ -1002,6 +1002,29 @@ function DangerZonePanel({
     onUninstall: () => void
 }) {
     const { t } = useTranslation()
+    const [confirming, setConfirming] = useState(false)
+
+    useEffect(() => {
+        if (!confirming) return
+        const timer = setTimeout(() => setConfirming(false), 4000)
+        return () => clearTimeout(timer)
+    }, [confirming])
+
+    const handleClick = () => {
+        if (!confirming) {
+            setConfirming(true)
+            return
+        }
+        setConfirming(false)
+        onUninstall()
+    }
+
+    const isUninstalling = actionPending === 'uninstall'
+    const label = isUninstalling
+        ? t('workerManager.actions.uninstalling')
+        : confirming
+            ? t('workerManager.actions.confirmUninstall')
+            : t('workerManager.actions.uninstall')
 
     return (
         <section
@@ -1018,8 +1041,8 @@ function DangerZonePanel({
                     </div>
                     <p className="mt-2 text-sm font-semibold leading-6">{t('workerManager.dashboard.uninstallHint')}</p>
                 </div>
-                <button className={buttonBaseClass} style={dangerButtonStyle} disabled={hasBusyOperation} onClick={onUninstall}>
-                    {actionPending === 'uninstall' ? t('workerManager.actions.uninstalling') : t('workerManager.actions.uninstall')}
+                <button className={buttonBaseClass} style={dangerButtonStyle} disabled={hasBusyOperation || isUninstalling} onClick={handleClick}>
+                    {label}
                 </button>
             </div>
         </section>

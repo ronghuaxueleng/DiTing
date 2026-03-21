@@ -962,6 +962,7 @@
             "unloadModel": "卸载模型",
             "unloading": "卸载中…",
             "uninstall": "卸载引擎",
+            "confirmUninstall": "确认卸载？",
             "uninstalling": "卸载中…",
             "addEngine": "新增引擎",
             "addAnotherEngine": "继续新增引擎",
