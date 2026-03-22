@@ -120,10 +120,10 @@ pub fn display_path(path: &Path) -> String {
     #[cfg(windows)]
     {
         let raw = path.to_string_lossy();
-        return raw
+        raw
             .strip_prefix("\\\\?\\")
             .unwrap_or(raw.as_ref())
-            .to_string();
+            .to_string()
     }
 
     #[cfg(not(windows))]

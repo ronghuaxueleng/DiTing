@@ -65,7 +65,7 @@ impl EngineInfo {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ManagerState {
     #[serde(default)]
     pub selected_engine_id: Option<String>,
@@ -151,15 +151,6 @@ impl ManagerState {
 
     pub fn sync_selected_engine(&mut self) {
         self.selected_engine_id = self.preferred_engine_id();
-    }
-}
-
-impl Default for ManagerState {
-    fn default() -> Self {
-        Self {
-            selected_engine_id: None,
-            engines: HashMap::new(),
-        }
     }
 }
 

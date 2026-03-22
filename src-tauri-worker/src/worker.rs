@@ -237,16 +237,13 @@ pub async fn start_worker(app: &AppHandle, engine_id: &str) -> Result<(), String
     let mut last_error: Option<String> = None;
 
     while tokio::time::Instant::now() < deadline {
-        match take_exited_child(engine_id)? {
-            Some((mut child, status)) => {
-                let stderr = read_child_stderr(&mut child).await;
-                let _ = child.wait().await;
-                if stderr.is_empty() {
-                    return Err(format!("Worker exited early: {status}"));
-                }
-                return Err(format!("Worker exited early: {status}\n{stderr}"));
+        if let Some((mut child, status)) = take_exited_child(engine_id)? {
+            let stderr = read_child_stderr(&mut child).await;
+            let _ = child.wait().await;
+            if stderr.is_empty() {
+                return Err(format!("Worker exited early: {status}"));
             }
-            None => {}
+            return Err(format!("Worker exited early: {status}\n{stderr}"));
         }
 
         match check_health(engine.port).await {

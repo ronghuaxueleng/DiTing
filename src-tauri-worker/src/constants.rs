@@ -1,4 +1,4 @@
-/// Constants migrated from worker_manager/constants.py and asr_worker/management/catalog.py
+//! Constants migrated from worker_manager/constants.py and asr_worker/management/catalog.py
 
 pub const PYTHON_VERSION: &str = "3.11";
 pub const WORKER_HEALTH_TIMEOUT_SECS: u64 = 30;

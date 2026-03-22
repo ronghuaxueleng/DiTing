@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use crate::{constants, hardware, manager_state, paths, worker};
 use flate2::read::GzDecoder;
 use reqwest::{Client, Proxy, Url};
@@ -310,11 +312,7 @@ fn is_safe_archive_path(path: &Path) -> bool {
     if path.is_absolute() || has_windows_drive_prefix(path) {
         return false;
     }
-    path.components().all(|component| match component {
-        Component::Normal(_) => true,
-        Component::CurDir => true,
-        _ => false,
-    })
+    path.components().all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
 }
 
 fn has_windows_drive_prefix(path: &Path) -> bool {
