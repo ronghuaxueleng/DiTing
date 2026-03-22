@@ -87,7 +87,8 @@ jobs:
         run: cargo binstall tauri-cli --version "^2" --no-confirm
 
       - name: Build Tauri Worker Manager
-        run: cargo tauri build --manifest-path src-tauri-worker/Cargo.toml --target ${{ matrix.rust_target }}
+        working-directory: src-tauri-worker
+        run: cargo tauri build --target ${{ matrix.rust_target }} --config '{"build":{"beforeBuildCommand":""}}'
 
       - name: Upload NSIS installer
         if: runner.os == 'Windows'
