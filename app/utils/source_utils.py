@@ -99,13 +99,13 @@ def normalize_source_id(raw_source: str, source_type: str = 'auto') -> str:
         return raw_source
 
     # 3. Douyin (Aweme ID)
-    # Try to extract numeric ID from URL path: /video/7458617091420114236
-    douyin_match = re.search(r"/video/(\d{19})", raw_source)
+    # Try to extract numeric ID from URL path: /video/xxx or /note/xxx
+    douyin_match = re.search(r"/(?:video|note)/(\d{15,})", raw_source)
     if douyin_match:
         return f"dy_{douyin_match.group(1)}"
-        
-    # If input is just the numeric ID (19 digits)
-    if re.match(r"^\d{19}$", raw_source):
+
+    # If input is just the numeric ID (15+ digits)
+    if re.match(r"^\d{15,}$", raw_source):
          return f"dy_{raw_source}"
 
     # 4. Fallback Hashing for everything else
