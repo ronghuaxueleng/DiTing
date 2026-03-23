@@ -1298,7 +1298,7 @@ export default function NoteView({
 
     if (!hasSegments) {
         // Can only transcribe if video exists and we know its type
-        const canTranscribe = video && (video.source_type === 'bilibili' || video.source_type === 'youtube' || (video.source_type === 'douyin' && video.media_available))
+        const canTranscribe = video && (video.source_type === 'bilibili' || video.source_type === 'youtube' || video.source_type === 'douyin')
         const isBiliOrYt = video?.source_type === 'bilibili' || video?.source_type === 'youtube'
 
         const handleTranscribe = async (onlySub: boolean) => {

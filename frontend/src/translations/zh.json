@@ -410,7 +410,7 @@
         "startCache": "开始缓存",
         "addToLibrary": "添加到库",
         "advancedOptions": "高级转录选项",
-        "douyinHint": "请注意：由于获取机制变动，网页端已暂时屏蔽对抖音的直接转录与缓存。请使用首页提供的油猴插件在抖音网页版中进行操作。",
+        "douyinHint": "抖音视频支持直接粘贴链接进行转录，也可通过油猴插件操作。",
         "subtitlePriorityHint": "B站、YouTube 优先尝试获取现有字幕，而非下载转录。",
         "forceASRHint": "提示：可在高级转录选项中选择只获取字幕或强制转录",
         "clipboardAutoFilled": "已从剪切板自动填入",

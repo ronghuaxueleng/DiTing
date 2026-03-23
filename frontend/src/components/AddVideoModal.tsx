@@ -137,10 +137,6 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                 if (text?.trim()) {
                     const cleaned = extractUrl(text)
                     setUrl(cleaned)
-                    // Auto-switch to bookmark if Douyin
-                    if (detectPlatform(cleaned) === 'douyin') {
-                        setMode('bookmark')
-                    }
                 }
             }).catch(() => {
                 // Permission denied — can't refocus here (gesture context already lost)
@@ -157,12 +153,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
 
     const platform = url ? detectPlatform(url) : null
 
-    // Auto-switch mode when url is manual-typed
-    useEffect(() => {
-        if (platform === 'douyin' && mode !== 'bookmark') {
-            setMode('bookmark');
-        }
-    }, [platform]);
+    // (no auto-switch needed)
 
     const handleSubmit = async () => {
         if (!url.trim()) {
@@ -303,8 +294,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                     <div className="flex bg-[var(--color-bg)] p-1 rounded-xl border border-[var(--color-border)]">
                         <button
                             onClick={() => setMode('transcribe')}
-                            disabled={platform === 'douyin'}
-                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${mode === 'transcribe'
+                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all ${mode === 'transcribe'
                                 ? 'bg-[var(--color-card)] text-[var(--color-primary)] shadow-sm'
                                 : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
                                 }`}
@@ -314,8 +304,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                         </button>
                         <button
                             onClick={() => setMode('cache')}
-                            disabled={platform === 'douyin'}
-                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${mode === 'cache'
+                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all ${mode === 'cache'
                                 ? 'bg-[var(--color-card)] text-blue-500 shadow-sm'
                                 : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
                                 }`}
@@ -334,20 +323,6 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                             {t('addVideo.mode.bookmark')}
                         </button>
                     </div>
-
-                    {/* Platform Hint (Only for Douyin) */}
-                    {platform === 'douyin' && (
-                        <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg overflow-hidden">
-                            <div className="w-full p-3 flex items-start gap-3 text-left">
-                                <Icons.Info className="w-5 h-5 text-cyan-500 shrink-0 mt-0.5" />
-                                <div className="flex-1">
-                                    <p className="text-sm text-cyan-600 dark:text-cyan-400">
-                                        {t('addVideo.douyinHint')}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                     {/* Options Area */}
                     {(mode === 'transcribe' || mode === 'cache') && (
@@ -556,7 +531,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                 <div className="px-6 py-4 border-t border-[var(--color-border)] flex gap-3 bg-[var(--color-bg)]/50">
                     <button
                         onClick={handleSubmit}
-                        disabled={loading || !platform || (platform === 'douyin' && mode !== 'bookmark')}
+                        disabled={loading || !platform}
                         className={`flex-1 px-4 py-3 rounded-xl font-medium disabled:opacity-50 transition-all shadow-lg flex items-center justify-center gap-2 ${mode === 'transcribe'
                             ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] shadow-[var(--color-primary)]/20'
                             : mode === 'cache'

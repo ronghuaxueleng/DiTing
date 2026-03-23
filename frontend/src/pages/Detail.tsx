@@ -701,7 +701,7 @@ export default function Detail() {
             {/* Re-transcribe Button */}
             {(video?.source_type === "bilibili" ||
               video?.source_type === "youtube" ||
-              (video?.source_type === "douyin" && video?.media_available)) && (
+              video?.source_type === "douyin") && (
               <button
                 onClick={() => setShowRetranscribeModal(true)}
                 className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-card)] rounded-lg transition-all duration-200"

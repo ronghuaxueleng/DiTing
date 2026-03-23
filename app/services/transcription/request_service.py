@@ -15,6 +15,7 @@ from app.db import get_system_config, get_best_media_path_by_source, get_transcr
 from app.db.video_meta import get_video_meta
 from app.downloaders.bilibili import get_video_info
 from app.downloaders.youtube import get_youtube_info
+from app.downloaders.douyin import get_douyin_info, extract_aweme_id
 from app.core.logger import logger
 from app.core.config import settings
 from app.services.storage import storage
@@ -190,63 +191,77 @@ def prepare_youtube_transcription(request) -> dict:
 async def prepare_douyin_transcription(request) -> dict:
     """
     Prepare dispatch params for a Douyin video.
-    Resolves short links, checks local cache.
+    Resolves short links, attempts server-side extraction, checks local cache.
     Returns kwargs dict for create_and_dispatch.
-    Raises ValueError if no cache and not bookmark.
     """
     url = request.url
     resolved_url = await run_in_threadpool(resolve_douyin_url, url)
     logger.info(f"🎵 [Douyin] URL: {url} → resolved: {resolved_url}")
 
+    # Determine source_id and metadata
+    title = request.title
+    cover = request.cover or ""
+    direct_url = request.direct_url
+
     if request.source_id:
         parsed_id = request.source_id.replace("dy_", "")
         normalized_id = f"dy_{parsed_id}"
-        # Force the original_source to the actual video URL if the ID was provided by userscript
         if "video/" not in resolved_url and "note/" not in resolved_url:
             resolved_url = f"https://www.douyin.com/video/{parsed_id}"
     else:
         normalized_id = normalize_source_id(resolved_url, "douyin")
 
+    # Server-side extraction: fetch metadata + direct_url if not provided by client
+    if not direct_url or not title:
+        logger.info(f"🔍 [Douyin] Attempting server-side extraction for: {url}")
+        info = await get_douyin_info(url)
+        if info:
+            if info.get("aweme_id"):
+                normalized_id = f"dy_{info['aweme_id']}"
+                if "video/" not in resolved_url and "note/" not in resolved_url:
+                    resolved_url = f"https://www.douyin.com/video/{info['aweme_id']}"
+            title = title or info.get("title")
+            cover = cover or info.get("cover", "")
+            direct_url = direct_url or info.get("direct_url", "")
+
+    title = title or f"Douyin {normalized_id.replace('dy_', '')}"
+
     if request.bookmark_only:
-        title = request.title or f"Douyin {normalized_id.replace('dy_', '')}"
         return dict(
             source_id=normalized_id,
             original_source=resolved_url,
             source_type="douyin",
             title=title,
-            cover=request.cover or "",
+            cover=cover,
             task_type=request.task_type,
             bookmark_only=True,
-
             language=request.language,
             quality=request.quality,
-            direct_url=request.direct_url,
+            direct_url=direct_url,
             stream_url=request.stream_url,
             only_get_subtitles=request.only_get_subtitles,
             force_transcription=request.force_transcription,
         )
 
-    # If it's a cache_only task, we MUST return direct_url so `process_cache_task` can download it
     if request.task_type == "cache_only":
-        title = request.title or f"Douyin {normalized_id.replace('dy_', '')}"
         return dict(
             source_id=normalized_id,
             original_source=resolved_url,
             source_type="douyin",
             title=title,
-            cover=request.cover or "",
+            cover=cover,
             task_type=request.task_type,
             bookmark_only=False,
             quality=request.quality,
-            direct_url=request.direct_url,
+            direct_url=direct_url,
             stream_url=request.stream_url,
         )
 
     media_path = get_best_media_path_by_source(normalized_id)
     if media_path and os.path.exists(media_path):
         row = get_transcription_by_source(normalized_id)
-        title = row['video_title'] if row else (request.title or f"Douyin {url}")
-        cover = row['video_cover'] if row else (request.cover or "")
+        title = row['video_title'] if row else title
+        cover = row['video_cover'] if row else cover
 
         return dict(
             source_id=normalized_id,
@@ -256,7 +271,6 @@ async def prepare_douyin_transcription(request) -> dict:
             cover=cover,
             task_type=request.task_type,
             bookmark_only=False,
-
             language=request.language,
             prompt=request.prompt,
             auto_analyze_prompt=request.auto_analyze_prompt,
@@ -265,24 +279,22 @@ async def prepare_douyin_transcription(request) -> dict:
             output_format=request.output_format,
             quality=request.quality,
             local_file_path=media_path,
-            direct_url=request.direct_url,
+            direct_url=direct_url,
             stream_url=request.stream_url,
             only_get_subtitles=request.only_get_subtitles,
             force_transcription=request.force_transcription,
         )
 
-    # fallback to direct_url passed by frontend if nothing is cached
-    if request.direct_url:
-        title = request.title or f"Douyin {normalized_id.replace('dy_', '')}"
+    # No cache — use direct_url (from client or server-side extraction)
+    if direct_url:
         return dict(
             source_id=normalized_id,
             original_source=resolved_url,
             source_type="douyin",
             title=title,
-            cover=request.cover or "",
+            cover=cover,
             task_type=request.task_type,
             bookmark_only=False,
-
             language=request.language,
             prompt=request.prompt,
             auto_analyze_prompt=request.auto_analyze_prompt,
@@ -290,15 +302,15 @@ async def prepare_douyin_transcription(request) -> dict:
             auto_analyze_strip_subtitle=request.auto_analyze_strip_subtitle,
             output_format=request.output_format,
             quality=request.quality,
-            direct_url=request.direct_url,
+            direct_url=direct_url,
             stream_url=request.stream_url,
             only_get_subtitles=request.only_get_subtitles,
             force_transcription=request.force_transcription,
         )
 
     raise ValueError(
-        "抖音链接需要通过浏览器插件（油猴脚本）获取直链。"
-        "当前未找到本地缓存，无法重新转录。请先使用「收藏」模式保存链接。"
+        "无法获取抖音视频直链。可能原因：视频已删除、网络无法访问抖音、或抖音反爬机制已更新。"
+        "也可尝试使用浏览器插件（油猴脚本）获取直链。"
     )
 
 
@@ -407,9 +419,19 @@ async def prepare_retranscription(request) -> dict:
                 raise ValueError(f"无法重新下载: {str(e)}")
 
     elif source_type == 'douyin':
-        if not has_cache:
-            raise ValueError("抖音视频无本地缓存，无法重新转录。请先缓存视频。")
-        kwargs['local_file_path'] = media_path
+        if has_cache:
+            kwargs['local_file_path'] = media_path
+        else:
+            # Attempt server-side extraction for direct_url
+            info = await get_douyin_info(original_source)
+            if info and info.get("direct_url"):
+                kwargs['direct_url'] = info['direct_url']
+                logger.info(f"[Douyin] Server-side extraction got direct_url for retranscription")
+            else:
+                raise ValueError(
+                    "抖音视频无本地缓存，且无法通过服务端获取直链。"
+                    "可能原因：视频已删除、网络无法访问抖音、或抖音反爬机制已更新。"
+                )
 
     elif source_type in ('video', 'audio', 'file'):
         if not has_cache:

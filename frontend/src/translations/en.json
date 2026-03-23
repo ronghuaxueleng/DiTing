@@ -406,7 +406,7 @@
         "startCache": "Start Cache",
         "addToLibrary": "Add to Library",
         "advancedOptions": "Advanced Options",
-        "douyinHint": "Please note: Direct downloading and transcribing from Douyin URLs is temporarily disabled in the web app. Please use the Tampermonkey script provided on the homepage to add videos directly from Douyin.",
+        "douyinHint": "Douyin videos can be transcribed by pasting the link directly, or via the Tampermonkey script.",
         "subtitlePriorityHint": "Bilibili and YouTube prioritize fetching existing subtitles instead of downloading/transcribing.",
         "forceASRHint": "Tip: You can choose to only fetch subtitles or force transcription in the advanced transcription options.",
         "clipboardAutoFilled": "Auto-filled from clipboard",
