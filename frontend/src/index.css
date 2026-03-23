@@ -927,6 +927,20 @@ body {
   animation: note-panel-in 0.15s ease-out;
 }
 
+@media (max-width: 768px) {
+  .note-gen-panel {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .note-gen-panel-footer {
+    position: sticky;
+    bottom: -14px;
+    padding-bottom: 14px;
+    background: inherit;
+    z-index: 1;
+  }
+}
+
 @keyframes note-panel-in {
   from {
     opacity: 0;
