@@ -160,7 +160,6 @@ export default function Detail() {
   const isDraggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
-  const [stickyHeight, setStickyHeight] = useState(0);
 
   // Vertical split state (left panel: player top / ref panel bottom, in AI notes mode)
   const VERT_SNAP_THRESHOLD = 8;
@@ -335,10 +334,11 @@ export default function Detail() {
     (e: React.MouseEvent) => {
       e.preventDefault();
       vertDraggingRef.current = true;
-      const leftCol = leftColumnRef.current;
-      if (!leftCol) return;
+      // On mobile, the split spans the full container; on desktop, it's within the left column
+      const container = isDesktop ? leftColumnRef.current : containerRef.current;
+      if (!container) return;
       const startY = e.clientY;
-      const rect = leftCol.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
       const containerH = rect.height;
       const startPct = topPanelPct;
       document.body.style.cursor = "row-resize";
@@ -359,19 +359,19 @@ export default function Detail() {
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },
-    [topPanelPct, applyVertDragPct],
+    [isDesktop, topPanelPct, applyVertDragPct],
   );
 
   const handleVertDividerTouchStart = useCallback(
     (e: React.TouchEvent) => {
       vertDraggingRef.current = true;
-      const leftCol = leftColumnRef.current;
-      if (!leftCol) return;
+      const container = isDesktop ? leftColumnRef.current : containerRef.current;
+      if (!container) return;
       const touch = e.touches[0];
       if (!touch) return;
 
       const startY = touch.clientY;
-      const rect = leftCol.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
       const containerH = rect.height;
       const startPct = topPanelPct;
 
@@ -400,7 +400,7 @@ export default function Detail() {
       window.addEventListener("touchend", onTouchEnd);
       window.addEventListener("touchcancel", onTouchEnd);
     },
-    [topPanelPct, applyVertDragPct],
+    [isDesktop, topPanelPct, applyVertDragPct],
   );
 
   const { data: video, isLoading: isVideoLoading } = useQuery({
@@ -491,18 +491,6 @@ export default function Detail() {
     setMobileLayout(next);
     localStorage.setItem("detail-mobile-layout", next);
   };
-
-  // Measure sticky left column height for split-screen bounded scroll
-  useEffect(() => {
-    if (mobileLayout !== "split" || !leftColumnRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setStickyHeight(entry.contentRect.height + 8); // +8 for border/padding
-      }
-    });
-    observer.observe(leftColumnRef.current);
-    return () => observer.disconnect();
-  }, [mobileLayout]);
 
   // Notes State
   const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -754,8 +742,10 @@ export default function Detail() {
       {/* Main Content Area - Full viewport height, independent scroll */}
       <div
         ref={containerRef}
-        className={`flex-1 flex flex-col lg:flex-row min-h-0 w-full gap-6 lg:gap-0 overflow-y-auto lg:overflow-hidden ${
-          isZenMode 
+        className={`flex-1 flex flex-col lg:flex-row min-h-0 w-full ${
+          !isDesktop && mobileLayout === "split" ? "gap-0 overflow-hidden" : "gap-6 overflow-y-auto"
+        } lg:gap-0 lg:overflow-hidden ${
+          isZenMode
             ? "p-0"
             : `px-4 sm:px-6 lg:px-8 ${mobileLayout === "split" ? "py-0 lg:py-4" : "py-4"}`
         }`}
@@ -778,9 +768,17 @@ export default function Detail() {
             className={`w-full lg:flex-shrink-0 lg:pr-3 ${
               isDesktop
                 ? "flex flex-col overflow-hidden"
-                : `lg:overflow-y-auto ${mobileLayout === "split" ? "sticky top-0 z-30 bg-[var(--color-bg)] pb-2 border-b lg:border-none border-[var(--color-border)] lg:relative lg:pb-4 lg:space-y-6" : "space-y-6 pb-4"}`
+                : mobileLayout === "split"
+                  ? "flex flex-col overflow-hidden shrink-0"
+                  : "lg:overflow-y-auto space-y-6 pb-4"
             }`}
-            style={isDesktop ? { width: `${leftPanelWidth}%` } : undefined}
+            style={
+              isDesktop
+                ? { width: `${leftPanelWidth}%` }
+                : mobileLayout === "split"
+                  ? { flex: `0 0 ${topPanelPct}%` }
+                  : undefined
+            }
           >
             {/* ------- Unify vertical split layout on desktop ------- */}
             {isDesktop ? (
@@ -1092,7 +1090,7 @@ export default function Detail() {
               </>
             ) : (
               /* ------- Mobile layout fallback ------- */
-              <>
+              <div className={mobileLayout === "split" ? "flex-1 min-h-0 overflow-y-auto" : "space-y-6"}>
                 {renderPlayer()}
 
                 {/* Notes Section for Mobile */}
@@ -1197,8 +1195,19 @@ export default function Detail() {
                     </div>
                   </div>
                 )}
-              </>
+              </div>
             )}
+          </div>
+        )}
+
+        {/* Vertical drag divider for mobile split mode */}
+        {!isDesktop && mobileLayout === "split" && !vertCollapsed && (
+          <div
+            className="flex items-center justify-center h-5 cursor-row-resize group flex-shrink-0 select-none touch-none"
+            onMouseDown={handleVertDividerMouseDown}
+            onTouchStart={handleVertDividerTouchStart}
+          >
+            <div className="h-1 w-12 rounded-full bg-[var(--color-border)] group-hover:bg-[var(--color-primary)] group-hover:w-20 group-active:bg-[var(--color-primary)] transition-all duration-200 opacity-50 group-hover:opacity-100" />
           </div>
         )}
 
@@ -1217,14 +1226,6 @@ export default function Detail() {
         {(!isDesktop || collapsedPanel !== "right") && (
           <div
             className={`flex-1 flex-col flex min-h-0 lg:overflow-hidden lg:pl-3 relative ${mobileLayout === "split" ? "overflow-hidden" : ""}`}
-            style={
-              !isDesktop && mobileLayout === "split" && stickyHeight > 0
-                ? {
-                    height: `calc(100vh - 4rem - ${stickyHeight}px)`,
-                    flexShrink: 0,
-                  }
-                : undefined
-            }
           >
             {isLoading ? (
               <div className="flex justify-center py-20">
