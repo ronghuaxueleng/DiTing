@@ -45,12 +45,13 @@ async def lifespan(app: FastAPI):
     async def periodic_gc():
         # Wait 5 minutes before first run to allow startup/transcription to settle
         # Initial next run time
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         from app.db.system_config import get_system_config
+        from app.utils.datetime_utils import now_local
         
         # Determine first run time
         first_delay = 60 * 5
-        MediaCacheService.next_gc_time = datetime.now() + timedelta(seconds=first_delay)
+        MediaCacheService.next_gc_time = now_local() + timedelta(seconds=first_delay)
         
         await asyncio.sleep(first_delay) 
         while True:
@@ -74,7 +75,7 @@ async def lifespan(app: FastAPI):
             # Re-read config in case it changed during execution? 
             # We already read it at start of loop.
             next_run_delay = int(interval_hours * 60 * 60)
-            MediaCacheService.next_gc_time = datetime.now() + timedelta(seconds=next_run_delay)
+            MediaCacheService.next_gc_time = now_local() + timedelta(seconds=next_run_delay)
             await asyncio.sleep(next_run_delay)
 
     asyncio.create_task(periodic_gc())

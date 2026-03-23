@@ -2,9 +2,9 @@
 Video Metadata Database Operations
 CRUD operations for the video_meta table.
 """
-from datetime import datetime
 from app.db.connection import get_connection, get_connection_with_row
 from app.core.logger import logger
+from app.utils.datetime_utils import normalize_cache_expires_at, now_local_sqlite
 
 def get_video_meta(source_id: str):
     """
@@ -57,8 +57,8 @@ def upsert_video_meta(source_id: str, cache_expires_at=None, cache_policy=None, 
     cursor.execute('SELECT 1 FROM video_meta WHERE source_id = ?', (source_id,))
     exists = cursor.fetchone()
     
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+    normalized_cache_expires_at = normalize_cache_expires_at(cache_expires_at) if cache_expires_at is not None else None
+    now = now_local_sqlite()
     if exists:
         # Dynamic update based on provided fields
         updates = []
@@ -72,7 +72,7 @@ def upsert_video_meta(source_id: str, cache_expires_at=None, cache_policy=None, 
             # Only update if provided and NOT resetting
             if cache_expires_at is not None:
                 updates.append("cache_expires_at = ?")
-                params.append(cache_expires_at)
+                params.append(normalized_cache_expires_at)
                 
             if cache_policy is not None:
                 updates.append("cache_policy = ?")
@@ -129,7 +129,7 @@ def upsert_video_meta(source_id: str, cache_expires_at=None, cache_policy=None, 
                                     original_source, is_archived,
                                     created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (source_id, cache_expires_at, cache_policy, notes, 
+        ''', (source_id, normalized_cache_expires_at, cache_policy, notes,
               video_title, video_cover, source_type, stream_url, stream_expired, 
               original_source, is_archived if is_archived is not None else 0,
               now, now))
@@ -161,7 +161,7 @@ def clear_cache_policy(source_id: str):
         UPDATE video_meta 
         SET cache_policy = NULL, cache_expires_at = NULL, updated_at = ?
         WHERE source_id = ?
-    ''', (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), source_id))
+    ''', (now_local_sqlite(), source_id))
     conn.commit()
     conn.close()
 
@@ -189,12 +189,11 @@ def batch_set_archived(source_ids: list[str], archived: bool):
     cursor = conn.cursor()
     
     placeholders = ','.join(['?'] * len(source_ids))
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+    now = now_local_sqlite()
     params = [1 if archived else 0, now] + source_ids
-    
+
     cursor.execute(f'''
-        UPDATE video_meta 
+        UPDATE video_meta
         SET is_archived = ?, updated_at = ?
         WHERE source_id IN ({placeholders})
     ''', params)

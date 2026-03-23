@@ -134,20 +134,38 @@ async def test_llm_connection(api_key: str, base_url: str, model: str, api_type:
 async def fetch_available_models(api_key: str, base_url: str):
     """
     Fetch available models from an OpenAI-compatible provider.
-    Uses GET /models endpoint (no token cost).
+    Uses raw HTTP GET /models to avoid openai SDK Pydantic parsing issues
+    with non-standard API responses.
     Returns { success: bool, models: list[{id, owned_by}], message: str }
     """
+    import httpx
+
+    # Normalize base_url: ensure no trailing slash
+    url = base_url.rstrip("/") + "/models"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "Authorization": f"Bearer {api_key}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Accept": "application/json",
     }
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url, default_headers=headers)
     try:
-        response = await client.models.list()
-        models = [
-            {"id": m.id, "owned_by": getattr(m, "owned_by", "")}
-            for m in response.data
-        ]
-        # Sort alphabetically by model id
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=10.0)) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+
+        # OpenAI format: { "data": [ { "id": "gpt-4o", "owned_by": "openai", ... } ] }
+        # Some providers return: { "models": [ ... ] } or just [ ... ]
+        raw_models = data.get("data") or data.get("models") or (data if isinstance(data, list) else [])
+
+        models = []
+        for m in raw_models:
+            if isinstance(m, str):
+                models.append({"id": m, "owned_by": ""})
+            elif isinstance(m, dict):
+                model_id = m.get("id") or m.get("name") or m.get("model") or ""
+                if model_id:
+                    models.append({"id": model_id, "owned_by": m.get("owned_by", "")})
+
         models.sort(key=lambda x: x["id"])
         return {"success": True, "models": models, "message": "OK"}
     except Exception as e:

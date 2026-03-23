@@ -321,22 +321,24 @@ export default function LLMTab() {
                                                     >
                                                         <Icons.X className="w-3 h-3" />
                                                     </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            handleTestModel(selectedProvider.id, model.id)
-                                                        }}
-                                                        disabled={testResults[model.id]?.loading}
-                                                        className="p-0.5 rounded-full text-[var(--color-text-muted)]/50 hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors"
-                                                        title={t('settings.llm.testConnection')}
-                                                    >
-                                                        {testResults[model.id]?.loading
-                                                            ? <Icons.Loader className="w-3 h-3 animate-spin" />
-                                                            : <Icons.Zap className="w-3 h-3" />
-                                                        }
-                                                    </button>
                                                 </div>
                                             )}
+                                            <div className="flex items-center pr-1 gap-0.5">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleTestModel(selectedProvider.id, model.id)
+                                                    }}
+                                                    disabled={testResults[model.id]?.loading}
+                                                    className="p-0.5 rounded-full text-[var(--color-text-muted)]/50 hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors"
+                                                    title={t('settings.llm.testConnection')}
+                                                >
+                                                    {testResults[model.id]?.loading
+                                                        ? <Icons.Loader className="w-3 h-3 animate-spin" />
+                                                        : <Icons.Zap className="w-3 h-3" />
+                                                    }
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                                 </div>

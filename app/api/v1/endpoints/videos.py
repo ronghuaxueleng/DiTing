@@ -25,6 +25,9 @@ from app.core.logger import logger
 from app.api.v1.endpoints.covers import download_and_cache_cover
 from app.services.media_cache import MediaCacheService
 from app.api.v1.endpoints.helpers import _format_cover_url
+from app.services.media_cache import MediaCacheService
+from app.api.v1.endpoints.helpers import _format_cover_url
+from app.utils.datetime_utils import normalize_cache_expires_at
 from app.utils.source_utils import normalize_source_id
 
 router = APIRouter(tags=["Videos"])

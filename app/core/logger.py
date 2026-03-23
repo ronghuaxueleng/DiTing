@@ -26,7 +26,7 @@ class JSONFormatter(logging.Formatter):
     """
     def format(self, record):
         log_record = {
-            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created).astimezone().isoformat(),
             "level": record.levelname,
             "name": record.name,
             "message": record.getMessage(),

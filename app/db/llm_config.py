@@ -126,21 +126,21 @@ def get_llm_model_full_by_id(model_id):
 
 
 def batch_add_models(provider_id, model_names):
-    """Batch add models to a provider, skipping duplicates. Returns count of newly added models."""
+    """Batch add models to a provider, skipping duplicates. Returns list of newly added model dicts with id and model_name."""
     conn = get_connection_with_row()
     cursor = conn.cursor()
     # Get existing model names for this provider
     cursor.execute("SELECT model_name FROM llm_models WHERE provider_id = ?", (provider_id,))
     existing = {row['model_name'] for row in cursor.fetchall()}
-    
-    added = 0
+
+    added = []
     for name in model_names:
         if name not in existing:
             cursor.execute(
                 "INSERT INTO llm_models (provider_id, model_name) VALUES (?, ?)",
                 (provider_id, name)
             )
-            added += 1
+            added.append({"id": cursor.lastrowid, "model_name": name})
     conn.commit()
     conn.close()
     return added

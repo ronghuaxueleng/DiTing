@@ -12,6 +12,7 @@ from app.db import (
     delete_all_notes_by_source,
 )
 from app.services.media_cache import MediaCacheService
+from app.utils.datetime_utils import format_datetime_iso, now_local, parse_datetime
 from app.utils.source_utils import normalize_source_id
 
 
@@ -124,7 +125,7 @@ def compute_effective_expiry(meta_dict: dict, cache_versions: list[dict]) -> str
     elif global_policy == 'always_keep':
         return '9999-12-31T23:59:59'
     elif global_policy == 'delete_after_asr':
-        return datetime.now().isoformat()
+        return now_local().isoformat()
 
     return None
 

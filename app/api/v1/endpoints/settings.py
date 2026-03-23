@@ -138,7 +138,7 @@ async def batch_add_provider_models(provider_id: int, body: dict = Body(...)):
         raise HTTPException(status_code=400, detail="model_names is required")
     
     added = batch_add_models(provider_id, model_names)
-    return {"status": "success", "added": added}
+    return {"status": "success", "added": len(added), "models": added}
 
 
 # ============ ASR Models ============
