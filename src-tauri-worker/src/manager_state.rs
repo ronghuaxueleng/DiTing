@@ -5,6 +5,12 @@ use tauri::AppHandle;
 
 use crate::{constants, paths};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharedPathMapping {
+    pub server: String,
+    pub worker: String,
+}
+
 fn default_device() -> String {
     "cpu".to_string()
 }
@@ -33,6 +39,8 @@ pub struct EngineInfo {
     pub advertise_url: Option<String>,
     #[serde(default)]
     pub initial_model_id: Option<String>,
+    #[serde(default)]
+    pub shared_paths: Vec<SharedPathMapping>,
 }
 
 impl EngineInfo {

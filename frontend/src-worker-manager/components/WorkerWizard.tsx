@@ -15,6 +15,7 @@ import type {
     InstallPathInfo,
     InstallPathPreview,
     InstallProgressPayload,
+    SharedPathMapping,
     WizardStep,
 } from '../types'
 
@@ -42,6 +43,7 @@ interface WizardSetupView {
     wizardPort: number
     serverUrl: string
     advertiseUrl: string
+    sharedPaths: SharedPathMapping[]
     effectiveAdvertiseUrl: string
     installDir: string
     effectiveInstallDir: string
@@ -81,6 +83,7 @@ interface WorkerWizardProps {
     onChangeDevice: (device: string) => void
     onChangePort: (port: number) => void
     onChangeServerUrl: (value: string) => void
+    onChangeSharedPaths: (paths: SharedPathMapping[]) => void
     onChangeInstallDir: (value: string) => void
     onBrowseInstallDir: () => void
     onChangeUseMirror: (value: boolean) => void
@@ -119,6 +122,7 @@ export default function WorkerWizard({
     onChangeDevice,
     onChangePort,
     onChangeServerUrl,
+    onChangeSharedPaths,
     onChangeInstallDir,
     onBrowseInstallDir,
     onChangeUseMirror,
@@ -264,6 +268,7 @@ export default function WorkerWizard({
                                 onChangePort={onChangePort}
                                 onChangeServerUrl={onChangeServerUrl}
                                 onChangeAdvertiseUrl={onChangeAdvertiseUrl}
+                                onChangeSharedPaths={onChangeSharedPaths}
                                 onChangeInstallDir={onChangeInstallDir}
                                 onBrowseInstallDir={onBrowseInstallDir}
                                 onChangeUseMirror={onChangeUseMirror}
@@ -417,6 +422,7 @@ function EngineSetupStepPanel({
     onChangePort,
     onChangeServerUrl,
     onChangeAdvertiseUrl,
+    onChangeSharedPaths,
     onChangeInstallDir,
     onBrowseInstallDir,
     onChangeUseMirror,
@@ -431,6 +437,7 @@ function EngineSetupStepPanel({
     onChangePort: (port: number) => void
     onChangeServerUrl: (value: string) => void
     onChangeAdvertiseUrl: (value: string) => void
+    onChangeSharedPaths: (paths: SharedPathMapping[]) => void
     onChangeInstallDir: (value: string) => void
     onBrowseInstallDir: () => void
     onChangeUseMirror: (value: boolean) => void
@@ -664,6 +671,61 @@ function EngineSetupStepPanel({
                         ) : null}
                     </div>
                 </div>
+
+                {setup.serverUrl.trim() ? (
+                    <div className="mt-4 space-y-3">
+                        <div className="text-sm font-medium">{t('workerManager.install.sharedPaths')}</div>
+                        <div className="rounded-xl border px-3 py-3 text-sm leading-6" style={{ borderColor: 'rgba(148,163,184,0.14)', background: 'rgba(15,23,42,0.04)', color: 'var(--color-text-muted)' }}>
+                            {t('workerManager.install.sharedPathsHint')}
+                        </div>
+                        {setup.sharedPaths.map((mapping, index) => (
+                            <div key={index} className="grid gap-2 items-end" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
+                                <Field label={index === 0 ? t('workerManager.install.sharedPathServer') : '\u00A0'}>
+                                    <input
+                                        className="w-full rounded-xl border px-3 py-2.5 text-sm"
+                                        style={formControlStyle}
+                                        value={mapping.server}
+                                        placeholder={t('workerManager.install.sharedPathServerPlaceholder')}
+                                        onChange={(event) => {
+                                            const next = [...setup.sharedPaths]
+                                            next[index] = { ...mapping, server: event.target.value }
+                                            onChangeSharedPaths(next)
+                                        }}
+                                    />
+                                </Field>
+                                <Field label={index === 0 ? t('workerManager.install.sharedPathWorker') : '\u00A0'}>
+                                    <input
+                                        className="w-full rounded-xl border px-3 py-2.5 text-sm"
+                                        style={formControlStyle}
+                                        value={mapping.worker}
+                                        placeholder={t('workerManager.install.sharedPathWorkerPlaceholder')}
+                                        onChange={(event) => {
+                                            const next = [...setup.sharedPaths]
+                                            next[index] = { ...mapping, worker: event.target.value }
+                                            onChangeSharedPaths(next)
+                                        }}
+                                    />
+                                </Field>
+                                <button
+                                    type="button"
+                                    className={buttonBaseClass}
+                                    style={{ ...secondaryButtonStyle, color: 'var(--color-error)' }}
+                                    onClick={() => onChangeSharedPaths(setup.sharedPaths.filter((_, i) => i !== index))}
+                                >
+                                    {t('workerManager.install.sharedPathRemove')}
+                                </button>
+                            </div>
+                        ))}
+                        <button
+                            type="button"
+                            className={buttonBaseClass}
+                            style={secondaryButtonStyle}
+                            onClick={() => onChangeSharedPaths([...setup.sharedPaths, { server: '', worker: '' }])}
+                        >
+                            {t('workerManager.install.sharedPathAdd')}
+                        </button>
+                    </div>
+                ) : null}
             </SectionCard>
         </>
     )

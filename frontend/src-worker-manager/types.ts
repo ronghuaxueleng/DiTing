@@ -11,6 +11,11 @@ export type HardwareInfo = {
     compute_key: string
 }
 
+export type SharedPathMapping = {
+    server: string
+    worker: string
+}
+
 export type EngineInfo = {
     engine_id: string
     display_name: string
@@ -24,6 +29,7 @@ export type EngineInfo = {
     server_url?: string | null
     advertise_url?: string | null
     initial_model_id?: string | null
+    shared_paths?: SharedPathMapping[]
 }
 
 export type ManagerState = {
@@ -132,6 +138,7 @@ export type InstallEngineRequest = {
     proxy: string
     serverUrl?: string
     advertiseUrl?: string
+    sharedPaths?: SharedPathMapping[]
     installDir: string
 }
 

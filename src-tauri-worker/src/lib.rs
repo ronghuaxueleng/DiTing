@@ -48,6 +48,8 @@ struct InstallEngineRequest {
     proxy: String,
     server_url: Option<String>,
     advertise_url: Option<String>,
+    #[serde(default)]
+    shared_paths: Vec<manager_state::SharedPathMapping>,
     install_dir: String,
 }
 
@@ -137,6 +139,7 @@ async fn install_engine(app: AppHandle, request: InstallEngineRequest) -> Result
         &request.proxy,
         request.server_url.as_deref().unwrap_or(""),
         request.advertise_url.as_deref().unwrap_or(""),
+        &request.shared_paths,
         &request.install_dir,
     )
     .await;
@@ -156,6 +159,7 @@ async fn update_engine_network_settings(
     port: u16,
     server_url: Option<String>,
     advertise_url: Option<String>,
+    shared_paths: Option<Vec<manager_state::SharedPathMapping>>,
 ) -> Result<manager_state::ManagerState, String> {
     let state = installer::update_engine_network_settings(
         &app,
@@ -163,6 +167,7 @@ async fn update_engine_network_settings(
         port,
         server_url.as_deref().unwrap_or(""),
         advertise_url.as_deref().unwrap_or(""),
+        &shared_paths.unwrap_or_default(),
     )
     .await?;
     tauri::async_runtime::spawn({

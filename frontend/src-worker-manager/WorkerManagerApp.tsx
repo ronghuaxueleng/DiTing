@@ -31,6 +31,7 @@ import type {
     InstallProgressPayload,
     ManagedModel,
     ManagerState,
+    SharedPathMapping,
     WorkerModelsResponse,
     WorkerOperationResponse,
     WorkerOperationStatus,
@@ -69,6 +70,7 @@ export default function WorkerManagerApp() {
     const [wizardPort, setWizardPort] = useState(DEFAULT_PORT)
     const [serverUrl, setServerUrl] = useState('')
     const [advertiseUrl, setAdvertiseUrl] = useState('')
+    const [sharedPaths, setSharedPaths] = useState<SharedPathMapping[]>([])
     const [theme, setTheme] = useState<'auto' | 'light' | 'dark'>(
         (localStorage.getItem('theme') as 'auto' | 'light' | 'dark') || 'auto'
     )
@@ -197,6 +199,7 @@ export default function WorkerManagerApp() {
             wizardPort,
             serverUrl,
             advertiseUrl,
+            sharedPaths,
             effectiveAdvertiseUrl: getEffectiveAdvertiseUrl(advertiseUrl, wizardPort),
             installDir,
             effectiveInstallDir,
@@ -238,6 +241,7 @@ export default function WorkerManagerApp() {
         wizardPort,
         serverUrl,
         advertiseUrl,
+        sharedPaths,
         installDir,
         effectiveInstallDir,
         installPathInfo,
@@ -278,6 +282,7 @@ export default function WorkerManagerApp() {
         setWizardPort(nextPort)
         setServerUrl('')
         setAdvertiseUrl(getDefaultAdvertiseUrl(nextPort))
+        setSharedPaths([])
         setInstallDir('')
         setInstallPathPreview(null)
         setUseMirror(false)
@@ -302,12 +307,13 @@ export default function WorkerManagerApp() {
         setInstallLog([])
     }
 
-    async function saveEngineNetworkSettings(engineId: string, updates: { port: number; serverUrl: string; advertiseUrl: string }) {
+    async function saveEngineNetworkSettings(engineId: string, updates: { port: number; serverUrl: string; advertiseUrl: string; sharedPaths: SharedPathMapping[] }) {
         const nextState = await invoke<ManagerState>('update_engine_network_settings', {
             engineId,
             port: updates.port,
             serverUrl: updates.serverUrl.trim() || null,
             advertiseUrl: updates.advertiseUrl.trim() || null,
+            sharedPaths: updates.sharedPaths,
         })
         setState(nextState)
         return nextState
@@ -647,6 +653,7 @@ export default function WorkerManagerApp() {
             proxy: useProxy ? proxy.trim() : '',
             serverUrl: serverUrl.trim() || undefined,
             advertiseUrl: advertiseUrl.trim() || undefined,
+            sharedPaths: sharedPaths.length > 0 ? sharedPaths : undefined,
             installDir: effectiveInstallDir,
         }
 
@@ -958,6 +965,7 @@ export default function WorkerManagerApp() {
                             onChangeDevice={setWizardDevice}
                             onChangePort={setWizardPort}
                             onChangeServerUrl={setServerUrl}
+                            onChangeSharedPaths={setSharedPaths}
                             onChangeInstallDir={setInstallDir}
                             onBrowseInstallDir={() => void doBrowseInstallDir()}
                             onChangeUseMirror={setUseMirror}

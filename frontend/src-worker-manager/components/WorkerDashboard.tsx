@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import OperationProgress from '../../src/components/OperationProgress'
 import Icons from '../../src/components/ui/Icons'
-import type { EngineDefinition, EngineInfo, ManagedModel, WorkerOperationStatus, WorkerStatus } from '../types'
+import type { EngineDefinition, EngineInfo, ManagedModel, SharedPathMapping, WorkerOperationStatus, WorkerStatus } from '../types'
 import {
     activeButtonStyle,
     buttonBaseClass,
@@ -77,7 +77,7 @@ interface WorkerDashboardProps {
     onCheck: () => void
     onUnloadModel: () => void
     onUninstall: () => void
-    onSaveNetworkSettings: (engineId: string, updates: { port: number; serverUrl: string; advertiseUrl: string }) => void
+    onSaveNetworkSettings: (engineId: string, updates: { port: number; serverUrl: string; advertiseUrl: string; sharedPaths: SharedPathMapping[] }) => void
     onRefreshModels: () => void
     onToggleModelsExpanded: () => void
     onDownloadModel: (modelId: string) => void
@@ -648,12 +648,13 @@ function NetworkSettingsPanel({
     selectedEngine: EngineInfo | null
     status: WorkerStatus | null
     hasBusyOperation: boolean
-    onSaveNetworkSettings: (engineId: string, updates: { port: number; serverUrl: string; advertiseUrl: string }) => void
+    onSaveNetworkSettings: (engineId: string, updates: { port: number; serverUrl: string; advertiseUrl: string; sharedPaths: SharedPathMapping[] }) => void
 }) {
     const { t } = useTranslation()
     const [port, setPort] = useState('')
     const [serverUrl, setServerUrl] = useState('')
     const [advertiseUrl, setAdvertiseUrl] = useState('')
+    const [sharedPaths, setSharedPaths] = useState<SharedPathMapping[]>([])
     const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -661,9 +662,10 @@ function NetworkSettingsPanel({
         setPort(selectedEngine ? String(selectedEngine.port) : '')
         setServerUrl(selectedEngine?.server_url || '')
         setAdvertiseUrl(selectedEngine?.advertise_url || (selectedEngine ? `http://127.0.0.1:${selectedEngine.port}` : ''))
+        setSharedPaths(selectedEngine?.shared_paths || [])
         setSaveState('idle')
         setErrorMessage(null)
-    }, [selectedEngine?.engine_id, selectedEngine?.port, selectedEngine?.server_url, selectedEngine?.advertise_url])
+    }, [selectedEngine?.engine_id, selectedEngine?.port, selectedEngine?.server_url, selectedEngine?.advertise_url, selectedEngine?.shared_paths])
 
     if (!selectedEngine) {
         return null
@@ -708,6 +710,61 @@ function NetworkSettingsPanel({
                     </Field>
                 </div>
 
+                {serverUrl.trim() ? (
+                    <div className="space-y-3">
+                        <div className="text-sm font-medium">{t('workerManager.install.sharedPaths')}</div>
+                        <div className="rounded-xl border px-3 py-3 text-sm leading-6" style={{ borderColor: 'rgba(148,163,184,0.14)', background: 'rgba(15,23,42,0.04)', color: 'var(--color-text-muted)' }}>
+                            {t('workerManager.install.sharedPathsHint')}
+                        </div>
+                        {sharedPaths.map((mapping, index) => (
+                            <div key={index} className="grid gap-2 items-end" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
+                                <Field label={index === 0 ? t('workerManager.install.sharedPathServer') : '\u00A0'}>
+                                    <input
+                                        className="w-full rounded-xl border px-3 py-2.5 text-sm"
+                                        style={formControlStyle}
+                                        value={mapping.server}
+                                        placeholder={t('workerManager.install.sharedPathServerPlaceholder')}
+                                        onChange={(event) => {
+                                            const next = [...sharedPaths]
+                                            next[index] = { ...mapping, server: event.target.value }
+                                            setSharedPaths(next)
+                                        }}
+                                    />
+                                </Field>
+                                <Field label={index === 0 ? t('workerManager.install.sharedPathWorker') : '\u00A0'}>
+                                    <input
+                                        className="w-full rounded-xl border px-3 py-2.5 text-sm"
+                                        style={formControlStyle}
+                                        value={mapping.worker}
+                                        placeholder={t('workerManager.install.sharedPathWorkerPlaceholder')}
+                                        onChange={(event) => {
+                                            const next = [...sharedPaths]
+                                            next[index] = { ...mapping, worker: event.target.value }
+                                            setSharedPaths(next)
+                                        }}
+                                    />
+                                </Field>
+                                <button
+                                    type="button"
+                                    className={buttonBaseClass}
+                                    style={{ ...secondaryButtonStyle, color: 'var(--color-error)' }}
+                                    onClick={() => setSharedPaths(sharedPaths.filter((_, i) => i !== index))}
+                                >
+                                    {t('workerManager.install.sharedPathRemove')}
+                                </button>
+                            </div>
+                        ))}
+                        <button
+                            type="button"
+                            className={buttonBaseClass}
+                            style={secondaryButtonStyle}
+                            onClick={() => setSharedPaths([...sharedPaths, { server: '', worker: '' }])}
+                        >
+                            {t('workerManager.install.sharedPathAdd')}
+                        </button>
+                    </div>
+                ) : null}
+
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_auto] lg:items-start">
                     <div className="rounded-xl border px-3 py-3 text-sm leading-6" style={{ borderColor: 'rgba(148,163,184,0.14)', background: 'rgba(15,23,42,0.04)', color: 'var(--color-text-muted)' }}>
                         <div>{t('workerManager.install.workerUrlHint')}</div>
@@ -732,6 +789,7 @@ function NetworkSettingsPanel({
                                         port: Number(port) || selectedEngine.port,
                                         serverUrl,
                                         advertiseUrl,
+                                        sharedPaths,
                                     })
                                     setSaveState('saved')
                                 } catch (error) {

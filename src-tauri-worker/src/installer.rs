@@ -857,6 +857,7 @@ fn write_worker_config(
     model_base_path: &Path,
     server_url: Option<&str>,
     advertise_url: Option<&str>,
+    shared_paths: &[manager_state::SharedPathMapping],
     model: Option<&constants::ModelDef>,
 ) -> Result<(), String> {
     #[derive(Serialize)]
@@ -867,7 +868,7 @@ fn write_worker_config(
         max_concurrency: u8,
         server_url: Option<String>,
         advertise_url: Option<String>,
-        shared_paths: Vec<String>,
+        shared_paths: Vec<manager_state::SharedPathMapping>,
         temp_upload_dir: String,
         model_base_path: String,
         models: serde_json::Value,
@@ -885,7 +886,7 @@ fn write_worker_config(
         max_concurrency: 1,
         server_url: server_url.map(|value| value.to_string()),
         advertise_url: advertise_url.map(|value| value.to_string()),
-        shared_paths: vec![],
+        shared_paths: shared_paths.to_vec(),
         temp_upload_dir: "temp_uploads".to_string(),
         model_base_path: paths::normalize_yaml_path(model_base_path),
         models: models_config,
@@ -912,6 +913,7 @@ pub async fn install_engine(
     proxy: &str,
     server_url: &str,
     advertise_url: &str,
+    shared_paths: &[manager_state::SharedPathMapping],
     install_dir: &str,
 ) -> Result<(), String> {
     let engine =
@@ -1103,6 +1105,7 @@ pub async fn install_engine(
             &models_dir,
             normalized_server_url.as_deref(),
             normalized_advertise_url.as_deref(),
+            shared_paths,
             model,
         )?;
 
@@ -1135,6 +1138,7 @@ pub async fn install_engine(
                 server_url: normalized_server_url.clone(),
                 advertise_url: normalized_advertise_url.clone(),
                 initial_model_id: model.map(|m| m.id.to_string()),
+                shared_paths: shared_paths.to_vec(),
             },
         );
         manager_state::save_state_for_runtime_root(app, &runtime_root, &state).await?;
@@ -1190,6 +1194,7 @@ pub async fn install_whisper_engine(
         proxy,
         "",
         "",
+        &[],
         install_dir,
     )
     .await
@@ -1201,6 +1206,7 @@ pub async fn update_engine_network_settings(
     port: u16,
     server_url: &str,
     advertise_url: &str,
+    shared_paths: &[manager_state::SharedPathMapping],
 ) -> Result<manager_state::ManagerState, String> {
     let normalized_server_url = normalize_optional_string(server_url);
     let normalized_advertise_url = normalize_optional_string(advertise_url);
@@ -1214,6 +1220,7 @@ pub async fn update_engine_network_settings(
     engine.port = port;
     engine.server_url = normalized_server_url.clone();
     engine.advertise_url = normalized_advertise_url.clone();
+    engine.shared_paths = shared_paths.to_vec();
 
     let model = engine
         .initial_model_id
@@ -1234,6 +1241,7 @@ pub async fn update_engine_network_settings(
         &models_dir,
         normalized_server_url.as_deref(),
         normalized_advertise_url.as_deref(),
+        shared_paths,
         model,
     )?;
 
