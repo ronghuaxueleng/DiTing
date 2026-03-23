@@ -73,7 +73,6 @@ async def batch_cache_videos(payload: BatchCacheRequest, background_tasks: Backg
             tid = save_transcription(
                  source=normalized_source,
                  raw_text="",
-                 source_type=source_type,
                  asr_model="Cache-Only",
                  status="pending"
             )

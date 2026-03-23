@@ -418,7 +418,7 @@ export default function VideoPlayer({
                                 </div>
                             ) : <div />}
 
-                            {['bilibili', 'youtube'].includes(video.source_type) && (
+                            {['bilibili', 'youtube', 'douyin'].includes(video.source_type) && (
                                 <div className="relative">
                                     <button
                                         onClick={() => setShowAppendCacheMenu(!showAppendCacheMenu)}

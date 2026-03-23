@@ -13,7 +13,7 @@ from app.core.config import settings
 # Clients
 from app.downloaders.bilibili import download_bilibili_video, download_audio, get_video_info
 from app.downloaders.youtube import download_youtube_media, download_youtube_video, get_youtube_info
-from app.downloaders.douyin import download_douyin_video
+from app.downloaders.douyin import download_douyin_video, get_douyin_info, pick_douyin_quality_url
 from app.api.v1.endpoints.covers import download_and_cache_cover
 
 async def process_cache_task(
@@ -127,20 +127,37 @@ async def process_cache_task(
                 media_quality_tag = quality # Preserve tag
                 
         elif source_type == 'douyin':
-            # Douyin is always video
-            # For cache tasks, 'url' is the direct_url (stream_url)
-            upsert_video_meta(source_id, stream_url=url)
-            
+            # Resolve page URL to CDN direct URL via server-side extraction
+            direct_url = url
+            if 'aweme.snssdk.com' not in url and 'bytecdn' not in url:
+                # url is a page URL (douyin.com/video/xxx), not a CDN URL
+                task_manager.update_progress(transcription_id, 5, "Resolving Douyin video...")
+                info = await get_douyin_info(url)
+                if info:
+                    if info.get("direct_urls"):
+                        direct_url = pick_douyin_quality_url(info["direct_urls"], quality)
+                    elif info.get("direct_url"):
+                        direct_url = info["direct_url"]
+                    else:
+                        raise Exception("Failed to extract Douyin CDN URL")
+                    # Update metadata
+                    cover = info.get("cover", "")
+                    if cover and (cover.startswith('http') or cover.startswith('//')):
+                        cover = await run_in_threadpool(download_and_cache_cover, cover)
+                    upsert_video_meta(source_id, video_title=info.get("title"), video_cover=cover, stream_url=direct_url)
+                else:
+                    raise Exception("Failed to resolve Douyin video info")
+            else:
+                upsert_video_meta(source_id, stream_url=direct_url)
+
             download_path = await run_in_threadpool(
                 download_douyin_video,
-                url,
-                "https://www.douyin.com/", # Referer
+                direct_url,
+                "https://www.douyin.com/",
                 transcription_id,
                 check_cancel_wrapper,
                 download_progress.get_callback()
             )
-            # Douyin is just direct CDN, no quality selection via yt-dlp
-            # We use the quality tag passed from frontend (e.g. '1080p', '720p')
             media_quality_tag = quality
             
         else:

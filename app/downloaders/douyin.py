@@ -129,17 +129,19 @@ async def get_douyin_info(url: str) -> dict | None:
             if cover_urls:
                 cover = cover_urls[-1]
 
-        # Direct URL: pick best no-watermark URL
-        direct_url = _pick_best_direct_url(detail)
+        # Direct URLs: build quality map via ratio parameter
+        direct_urls = _build_quality_urls(detail)
+        direct_url = direct_urls.get("original") or next(iter(direct_urls.values()), "")
 
         result = {
             "title": title or f"Douyin {aweme_id}",
             "author": author,
             "cover": cover,
             "direct_url": direct_url,
+            "direct_urls": direct_urls,
             "aweme_id": aweme_id,
         }
-        logger.info(f"[Douyin] Extracted: title={title[:50]}, author={author}, has_url={bool(direct_url)}")
+        logger.info(f"[Douyin] Extracted: title={title[:50]}, author={author}, qualities={list(direct_urls.keys())}")
         return result
 
     except Exception as e:
@@ -147,38 +149,40 @@ async def get_douyin_info(url: str) -> dict | None:
         return None
 
 
-def _pick_best_direct_url(detail: dict) -> str:
-    """Pick the best no-watermark CDN URL from video detail."""
+def _build_quality_urls(detail: dict) -> dict[str, str]:
+    """Build multi-quality no-watermark CDN URLs via ratio parameter."""
     video = detail.get("video", {})
     if not video:
+        return {}
+
+    uri = video.get("play_addr", {}).get("uri", "")
+    if not uri:
+        return {}
+
+    base = f"https://aweme.snssdk.com/aweme/v1/play/?video_id={uri}"
+    return {
+        "original": f"{base}&ratio=default&line=0",
+        "1080p": f"{base}&ratio=1080p&line=0",
+        "720p": f"{base}&ratio=720p&line=0",
+        "540p": f"{base}&ratio=540p&line=0",
+    }
+
+
+# Map DiTing quality names to Douyin ratio keys
+_QUALITY_MAP = {
+    "best": "original",
+    "medium": "720p",
+    "worst": "540p",
+    "audio": "540p",  # no audio-only from CDN, use lowest video
+}
+
+
+def pick_douyin_quality_url(direct_urls: dict[str, str], quality: str = "best") -> str:
+    """Pick the appropriate CDN URL for a DiTing quality setting."""
+    if not direct_urls:
         return ""
-
-    play_addr = video.get("play_addr", {})
-    uri = play_addr.get("uri", "")
-    url_list = play_addr.get("url_list", [])
-
-    # Priority 1: no-watermark HQ from url_list (playwm → play replacement)
-    if url_list:
-        wm_url = url_list[0]
-        nwm_url = wm_url.replace("playwm", "play")
-        if nwm_url != wm_url:
-            return nwm_url
-
-    # Priority 2: construct from URI via aweme.snssdk.com
-    if uri:
-        return (
-            f"https://aweme.snssdk.com/aweme/v1/play/"
-            f"?video_id={uri}&ratio=1080p&line=0"
-        )
-
-    # Priority 3: bit_rate entries
-    for br in video.get("bit_rate") or []:
-        addr = br.get("play_addr", {})
-        br_urls = addr.get("url_list", [])
-        if br_urls:
-            return br_urls[0].replace("playwm", "play")
-
-    return ""
+    target = _QUALITY_MAP.get(quality, "original")
+    return direct_urls.get(target) or direct_urls.get("original") or next(iter(direct_urls.values()), "")
 
 
 @retry_on_network_error(max_retries=3, retry_delay=5)

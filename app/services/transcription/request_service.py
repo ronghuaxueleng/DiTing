@@ -15,7 +15,7 @@ from app.db import get_system_config, get_best_media_path_by_source, get_transcr
 from app.db.video_meta import get_video_meta
 from app.downloaders.bilibili import get_video_info
 from app.downloaders.youtube import get_youtube_info
-from app.downloaders.douyin import get_douyin_info, extract_aweme_id
+from app.downloaders.douyin import get_douyin_info, extract_aweme_id, pick_douyin_quality_url
 from app.core.logger import logger
 from app.core.config import settings
 from app.services.storage import storage
@@ -222,7 +222,10 @@ async def prepare_douyin_transcription(request) -> dict:
                     resolved_url = f"https://www.douyin.com/video/{info['aweme_id']}"
             title = title or info.get("title")
             cover = cover or info.get("cover", "")
-            direct_url = direct_url or info.get("direct_url", "")
+            if not direct_url and info.get("direct_urls"):
+                direct_url = pick_douyin_quality_url(info["direct_urls"], request.quality or "best")
+            elif not direct_url:
+                direct_url = info.get("direct_url", "")
 
     title = title or f"Douyin {normalized_id.replace('dy_', '')}"
 
@@ -424,7 +427,10 @@ async def prepare_retranscription(request) -> dict:
         else:
             # Attempt server-side extraction for direct_url
             info = await get_douyin_info(original_source)
-            if info and info.get("direct_url"):
+            if info and info.get("direct_urls"):
+                kwargs['direct_url'] = pick_douyin_quality_url(info["direct_urls"])
+                logger.info(f"[Douyin] Server-side extraction got direct_url for retranscription")
+            elif info and info.get("direct_url"):
                 kwargs['direct_url'] = info['direct_url']
                 logger.info(f"[Douyin] Server-side extraction got direct_url for retranscription")
             else:
