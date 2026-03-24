@@ -890,6 +890,7 @@
         "desc": "Select a prompt template or enter custom instructions for analysis",
         "descRefine": "Follow up based on existing summaries, the result will be saved as a sub-version",
         "analysisSent": "Analysis request sent",
+        "analysisStarted": "AI analysis started",
         "analysisFailed": "Analysis failed: ",
         "all": "All",
         "uncategorized": "Uncategorized",

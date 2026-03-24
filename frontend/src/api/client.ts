@@ -271,70 +271,11 @@ export interface AnalyzeRequest {
     strip_subtitle?: boolean
 }
 
-export async function analyzeSegment(request: AnalyzeRequest): Promise<{ summary_id: number }> {
+export async function analyzeSegment(request: AnalyzeRequest): Promise<{ task_id: number; status: string }> {
     return fetchJson(`${API_BASE}/analyze`, {
         method: 'POST',
         body: JSON.stringify(request),
     })
-}
-
-export async function analyzeSegmentStream(
-    request: AnalyzeRequest,
-    callbacks: {
-        onTaskStarted?: (taskId: number) => void
-        onStart?: (model: string) => void
-        onChunk: (text: string) => void
-        onDone: (duration: number) => void
-        onError: (message: string) => void
-    },
-    signal?: AbortSignal
-): Promise<void> {
-    // Step 1: Start background analysis task
-    const { task_id } = await fetchJson<{ task_id: number }>(`${API_BASE}/analyze`, {
-        method: 'POST',
-        body: JSON.stringify(request),
-    })
-    callbacks.onTaskStarted?.(task_id)
-
-    // Step 2: Observe the stream (aborting only disconnects the observer, task continues)
-    try {
-        const response = await fetch(`${API_BASE}/analyze/stream/${task_id}`, { signal })
-
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ detail: 'Stream observation failed' }))
-            throw new Error(error.detail || `HTTP ${response.status}`)
-        }
-
-        const reader = response.body!.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-
-            buffer += decoder.decode(value, { stream: true })
-            const parts = buffer.split('\n\n')
-            buffer = parts.pop()!
-
-            for (const part of parts) {
-                const dataLine = part.split('\n').find(l => l.startsWith('data: '))
-                if (!dataLine) continue
-                try {
-                    const data = JSON.parse(dataLine.slice(6))
-                    switch (data.type) {
-                        case 'start': callbacks.onStart?.(data.model); break
-                        case 'chunk': callbacks.onChunk(data.text); break
-                        case 'done': callbacks.onDone(data.duration); break
-                        case 'error': callbacks.onError(data.message); break
-                    }
-                } catch { /* skip malformed events */ }
-            }
-        }
-    } catch (e: any) {
-        if (e.name !== 'AbortError') throw e
-        // AbortError = user closed modal, task continues in background
-    }
 }
 
 export async function deleteSummary(summaryId: number): Promise<void> {

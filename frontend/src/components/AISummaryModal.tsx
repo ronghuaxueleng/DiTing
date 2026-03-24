@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-    getLLMProviders, analyzeSegmentStream, deleteSummary, cancelTask,
+    getLLMProviders, analyzeSegment, deleteSummary,
     getPrompts, getCategories, createPrompt, updatePrompt, deletePrompt,
     createCategory, updateCategory, deleteCategory
 } from '../api'
@@ -12,18 +12,16 @@ import ConfirmModal from './ConfirmModal'
 import type { RefineContext } from './SegmentCard'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { useTranslation } from 'react-i18next'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { useStreamingStore } from '../stores/useStreamingStore'
 
 interface AISummaryModalProps {
     isOpen: boolean
     onClose: () => void
     segment: Segment | null
-    onSuccess: () => void
     refineContext?: RefineContext | null
 }
 
-export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, refineContext }: AISummaryModalProps) {
+export default function AISummaryModal({ isOpen, onClose, segment, refineContext }: AISummaryModalProps) {
     const { t } = useTranslation()
     const queryClient = useQueryClient()
     const { showToast, showUndoableDelete } = useToast()
@@ -38,49 +36,15 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
     const [showRefineContext, setShowRefineContext] = useState(true)
     const [stripSubtitle, setStripSubtitle] = useState<boolean>(!!segment?.is_subtitle)
 
-    // Streaming state
-    const [isStreaming, setIsStreaming] = useState(false)
-    const [streamedText, setStreamedText] = useState('')
-    const [streamModel, setStreamModel] = useState('')
-    const [streamDone, setStreamDone] = useState(false)
-    const [streamError, setStreamError] = useState('')
-    const [streamDuration, setStreamDuration] = useState(0)
-    const [streamTaskId, setStreamTaskId] = useState<number | null>(null)
-    const abortRef = useRef<AbortController | null>(null)
-    const streamContainerRef = useRef<HTMLDivElement>(null)
+    // Escape key: simple close
+    useEscapeKey(onClose, isOpen)
 
-    // Escape key: close modal (streaming continues in background)
-    useEscapeKey(() => {
-        if (isStreaming && !streamDone && !streamError) {
-            abortRef.current?.abort()
-            abortRef.current = null
-            showToast('info', t('aiSummaryModal.streamContinueBackground'))
-        }
-        onClose()
-    }, isOpen)
-
-    // Sync state when modal opens; disconnect observer when modal closes
+    // Sync state when modal opens
     useEffect(() => {
         if (isOpen && segment) {
             setStripSubtitle(segment.is_subtitle === 1 || segment.is_subtitle === true)
         }
-        if (!isOpen) {
-            abortRef.current?.abort()
-            abortRef.current = null
-            setIsStreaming(false)
-            setStreamedText('')
-            setStreamDone(false)
-            setStreamError('')
-            setStreamTaskId(null)
-        }
     }, [isOpen, segment])
-
-    // Auto-scroll streaming content
-    useEffect(() => {
-        if (isStreaming && streamContainerRef.current) {
-            streamContainerRef.current.scrollTop = streamContainerRef.current.scrollHeight
-        }
-    }, [streamedText, isStreaming])
 
     // CRUD state
     const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null)
@@ -158,74 +122,21 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
             await deleteSummary(selectedOverwriteId as number)
         }
 
-        // Start streaming
-        setIsStreaming(true)
-        setStreamedText('')
-        setStreamModel('')
-        setStreamDone(false)
-        setStreamError('')
-
-        const controller = new AbortController()
-        abortRef.current = controller
-
         try {
-            await analyzeSegmentStream(
-                {
-                    transcription_id: segment.id,
-                    prompt: customPrompt,
-                    llm_model_id: selectedModelId === '' ? undefined : selectedModelId,
-                    parent_id: refineContext?.parentId ?? undefined,
-                    input_text: refineContext ? refineContext.contextText : undefined,
-                    strip_subtitle: stripSubtitle,
-                },
-                {
-                    onTaskStarted: (taskId) => setStreamTaskId(taskId),
-                    onStart: (model) => setStreamModel(model),
-                    onChunk: (text) => setStreamedText(prev => prev + text),
-                    onDone: (duration) => {
-                        setStreamDone(true)
-                        setStreamDuration(duration)
-                        queryClient.invalidateQueries({ queryKey: ['video-detail'] })
-                    },
-                    onError: (msg) => {
-                        setStreamError(msg)
-                        showToast('error', msg)
-                    },
-                },
-                controller.signal
-            )
+            const { task_id } = await analyzeSegment({
+                transcription_id: segment.id,
+                prompt: customPrompt,
+                llm_model_id: selectedModelId === '' ? undefined : selectedModelId,
+                parent_id: refineContext?.parentId ?? undefined,
+                input_text: refineContext ? refineContext.contextText : undefined,
+                strip_subtitle: stripSubtitle,
+            })
+            useStreamingStore.getState().startStream(segment.id, task_id)
+            showToast('info', t('aiSummaryModal.analysisStarted'))
+            onClose()
         } catch (e: any) {
-            if (e.name !== 'AbortError') {
-                setStreamError(e.message)
-                showToast('error', e.message)
-            }
+            showToast('error', t('aiSummaryModal.analysisFailed') + e.message)
         }
-    }
-
-    const handleCancelAnalysis = () => {
-        if (streamTaskId) {
-            cancelTask(streamTaskId)
-        }
-        abortRef.current?.abort()
-        abortRef.current = null
-        setIsStreaming(false)
-        setStreamedText('')
-        setStreamTaskId(null)
-    }
-
-    const handleCloseWhileStreaming = () => {
-        abortRef.current?.abort()
-        abortRef.current = null
-        showToast('info', t('aiSummaryModal.streamContinueBackground'))
-        onClose()
-    }
-
-    const handleStreamClose = () => {
-        setIsStreaming(false)
-        setStreamedText('')
-        setStreamDone(false)
-        onSuccess()
-        onClose()
     }
 
     const handleDeletePrompt = (id: number, name: string) => {
@@ -235,7 +146,7 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={isStreaming && !streamDone && !streamError ? handleCloseWhileStreaming : onClose}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
             <div className="bg-[var(--color-card)] w-full max-w-5xl h-[100dvh] md:h-[85vh] rounded-none md:rounded-xl border border-[var(--color-border)] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-[var(--color-border)] flex justify-between items-center bg-[var(--color-bg)]/50">
@@ -245,53 +156,9 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                         </h2>
                         <p className="text-xs text-[var(--color-text-muted)] mt-1">{refineContext ? t('aiSummaryModal.descRefine') : t('aiSummaryModal.desc')}</p>
                     </div>
-                    <button onClick={isStreaming && !streamDone && !streamError ? handleCloseWhileStreaming : onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] p-2">✕</button>
+                    <button onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] p-2">✕</button>
                 </div>
 
-                {isStreaming ? (
-                    <>
-                        {/* Streaming View */}
-                        <div ref={streamContainerRef} className="flex-1 overflow-y-auto p-6">
-                            <div className="flex items-center gap-2 mb-4 text-sm text-[var(--color-text-muted)]">
-                                {!streamDone && !streamError && (
-                                    <Icons.Loader className="w-4 h-4 animate-spin text-[var(--color-primary)]" />
-                                )}
-                                {streamDone && <Icons.CheckCircle className="w-4 h-4 text-green-500" />}
-                                {streamError && <Icons.AlertCircle className="w-4 h-4 text-red-500" />}
-                                <span>
-                                    {streamDone
-                                        ? t('aiSummaryModal.streamComplete', { model: streamModel, duration: streamDuration })
-                                        : streamError
-                                            ? t('aiSummaryModal.streamError')
-                                            : t('aiSummaryModal.streamGenerating', { model: streamModel || '...' })}
-                                </span>
-                            </div>
-                            <div className="prose prose-sm max-w-none dark:prose-invert text-[var(--color-text)]">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                    {streamedText}
-                                </ReactMarkdown>
-                                {!streamDone && !streamError && streamedText && (
-                                    <span className="inline-block w-1.5 h-4 bg-[var(--color-primary)] animate-pulse rounded-sm ml-0.5 align-text-bottom" />
-                                )}
-                            </div>
-                            {!streamedText && !streamError && (
-                                <div className="text-sm text-[var(--color-text-muted)] italic mt-4">{t('aiSummaryModal.streamGenerating', { model: streamModel || '...' })}</div>
-                            )}
-                        </div>
-                        <div className="p-4 border-t border-[var(--color-border)] bg-[var(--color-bg)]/50 flex justify-end gap-3">
-                            {!streamDone && !streamError ? (
-                                <button onClick={handleCancelAnalysis} className="px-5 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                                    {t('aiSummaryModal.streamCancelAnalysis')}
-                                </button>
-                            ) : (
-                                <button onClick={handleStreamClose} className="px-5 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 font-medium">
-                                    {t('aiSummaryModal.streamDone')}
-                                </button>
-                            )}
-                        </div>
-                    </>
-                ) : (
-                    <>
                 <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
                     {/* Categories Sidebar (Horizontal tabs on mobile) */}
                     <div className="md:w-48 border-b md:border-b-0 md:border-r border-[var(--color-border)] bg-[var(--color-bg)]/30 flex flex-row md:flex-col shrink-0">
@@ -433,8 +300,6 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                         </button>
                     </div>
                 </div>
-                    </>
-                )}
 
                 {/* Prompt/Category Forms (Overlays) */}
                 {showPromptForm && (

@@ -272,10 +272,6 @@ export default function DetailPanel({ video, onClose, onRefresh }: DetailPanelPr
                 onClose={() => setAiModalState(null)}
                 segment={aiModalState?.segment ?? null}
                 refineContext={aiModalState?.refineContext ?? null}
-                onSuccess={() => {
-                    refetch()
-                    onRefresh()
-                }}
             />
 
             {/* Delete Confirmation Modal */}

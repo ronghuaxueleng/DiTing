@@ -1,11 +1,16 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Segment } from '../api/types'
-import { updateSegmentText, deleteSegment, deleteSummary, toggleSegmentPin } from '../api'
+import { updateSegmentText, deleteSegment, deleteSummary, toggleSegmentPin, cancelTask } from '../api'
 import { useToast } from '../contexts/ToastContext'
 import { useQueryClient } from '@tanstack/react-query'
 import Icons from './ui/Icons'
 import { cleanEmotionTags, formatTime, buildSummaryTree, stripSubtitleMetadata, hasSrtMetadata } from './segmentHelpers'
 import SummaryNode from './SummaryNode'
+import { useStreamObserver } from '../hooks/useStreamObserver'
+import { useStreamingStore } from '../stores/useStreamingStore'
+import { useTranslation } from 'react-i18next'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export interface RefineContext {
     parentId: number
@@ -23,6 +28,7 @@ interface SegmentCardProps {
 
 export default function SegmentCard({ segment, onRefresh, isExpandedDefault = false, onOpenAiModal, highlightText }: SegmentCardProps) {
     const { showUndoableDelete, showToast } = useToast()
+    const { t } = useTranslation()
     const queryClient = useQueryClient()
     const [isExpanded, setIsExpanded] = useState(isExpandedDefault)
     const [isPinned, setIsPinned] = useState(!!segment.is_pinned)
@@ -65,6 +71,44 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
 
     const aiSectionRef = useRef<HTMLDivElement>(null)
     // previewRef removed — preview is now inline, no click-outside needed
+
+    // Streaming state from global store
+    const streamEntry = useStreamObserver(segment.id)
+    const isStreamActive = !!streamEntry && (streamEntry.status === 'connecting' || streamEntry.status === 'streaming')
+    const streamContainerRef = useRef<HTMLDivElement>(null)
+
+    // Auto-scroll streaming content
+    useEffect(() => {
+        if (isStreamActive && streamContainerRef.current) {
+            streamContainerRef.current.scrollTop = streamContainerRef.current.scrollHeight
+        }
+    }, [streamEntry?.text, isStreamActive])
+
+    // When stream completes, refresh data and clear store
+    const streamDoneHandled = useRef(false)
+    useEffect(() => {
+        if (streamEntry?.status === 'done' && !streamDoneHandled.current) {
+            streamDoneHandled.current = true
+            queryClient.invalidateQueries({ queryKey: ['video-detail'] })
+            // Small delay to let server persist, then clear streaming UI
+            const timer = setTimeout(() => {
+                useStreamingStore.getState().clearStream(segment.id)
+                onRefresh()
+                streamDoneHandled.current = false
+            }, 1500)
+            return () => clearTimeout(timer)
+        }
+        if (!streamEntry || streamEntry.status !== 'done') {
+            streamDoneHandled.current = false
+        }
+    }, [streamEntry?.status, segment.id, queryClient, onRefresh])
+
+    const handleCancelStream = () => {
+        if (streamEntry) {
+            cancelTask(streamEntry.taskId)
+            useStreamingStore.getState().clearStream(segment.id)
+        }
+    }
 
     const handleSave = async () => {
         if (text === (segment.text || '')) return setIsEditing(false)
@@ -197,7 +241,14 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
                 </button>
 
                 {/* AI Summary Button */}
-                {hasVisibleAi ? (
+                {isStreamActive ? (
+                    <span
+                        className="shrink-0 whitespace-nowrap px-1.5 py-[2px] border border-[var(--color-primary)]/50 text-[var(--color-primary)] rounded-full"
+                        style={{ fontSize: '0.65rem' }}
+                    >
+                        <div className="flex items-center gap-1"><Icons.Loader className="w-3 h-3 animate-spin" /><span className="hidden @min-[480px]:inline">AI 生成中</span></div>
+                    </span>
+                ) : hasVisibleAi ? (
                     <button
                         className="shrink-0 whitespace-nowrap px-1.5 py-[2px] border border-emerald-500/50 text-emerald-500 rounded-full hover:bg-emerald-500/10 transition-colors"
                         style={{ fontSize: '0.65rem' }}
@@ -341,6 +392,49 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
                         {/* AI Actions */}
                         {!isEditing && (
                             <>
+                                {/* Streaming Preview */}
+                                {streamEntry && streamEntry.status !== 'done' && (
+                                    <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
+                                        <div className="flex items-center gap-2 mb-3 text-sm text-[var(--color-text-muted)]">
+                                            {streamEntry.status === 'error' ? (
+                                                <Icons.AlertCircle className="w-4 h-4 text-red-500" />
+                                            ) : (
+                                                <Icons.Loader className="w-4 h-4 animate-spin text-[var(--color-primary)]" />
+                                            )}
+                                            <span>
+                                                {streamEntry.status === 'error'
+                                                    ? t('aiSummaryModal.streamError')
+                                                    : t('aiSummaryModal.streamGenerating', { model: streamEntry.model || '...' })}
+                                            </span>
+                                        </div>
+                                        {streamEntry.text && (
+                                            <div ref={streamContainerRef} className="max-h-96 overflow-y-auto prose prose-sm max-w-none dark:prose-invert text-[var(--color-text)]">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                    {streamEntry.text}
+                                                </ReactMarkdown>
+                                                {isStreamActive && (
+                                                    <span className="inline-block w-1.5 h-4 bg-[var(--color-primary)] animate-pulse rounded-sm ml-0.5 align-text-bottom" />
+                                                )}
+                                            </div>
+                                        )}
+                                        {!streamEntry.text && streamEntry.status !== 'error' && (
+                                            <div className="text-sm text-[var(--color-text-muted)] italic">
+                                                {t('aiSummaryModal.streamGenerating', { model: streamEntry.model || '...' })}
+                                            </div>
+                                        )}
+                                        {isStreamActive && (
+                                            <div className="mt-3 flex justify-end">
+                                                <button
+                                                    onClick={handleCancelStream}
+                                                    className="text-xs px-3 py-1.5 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                >
+                                                    {t('aiSummaryModal.streamCancelAnalysis')}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {hasVisibleAi ? (
                                     <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
                                         <div

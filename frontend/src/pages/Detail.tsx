@@ -1464,9 +1464,6 @@ export default function Detail() {
         onClose={() => setAiModalState(null)}
         segment={aiModalState?.segment ?? null}
         refineContext={aiModalState?.refineContext ?? null}
-        onSuccess={() => {
-          refetchSegments();
-        }}
       />
 
       {/* Delete Cache Confirm Modal */}

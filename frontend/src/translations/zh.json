@@ -904,6 +904,7 @@
         "desc": "选择提示词模板或输入自定义指令进行分析",
         "descRefine": "基于已有总结内容进行追问，生成的结果将作为子版本",
         "analysisSent": "分析请求已发送",
+        "analysisStarted": "AI 分析已开始",
         "analysisFailed": "分析失败: ",
         "all": "全部",
         "uncategorized": "未分类",
