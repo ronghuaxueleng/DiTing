@@ -1,11 +1,49 @@
 import os
 import time
+import httpx
 from openai import AsyncOpenAI
 
 # load_dotenv() - Removed
 
 from app.db import get_active_model_full, get_llm_model_full_by_id
 from app.core.logger import logger
+
+_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+
+# Client cache: reuse connections across requests (keyed by base_url + api_key + proxy)
+_client_cache: dict[tuple[str, str, str], AsyncOpenAI] = {}
+
+
+def _get_proxy_url() -> str | None:
+    """Read proxy_url from system config (DB)."""
+    from app.db import get_system_config
+    raw = (get_system_config("proxy_url") or "").strip()
+    return raw if raw.startswith(("http://", "https://", "socks")) else None
+
+
+def _get_llm_client(api_key: str, base_url: str) -> AsyncOpenAI:
+    """Get or create a cached AsyncOpenAI client with proxy & timeout configured."""
+    proxy_url = _get_proxy_url()
+    cache_key = (base_url, api_key, proxy_url or "")
+
+    cached = _client_cache.get(cache_key)
+    if cached:
+        return cached
+
+    kwargs: dict = {
+        "api_key": api_key,
+        "base_url": base_url,
+        "default_headers": {"User-Agent": _USER_AGENT},
+        "timeout": 300.0,
+        "max_retries": 1,
+    }
+    if proxy_url:
+        logger.info(f"🌐 LLM using proxy: {proxy_url}")
+        kwargs["http_client"] = httpx.AsyncClient(proxy=proxy_url)
+
+    client = AsyncOpenAI(**kwargs)
+    _client_cache[cache_key] = client
+    return client
 
 async def analyze_text(text: str, prompt: str, llm_model_id: int = None):
     """
@@ -53,10 +91,7 @@ async def analyze_text(text: str, prompt: str, llm_model_id: int = None):
 
     if not api_key:
         return "❌ LLM API Key is missing. 请在系统设置中配置有效的 API Key。", model
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-    }
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url, default_headers=headers)
+    client = _get_llm_client(api_key, base_url)
 
     sys_prompt = (
     "你是一个专业的内容精炼专家，擅长处理多方对话及单人演讲的语音转文字(ASR)材料。\n"
@@ -145,10 +180,7 @@ def create_analysis_stream(text: str, prompt: str, llm_model_id: int = None):
 
     logger.info(f"🤖 LLM Stream Request -> Model: {model} | BaseURL: {base_url} | Protocol: {api_type}")
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-    }
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url, default_headers=headers)
+    client = _get_llm_client(api_key, base_url)
 
     sys_prompt = (
         "你是一个专业的内容精炼专家，擅长处理多方对话及单人演讲的语音转文字(ASR)材料。\n"
@@ -202,10 +234,17 @@ async def test_llm_connection(api_key: str, base_url: str, model: str, api_type:
     Test LLM provider connectivity with a minimal request.
     Returns { success: bool, message: str, latency_ms: int }
     """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    proxy_url = _get_proxy_url()
+    kwargs: dict = {
+        "api_key": api_key,
+        "base_url": base_url,
+        "default_headers": {"User-Agent": _USER_AGENT},
+        "timeout": 30.0,
+        "max_retries": 0,
     }
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url, default_headers=headers)
+    if proxy_url:
+        kwargs["http_client"] = httpx.AsyncClient(proxy=proxy_url)
+    client = AsyncOpenAI(**kwargs)
     start = time.time()
     try:
         if api_type == 'responses':
