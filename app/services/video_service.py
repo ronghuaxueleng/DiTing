@@ -462,7 +462,29 @@ async def refresh_metadata(source_id: str, format_cover, download_cover_fn) -> d
         source_type = infer_source_type(source_id)
 
     if source_type == 'douyin':
-        raise ValueError("抖音不支持服务器端同步 (请使用浏览器插件)")
+        from app.downloaders.douyin import get_douyin_info
+        # Use original_source URL for extraction; fall back to constructing URL from source_id
+        douyin_url = actual_source
+        if not douyin_url or not douyin_url.startswith('http'):
+            vid = source_id.replace('dy_', '')
+            douyin_url = f"https://www.douyin.com/video/{vid}"
+        info = await get_douyin_info(douyin_url)
+        if not info:
+            raise ValueError("无法获取抖音元数据，可能视频已删除或抖音反爬机制已更新")
+        cover = info.get('cover', '')
+        if cover and (cover.startswith('http') or cover.startswith('//')):
+            cover = await run_in_threadpool(download_cover_fn, cover)
+        title = info.get('title', '')
+        if not title:
+            raise ValueError("抖音元数据获取失败：无标题")
+        update_video_metadata(source_id, title, cover)
+        return {
+            "status": "success",
+            "updated_count": 1,
+            "title": title,
+            "cover": format_cover(cover),
+            "source_type": "douyin",
+        }
 
     if source_type == 'youtube':
         proxy = get_system_config('proxy_url')
