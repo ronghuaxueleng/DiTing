@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-    getLLMProviders, analyzeSegmentStream, deleteSummary,
+    getLLMProviders, analyzeSegmentStream, deleteSummary, cancelTask,
     getPrompts, getCategories, createPrompt, updatePrompt, deletePrompt,
     createCategory, updateCategory, deleteCategory
 } from '../api'
@@ -25,7 +25,6 @@ interface AISummaryModalProps {
 
 export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, refineContext }: AISummaryModalProps) {
     const { t } = useTranslation()
-    useEscapeKey(onClose, isOpen)
     const queryClient = useQueryClient()
     const { showToast, showUndoableDelete } = useToast()
 
@@ -46,19 +45,33 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
     const [streamDone, setStreamDone] = useState(false)
     const [streamError, setStreamError] = useState('')
     const [streamDuration, setStreamDuration] = useState(0)
+    const [streamTaskId, setStreamTaskId] = useState<number | null>(null)
     const abortRef = useRef<AbortController | null>(null)
     const streamContainerRef = useRef<HTMLDivElement>(null)
 
-    // Sync state when modal opens
+    // Escape key: close modal (streaming continues in background)
+    useEscapeKey(() => {
+        if (isStreaming && !streamDone && !streamError) {
+            abortRef.current?.abort()
+            abortRef.current = null
+            showToast('info', t('aiSummaryModal.streamContinueBackground'))
+        }
+        onClose()
+    }, isOpen)
+
+    // Sync state when modal opens; disconnect observer when modal closes
     useEffect(() => {
         if (isOpen && segment) {
             setStripSubtitle(segment.is_subtitle === 1 || segment.is_subtitle === true)
         }
         if (!isOpen) {
+            abortRef.current?.abort()
+            abortRef.current = null
             setIsStreaming(false)
             setStreamedText('')
             setStreamDone(false)
             setStreamError('')
+            setStreamTaskId(null)
         }
     }, [isOpen, segment])
 
@@ -166,6 +179,7 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                     strip_subtitle: stripSubtitle,
                 },
                 {
+                    onTaskStarted: (taskId) => setStreamTaskId(taskId),
                     onStart: (model) => setStreamModel(model),
                     onChunk: (text) => setStreamedText(prev => prev + text),
                     onDone: (duration) => {
@@ -188,10 +202,22 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
         }
     }
 
-    const handleCancelStream = () => {
+    const handleCancelAnalysis = () => {
+        if (streamTaskId) {
+            cancelTask(streamTaskId)
+        }
         abortRef.current?.abort()
+        abortRef.current = null
         setIsStreaming(false)
         setStreamedText('')
+        setStreamTaskId(null)
+    }
+
+    const handleCloseWhileStreaming = () => {
+        abortRef.current?.abort()
+        abortRef.current = null
+        showToast('info', t('aiSummaryModal.streamContinueBackground'))
+        onClose()
     }
 
     const handleStreamClose = () => {
@@ -209,7 +235,7 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={isStreaming && !streamDone && !streamError ? handleCloseWhileStreaming : onClose}>
             <div className="bg-[var(--color-card)] w-full max-w-5xl h-[100dvh] md:h-[85vh] rounded-none md:rounded-xl border border-[var(--color-border)] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-[var(--color-border)] flex justify-between items-center bg-[var(--color-bg)]/50">
@@ -219,7 +245,7 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                         </h2>
                         <p className="text-xs text-[var(--color-text-muted)] mt-1">{refineContext ? t('aiSummaryModal.descRefine') : t('aiSummaryModal.desc')}</p>
                     </div>
-                    <button onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] p-2">✕</button>
+                    <button onClick={isStreaming && !streamDone && !streamError ? handleCloseWhileStreaming : onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] p-2">✕</button>
                 </div>
 
                 {isStreaming ? (
@@ -254,8 +280,8 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                         </div>
                         <div className="p-4 border-t border-[var(--color-border)] bg-[var(--color-bg)]/50 flex justify-end gap-3">
                             {!streamDone && !streamError ? (
-                                <button onClick={handleCancelStream} className="px-5 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                                    {t('aiSummaryModal.streamCancel')}
+                                <button onClick={handleCancelAnalysis} className="px-5 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                                    {t('aiSummaryModal.streamCancelAnalysis')}
                                 </button>
                             ) : (
                                 <button onClick={handleStreamClose} className="px-5 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 font-medium">

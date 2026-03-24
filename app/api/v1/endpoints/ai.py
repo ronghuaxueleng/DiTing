@@ -18,7 +18,7 @@ from app.db import (
     add_ai_summary, get_ai_summaries, delete_ai_summary, clear_ai_summaries, update_ai_summary,
 )
 from app.core.config import settings
-from app.services.llm import analyze_text, create_analysis_stream
+from app.services.llm import create_analysis_stream
 from app.core.logger import logger, trace_id_ctx
 from app.utils.source_utils import normalize_source_id
 from app.core.task_manager import task_manager, TaskCancelledException
@@ -60,47 +60,77 @@ async def process_ai_analysis(
     token = None
     if trace_id_token:
         token = trace_id_ctx.set(trace_id_token)
-        
+
+    # Attach stream data to task for SSE observer
+    task = task_manager.tasks.get(task_id)
+    if task:
+        task["_stream_chunks"] = []
+        task["_stream_model"] = ""
+        task["_stream_done"] = False
+        task["_stream_result"] = ""
+        task["_stream_duration"] = 0
+        task["_stream_error"] = ""
+
     try:
         logger.info(f"🧠 Starting AI Analysis for Item {item_id}, Task {task_id}...")
         update_ai_status(item_id, "processing")
         task_manager.update_progress(task_id, 10, "Requesting LLM...")
-        
+
         start_time = time.time()
-        
-        llm_task = asyncio.create_task(analyze_text(text_to_analyze, prompt, llm_model_id))
-        while not llm_task.done():
+
+        model_name, stream = create_analysis_stream(text_to_analyze, prompt, llm_model_id)
+
+        if task:
+            task["_stream_model"] = model_name
+
+        full_text = ""
+        async for chunk in stream:
             if task_manager.is_cancelled(task_id):
-                llm_task.cancel()
                 raise TaskCancelledException(f"Task {task_id} cancelled by user")
-            await asyncio.sleep(0.5)
-            
-        summary, model_name = llm_task.result()
+            full_text += chunk
+            if task:
+                task["_stream_chunks"].append(chunk)
+
         duration = round(time.time() - start_time, 2)
-        
+
         task_manager.update_progress(task_id, 90, "Saving summary...")
-        
+
         if overwrite:
             clear_ai_summaries(item_id)
         elif overwrite_id:
             delete_ai_summary(overwrite_id)
-        
-        add_ai_summary(item_id, prompt, summary, model_name, duration, parent_id=parent_id, input_text=input_text)
-        
+
+        add_ai_summary(item_id, prompt, full_text, model_name, duration, parent_id=parent_id, input_text=input_text)
+
         update_ai_status(item_id, "completed")
         logger.info(f"✅ AI Analysis completed for Item {item_id}")
         task_manager.update_progress(task_id, 100, "Completed")
-        
+
+        if task:
+            task["_stream_done"] = True
+            task["_stream_result"] = "completed"
+            task["_stream_duration"] = duration
+
     except TaskCancelledException as e:
         logger.warning(f"⚠️ AI Analysis cancelled for Item {item_id}: {e}")
         update_ai_status(item_id, "cancelled")
+        if task:
+            task["_stream_done"] = True
+            task["_stream_result"] = "cancelled"
     except asyncio.CancelledError:
         logger.warning(f"⚠️ AI Analysis asyncio task cancelled for Item {item_id}")
         update_ai_status(item_id, "cancelled")
+        if task:
+            task["_stream_done"] = True
+            task["_stream_result"] = "cancelled"
     except Exception as e:
         logger.error(f"❌ AI Analysis failed for Item {item_id}: {e}")
         update_ai_status(item_id, "failed")
         task_manager.update_progress(task_id, 0, f"Failed: {str(e)}")
+        if task:
+            task["_stream_done"] = True
+            task["_stream_result"] = "failed"
+            task["_stream_error"] = str(e)
     finally:
         task_manager.finish_task(task_id)
         if token:
@@ -154,7 +184,8 @@ async def analyze_endpoint(
     
     task_manager.start_task(task_id, meta={
         "type": "ai",
-        "filename": f"AI: {title}"
+        "filename": f"AI: {title}",
+        "item_id": item_id,
     })
     
     trace_id = trace_id_ctx.get()
@@ -177,80 +208,58 @@ async def analyze_endpoint(
     return {"status": "queued", "message": "AI Analysis started in background", "task_id": task_id}
 
 
-# --- Streaming Analyze Endpoint ---
+# --- Stream Observer Endpoint ---
 
-@router.post("/analyze/stream")
-async def analyze_stream_endpoint(request: AnalyzeRequest):
-    """SSE endpoint that streams LLM output token-by-token."""
-    record = None
-    if request.transcription_id:
-        conn = sqlite3.connect(settings.DB_PATH)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute("SELECT * FROM transcriptions WHERE id = ?", (request.transcription_id,))
-        record = c.fetchone()
-        conn.close()
-
-    if request.source_id and not record:
-        source_id = normalize_source_id(request.source_id)
-        record = get_transcription_by_source(source_id)
-
-    if not record:
-        raise HTTPException(status_code=404, detail="Transcription not found. Please transcribe the video first.")
-
-    if request.prompt_id:
-        from app.db.prompts import increment_prompt_use_count
-        increment_prompt_use_count(request.prompt_id)
-
-    text_to_analyze = request.input_text
-    if not text_to_analyze:
-        raw_text = record['raw_text']
-        if request.strip_subtitle:
-            from app.utils.preprocessing import strip_subtitle_metadata
-            text_to_analyze = strip_subtitle_metadata(raw_text)
-        else:
-            text_to_analyze = re.sub(r'<\|.*?\|>', '', raw_text)
-
-    item_id = record['id']
-
-    try:
-        model_name, chunk_stream = create_analysis_stream(
-            text_to_analyze, request.prompt, request.llm_model_id
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+@router.get("/analyze/stream/{task_id}")
+async def observe_analysis_stream(task_id: int):
+    """SSE endpoint to observe a running AI analysis task. Disconnecting does NOT cancel the task."""
+    task = task_manager.tasks.get(task_id)
+    if not task:
+        raise HTTPException(404, detail="Task not found")
 
     async def event_stream():
-        full_text = ""
-        start_time = time.time()
-        try:
-            update_ai_status(item_id, "processing")
-            yield f"data: {json.dumps({'type': 'start', 'model': model_name}, ensure_ascii=False)}\n\n"
+        cursor = 0
+        model_sent = False
 
-            async for chunk in chunk_stream:
-                full_text += chunk
-                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)}\n\n"
+        while True:
+            task = task_manager.tasks.get(task_id)
+            if not task:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Task removed'}, ensure_ascii=False)}\n\n"
+                break
 
-            duration = round(time.time() - start_time, 2)
+            # Send start event once model name is known
+            if not model_sent:
+                model = task.get("_stream_model", "")
+                if model:
+                    yield f"data: {json.dumps({'type': 'start', 'model': model}, ensure_ascii=False)}\n\n"
+                    model_sent = True
 
-            if request.overwrite:
-                clear_ai_summaries(item_id)
-            elif request.overwrite_id:
-                delete_ai_summary(request.overwrite_id)
+            # Send new chunks
+            chunks = task.get("_stream_chunks", [])
+            while cursor < len(chunks):
+                yield f"data: {json.dumps({'type': 'chunk', 'text': chunks[cursor]}, ensure_ascii=False)}\n\n"
+                cursor += 1
 
-            add_ai_summary(
-                item_id, request.prompt, full_text, model_name, duration,
-                parent_id=request.parent_id, input_text=request.input_text
-            )
-            update_ai_status(item_id, "completed")
-            logger.info(f"✅ AI Stream completed for Item {item_id} in {duration}s")
+            # Check if task is done
+            if task.get("_stream_done"):
+                # Flush any remaining chunks
+                chunks = task.get("_stream_chunks", [])
+                while cursor < len(chunks):
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunks[cursor]}, ensure_ascii=False)}\n\n"
+                    cursor += 1
 
-            yield f"data: {json.dumps({'type': 'done', 'duration': duration}, ensure_ascii=False)}\n\n"
+                result = task.get("_stream_result", "failed")
+                if result == "completed":
+                    duration = task.get("_stream_duration", 0)
+                    yield f"data: {json.dumps({'type': 'done', 'duration': duration}, ensure_ascii=False)}\n\n"
+                elif result == "cancelled":
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'Task cancelled'}, ensure_ascii=False)}\n\n"
+                else:
+                    error_msg = task.get("_stream_error", "Unknown error")
+                    yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
+                break
 
-        except Exception as e:
-            logger.error(f"❌ AI Stream Error for Item {item_id}: {e}")
-            update_ai_status(item_id, "failed")
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0.05)
 
     return StreamingResponse(
         event_stream(),

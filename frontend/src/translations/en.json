@@ -927,7 +927,9 @@
         "streamComplete": "Complete · {{model}} · {{duration}}s",
         "streamError": "Generation failed",
         "streamDone": "Done",
-        "streamCancel": "Cancel"
+        "streamCancel": "Cancel",
+        "streamCancelAnalysis": "Cancel Analysis",
+        "streamContinueBackground": "AI analysis will continue in the background. Check Task Center for progress."
     },
     "workerManager": {
         "title": "DiTing Worker Manager",

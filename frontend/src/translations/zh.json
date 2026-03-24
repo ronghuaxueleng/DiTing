@@ -941,7 +941,9 @@
         "streamComplete": "生成完成 · {{model}} · {{duration}}s",
         "streamError": "生成失败",
         "streamDone": "完成",
-        "streamCancel": "取消生成"
+        "streamCancel": "取消生成",
+        "streamCancelAnalysis": "取消分析",
+        "streamContinueBackground": "AI 分析将在后台继续，可在任务中心查看进度"
     },
     "workerManager": {
         "title": "DiTing Worker Manager",
