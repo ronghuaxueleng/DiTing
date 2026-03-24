@@ -278,6 +278,56 @@ export async function analyzeSegment(request: AnalyzeRequest): Promise<{ summary
     })
 }
 
+export async function analyzeSegmentStream(
+    request: AnalyzeRequest,
+    callbacks: {
+        onStart?: (model: string) => void
+        onChunk: (text: string) => void
+        onDone: (duration: number) => void
+        onError: (message: string) => void
+    },
+    signal?: AbortSignal
+): Promise<void> {
+    const response = await fetch(`${API_BASE}/analyze/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+        signal,
+    })
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Stream request failed' }))
+        throw new Error(error.detail || `HTTP ${response.status}`)
+    }
+
+    const reader = response.body!.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop()!
+
+        for (const part of parts) {
+            const dataLine = part.split('\n').find(l => l.startsWith('data: '))
+            if (!dataLine) continue
+            try {
+                const data = JSON.parse(dataLine.slice(6))
+                switch (data.type) {
+                    case 'start': callbacks.onStart?.(data.model); break
+                    case 'chunk': callbacks.onChunk(data.text); break
+                    case 'done': callbacks.onDone(data.duration); break
+                    case 'error': callbacks.onError(data.message); break
+                }
+            } catch { /* skip malformed events */ }
+        }
+    }
+}
+
 export async function deleteSummary(summaryId: number): Promise<void> {
     await fetchJson(`${API_BASE}/summaries/${summaryId}`, { method: 'DELETE' })
 }

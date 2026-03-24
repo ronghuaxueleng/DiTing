@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-    getLLMProviders, analyzeSegment, deleteSummary,
+    getLLMProviders, analyzeSegmentStream, deleteSummary,
     getPrompts, getCategories, createPrompt, updatePrompt, deletePrompt,
     createCategory, updateCategory, deleteCategory
 } from '../api'
@@ -12,6 +12,8 @@ import ConfirmModal from './ConfirmModal'
 import type { RefineContext } from './SegmentCard'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { useTranslation } from 'react-i18next'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface AISummaryModalProps {
     isOpen: boolean
@@ -37,12 +39,35 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
     const [showRefineContext, setShowRefineContext] = useState(true)
     const [stripSubtitle, setStripSubtitle] = useState<boolean>(!!segment?.is_subtitle)
 
+    // Streaming state
+    const [isStreaming, setIsStreaming] = useState(false)
+    const [streamedText, setStreamedText] = useState('')
+    const [streamModel, setStreamModel] = useState('')
+    const [streamDone, setStreamDone] = useState(false)
+    const [streamError, setStreamError] = useState('')
+    const [streamDuration, setStreamDuration] = useState(0)
+    const abortRef = useRef<AbortController | null>(null)
+    const streamContainerRef = useRef<HTMLDivElement>(null)
+
     // Sync state when modal opens
     useEffect(() => {
         if (isOpen && segment) {
             setStripSubtitle(segment.is_subtitle === 1 || segment.is_subtitle === true)
         }
+        if (!isOpen) {
+            setIsStreaming(false)
+            setStreamedText('')
+            setStreamDone(false)
+            setStreamError('')
+        }
     }, [isOpen, segment])
+
+    // Auto-scroll streaming content
+    useEffect(() => {
+        if (isStreaming && streamContainerRef.current) {
+            streamContainerRef.current.scrollTop = streamContainerRef.current.scrollHeight
+        }
+    }, [streamedText, isStreaming])
 
     // CRUD state
     const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null)
@@ -57,16 +82,6 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
     const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories, enabled: isOpen })
 
     // Mutations
-    const analyzeMutation = useMutation<any, Error, any>({
-        mutationFn: (params: any) => analyzeSegment(params),
-        onSuccess: () => {
-            showToast('success', t('aiSummaryModal.analysisSent'))
-            onSuccess()
-            onClose()
-        },
-        onError: (e: any) => showToast('error', t('aiSummaryModal.analysisFailed') + e.message)
-    })
-
     const promptMutation = useMutation<any, Error, any>({
         mutationFn: (data: any) => data.id ? updatePrompt(data.id, data.name, data.content, data.category_id) : createPrompt(data.name, data.content, data.category_id),
         onSuccess: () => {
@@ -130,14 +145,61 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
             await deleteSummary(selectedOverwriteId as number)
         }
 
-        analyzeMutation.mutate({
-            transcription_id: segment.id,
-            prompt: customPrompt,
-            llm_model_id: selectedModelId === '' ? undefined : selectedModelId,
-            parent_id: refineContext?.parentId ?? undefined,
-            input_text: refineContext ? refineContext.contextText : undefined,
-            strip_subtitle: stripSubtitle,
-        })
+        // Start streaming
+        setIsStreaming(true)
+        setStreamedText('')
+        setStreamModel('')
+        setStreamDone(false)
+        setStreamError('')
+
+        const controller = new AbortController()
+        abortRef.current = controller
+
+        try {
+            await analyzeSegmentStream(
+                {
+                    transcription_id: segment.id,
+                    prompt: customPrompt,
+                    llm_model_id: selectedModelId === '' ? undefined : selectedModelId,
+                    parent_id: refineContext?.parentId ?? undefined,
+                    input_text: refineContext ? refineContext.contextText : undefined,
+                    strip_subtitle: stripSubtitle,
+                },
+                {
+                    onStart: (model) => setStreamModel(model),
+                    onChunk: (text) => setStreamedText(prev => prev + text),
+                    onDone: (duration) => {
+                        setStreamDone(true)
+                        setStreamDuration(duration)
+                        queryClient.invalidateQueries({ queryKey: ['video-detail'] })
+                    },
+                    onError: (msg) => {
+                        setStreamError(msg)
+                        showToast('error', msg)
+                    },
+                },
+                controller.signal
+            )
+        } catch (e: any) {
+            if (e.name !== 'AbortError') {
+                setStreamError(e.message)
+                showToast('error', e.message)
+            }
+        }
+    }
+
+    const handleCancelStream = () => {
+        abortRef.current?.abort()
+        setIsStreaming(false)
+        setStreamedText('')
+    }
+
+    const handleStreamClose = () => {
+        setIsStreaming(false)
+        setStreamedText('')
+        setStreamDone(false)
+        onSuccess()
+        onClose()
     }
 
     const handleDeletePrompt = (id: number, name: string) => {
@@ -160,6 +222,50 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                     <button onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] p-2">✕</button>
                 </div>
 
+                {isStreaming ? (
+                    <>
+                        {/* Streaming View */}
+                        <div ref={streamContainerRef} className="flex-1 overflow-y-auto p-6">
+                            <div className="flex items-center gap-2 mb-4 text-sm text-[var(--color-text-muted)]">
+                                {!streamDone && !streamError && (
+                                    <Icons.Loader className="w-4 h-4 animate-spin text-[var(--color-primary)]" />
+                                )}
+                                {streamDone && <Icons.CheckCircle className="w-4 h-4 text-green-500" />}
+                                {streamError && <Icons.AlertCircle className="w-4 h-4 text-red-500" />}
+                                <span>
+                                    {streamDone
+                                        ? t('aiSummaryModal.streamComplete', { model: streamModel, duration: streamDuration })
+                                        : streamError
+                                            ? t('aiSummaryModal.streamError')
+                                            : t('aiSummaryModal.streamGenerating', { model: streamModel || '...' })}
+                                </span>
+                            </div>
+                            <div className="prose prose-sm max-w-none dark:prose-invert text-[var(--color-text)]">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {streamedText}
+                                </ReactMarkdown>
+                                {!streamDone && !streamError && streamedText && (
+                                    <span className="inline-block w-1.5 h-4 bg-[var(--color-primary)] animate-pulse rounded-sm ml-0.5 align-text-bottom" />
+                                )}
+                            </div>
+                            {!streamedText && !streamError && (
+                                <div className="text-sm text-[var(--color-text-muted)] italic mt-4">{t('aiSummaryModal.streamGenerating', { model: streamModel || '...' })}</div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-[var(--color-border)] bg-[var(--color-bg)]/50 flex justify-end gap-3">
+                            {!streamDone && !streamError ? (
+                                <button onClick={handleCancelStream} className="px-5 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                                    {t('aiSummaryModal.streamCancel')}
+                                </button>
+                            ) : (
+                                <button onClick={handleStreamClose} className="px-5 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 font-medium">
+                                    {t('aiSummaryModal.streamDone')}
+                                </button>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    <>
                 <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
                     {/* Categories Sidebar (Horizontal tabs on mobile) */}
                     <div className="md:w-48 border-b md:border-b-0 md:border-r border-[var(--color-border)] bg-[var(--color-bg)]/30 flex flex-row md:flex-col shrink-0">
@@ -296,11 +402,13 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
 
                     <div className="flex gap-3 w-full md:w-auto md:ml-auto mt-2 md:mt-0">
                         <button onClick={onClose} className="hidden md:block px-5 py-2 text-sm border rounded-lg hover:bg-[var(--color-bg-hover)]">{t('common.cancel')}</button>
-                        <button onClick={handleAnalyze} disabled={analyzeMutation.isPending || !customPrompt.trim()} className="flex-1 md:flex-none px-5 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm font-medium">
-                            {analyzeMutation.isPending ? <><Icons.Loader className="w-4 h-4 animate-spin" /> {t('aiSummaryModal.requesting')}</> : <><Icons.Sparkles className="w-4 h-4" /> {t('aiSummaryModal.startAnalysis')}</>}
+                        <button onClick={handleAnalyze} disabled={!customPrompt.trim()} className="flex-1 md:flex-none px-5 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm font-medium">
+                            <Icons.Sparkles className="w-4 h-4" /> {t('aiSummaryModal.startAnalysis')}
                         </button>
                     </div>
                 </div>
+                    </>
+                )}
 
                 {/* Prompt/Category Forms (Overlays) */}
                 {showPromptForm && (

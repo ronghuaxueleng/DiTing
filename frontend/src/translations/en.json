@@ -922,7 +922,12 @@
         "deleteCategory": "Delete Category",
         "deleteCategoryConfirm": "Are you sure you want to delete category \"{{name}}\"?",
         "deleteCategoryAndClean": "Delete Category & Clean",
-        "selectWarning": "Please select a version to overwrite"
+        "selectWarning": "Please select a version to overwrite",
+        "streamGenerating": "Generating with {{model}}...",
+        "streamComplete": "Complete · {{model}} · {{duration}}s",
+        "streamError": "Generation failed",
+        "streamDone": "Done",
+        "streamCancel": "Cancel"
     },
     "workerManager": {
         "title": "DiTing Worker Manager",

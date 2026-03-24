@@ -5,10 +5,12 @@ All LLM/ASR/Prompt configuration routes are in settings.py
 """
 import re
 import time
+import json
 import sqlite3
 from typing import Optional
 
 from fastapi import APIRouter, Body, HTTPException, BackgroundTasks
+from starlette.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.db import (
@@ -16,7 +18,7 @@ from app.db import (
     add_ai_summary, get_ai_summaries, delete_ai_summary, clear_ai_summaries, update_ai_summary,
 )
 from app.core.config import settings
-from app.services.llm import analyze_text
+from app.services.llm import analyze_text, create_analysis_stream
 from app.core.logger import logger, trace_id_ctx
 from app.utils.source_utils import normalize_source_id
 from app.core.task_manager import task_manager, TaskCancelledException
@@ -173,6 +175,88 @@ async def analyze_endpoint(
     update_ai_status(item_id, "queued")
 
     return {"status": "queued", "message": "AI Analysis started in background", "task_id": task_id}
+
+
+# --- Streaming Analyze Endpoint ---
+
+@router.post("/analyze/stream")
+async def analyze_stream_endpoint(request: AnalyzeRequest):
+    """SSE endpoint that streams LLM output token-by-token."""
+    record = None
+    if request.transcription_id:
+        conn = sqlite3.connect(settings.DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM transcriptions WHERE id = ?", (request.transcription_id,))
+        record = c.fetchone()
+        conn.close()
+
+    if request.source_id and not record:
+        source_id = normalize_source_id(request.source_id)
+        record = get_transcription_by_source(source_id)
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Transcription not found. Please transcribe the video first.")
+
+    if request.prompt_id:
+        from app.db.prompts import increment_prompt_use_count
+        increment_prompt_use_count(request.prompt_id)
+
+    text_to_analyze = request.input_text
+    if not text_to_analyze:
+        raw_text = record['raw_text']
+        if request.strip_subtitle:
+            from app.utils.preprocessing import strip_subtitle_metadata
+            text_to_analyze = strip_subtitle_metadata(raw_text)
+        else:
+            text_to_analyze = re.sub(r'<\|.*?\|>', '', raw_text)
+
+    item_id = record['id']
+
+    try:
+        model_name, chunk_stream = create_analysis_stream(
+            text_to_analyze, request.prompt, request.llm_model_id
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    async def event_stream():
+        full_text = ""
+        start_time = time.time()
+        try:
+            update_ai_status(item_id, "processing")
+            yield f"data: {json.dumps({'type': 'start', 'model': model_name}, ensure_ascii=False)}\n\n"
+
+            async for chunk in chunk_stream:
+                full_text += chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)}\n\n"
+
+            duration = round(time.time() - start_time, 2)
+
+            if request.overwrite:
+                clear_ai_summaries(item_id)
+            elif request.overwrite_id:
+                delete_ai_summary(request.overwrite_id)
+
+            add_ai_summary(
+                item_id, request.prompt, full_text, model_name, duration,
+                parent_id=request.parent_id, input_text=request.input_text
+            )
+            update_ai_status(item_id, "completed")
+            logger.info(f"✅ AI Stream completed for Item {item_id} in {duration}s")
+
+            yield f"data: {json.dumps({'type': 'done', 'duration': duration}, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            logger.error(f"❌ AI Stream Error for Item {item_id}: {e}")
+            update_ai_status(item_id, "failed")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # --- Summaries CRUD ---

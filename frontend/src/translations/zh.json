@@ -936,7 +936,12 @@
         "deleteCategory": "删除分类",
         "deleteCategoryConfirm": "确定要删除分类 \"{{name}}\" 吗？",
         "deleteCategoryAndClean": "删除分类并清理",
-        "selectWarning": "请选择要覆盖的版本"
+        "selectWarning": "请选择要覆盖的版本",
+        "streamGenerating": "正在使用 {{model}} 生成...",
+        "streamComplete": "生成完成 · {{model}} · {{duration}}s",
+        "streamError": "生成失败",
+        "streamDone": "完成",
+        "streamCancel": "取消生成"
     },
     "workerManager": {
         "title": "DiTing Worker Manager",
