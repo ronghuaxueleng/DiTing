@@ -14,6 +14,7 @@ import {
 import { useToast } from '../contexts/ToastContext'
 import Icons from './ui/Icons'
 import { preprocessLaTeX } from '../utils/markdown'
+import { useNoteStreamObserver } from '../hooks/useNoteStreamObserver'
 
 interface NoteViewProps {
     sourceId: string
@@ -832,6 +833,9 @@ export default function NoteView({
     const activeTask: Task | null = pendingTaskId !== null
         ? (tasksMap?.[String(pendingTaskId)] ?? null)
         : null
+
+    // Stream observer for real-time note generation preview
+    const noteStream = useNoteStreamObserver(pendingTaskId)
 
     // Watch task completion
     useEffect(() => {
@@ -1671,7 +1675,7 @@ export default function NoteView({
             )}
 
             {/* ---- EMPTY STATE ---- */}
-            {!activeNote && !generateMut.isPending && !showGenPanel && (
+            {!activeNote && !generateMut.isPending && !showGenPanel && pendingTaskId === null && (
                 <div className="note-view-empty">
                     <span className="note-empty-icon">🧠</span>
                     <p className="note-empty-title">{t('detail.aiNotes.emptyTitle')}</p>
@@ -1683,11 +1687,27 @@ export default function NoteView({
                 </div>
             )}
 
-            {/* ---- GENERATING STATE ---- */}
-            {!activeNote && generateMut.isPending && (
+            {/* ---- GENERATING STATE (streaming preview) ---- */}
+            {!activeNote && (generateMut.isPending || (pendingTaskId !== null && noteStream)) && (
                 <div className="note-view-generating">
-                    <div className="note-generating-spinner" />
-                    <p>{t('detail.aiNotes.generating')}</p>
+                    {noteStream && noteStream.text ? (
+                        <div className="note-stream-preview">
+                            <div className="note-stream-header">
+                                <div className="note-generating-spinner" />
+                                <span>{noteStream.model ? `${noteStream.model} ` : ''}{t('detail.aiNotes.generating')}</span>
+                            </div>
+                            <div className="note-content markdown-body">
+                                <Markdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={[rehypeKatex]}>
+                                    {preprocessLaTeX(noteStream.text)}
+                                </Markdown>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="note-generating-spinner" />
+                            <p>{t('detail.aiNotes.generating')}</p>
+                        </>
+                    )}
                 </div>
             )}
 

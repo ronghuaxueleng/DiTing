@@ -23,7 +23,7 @@ from app.db import (
     get_active_model_full, get_llm_model_full_by_id,
 )
 from app.db.media_cache_entries import get_best_cache_path
-from app.services.llm import analyze_text
+from app.services.llm import analyze_text, create_analysis_stream
 from app.core.logger import logger, trace_id_ctx
 from app.core.config import settings
 from app.core.task_manager import task_manager, TaskCancelledException
@@ -217,20 +217,35 @@ async def _process_note_generation(
     if trace_id_token:
         token = trace_id_ctx.set(trace_id_token)
 
+    # Attach stream data to task for SSE observer
+    task = task_manager.tasks.get(task_id)
+    if task:
+        task["_stream_chunks"] = []
+        task["_stream_model"] = ""
+        task["_stream_done"] = False
+        task["_stream_result"] = ""
+        task["_stream_duration"] = 0
+        task["_stream_error"] = ""
+
     try:
         logger.info(f"📝 Starting note generation for {source_id}, Task {task_id}...")
         task_manager.update_progress(task_id, 10, f"Requesting LLM... (style={style or 'default'})")
 
         start_time = time.time()
 
-        llm_task = asyncio.create_task(analyze_text(transcript_text, prompt, llm_model_id))
-        while not llm_task.done():
-            if task_manager.is_cancelled(task_id):
-                llm_task.cancel()
-                raise TaskCancelledException(f"Task {task_id} cancelled by user")
-            await asyncio.sleep(0.5)
+        model_name, stream = create_analysis_stream(transcript_text, prompt, llm_model_id)
 
-        content, model_name = llm_task.result()
+        if task:
+            task["_stream_model"] = model_name
+
+        content = ""
+        async for chunk in stream:
+            if task_manager.is_cancelled(task_id):
+                raise TaskCancelledException(f"Task {task_id} cancelled by user")
+            content += chunk
+            if task:
+                task["_stream_chunks"].append(chunk)
+
         duration = round(time.time() - start_time, 2)
 
         # Post-process: extract keyframe screenshots if enabled
@@ -277,13 +292,28 @@ async def _process_note_generation(
         logger.info(f"✅ Note generation completed for {source_id}")
         task_manager.update_progress(task_id, 100, "Note generated successfully")
 
+        if task:
+            task["_stream_done"] = True
+            task["_stream_result"] = "completed"
+            task["_stream_duration"] = duration
+
     except TaskCancelledException as e:
         logger.warning(f"⚠️ Note generation cancelled for {source_id}: {e}")
+        if task:
+            task["_stream_done"] = True
+            task["_stream_result"] = "cancelled"
     except asyncio.CancelledError:
         logger.warning(f"⚠️ Note generation asyncio task cancelled for {source_id}")
+        if task:
+            task["_stream_done"] = True
+            task["_stream_result"] = "cancelled"
     except Exception as e:
         logger.error(f"❌ Note generation failed for {source_id}: {e}", exc_info=True)
         task_manager.update_progress(task_id, 0, f"Failed: {str(e)}")
+        if task:
+            task["_stream_done"] = True
+            task["_stream_result"] = "failed"
+            task["_stream_error"] = str(e)
     finally:
         task_manager.finish_task(task_id)
         if token:
