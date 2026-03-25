@@ -86,6 +86,11 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
 
     // When stream completes, refresh data and clear store
     const streamDoneHandled = useRef(false)
+    const hadStream = useRef(false)
+    useEffect(() => {
+        if (isStreamActive) hadStream.current = true
+    }, [isStreamActive])
+
     useEffect(() => {
         if (streamEntry?.status === 'done' && !streamDoneHandled.current) {
             streamDoneHandled.current = true
@@ -102,6 +107,16 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
             streamDoneHandled.current = false
         }
     }, [streamEntry?.status, segment.id, queryClient, onRefresh])
+
+    // Auto-select newest summary tab after stream finishes and new data arrives
+    useEffect(() => {
+        if (hadStream.current && !streamEntry && summaryTree.length > 0) {
+            hadStream.current = false
+            // Pick the newest root (last in the tree, highest id)
+            const newest = summaryTree.reduce((a, b) => (b.id > a!.id ? b : a!), summaryTree[0])
+            if (newest) setActiveSummaryRootId(newest.id)
+        }
+    }, [streamEntry, summaryTree])
 
     const handleCancelStream = () => {
         if (streamEntry) {
@@ -241,12 +256,17 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
                 </button>
 
                 {/* AI Summary Button */}
-                {isStreamActive ? (
+                {streamEntry && streamEntry.status !== 'error' ? (
                     <span
-                        className="shrink-0 whitespace-nowrap px-1.5 py-[2px] border border-[var(--color-primary)]/50 text-[var(--color-primary)] rounded-full"
+                        className={`shrink-0 whitespace-nowrap px-1.5 py-[2px] border rounded-full ${streamEntry.status === 'done' ? 'border-green-500/50 text-green-500' : 'border-[var(--color-primary)]/50 text-[var(--color-primary)]'}`}
                         style={{ fontSize: '0.65rem' }}
                     >
-                        <div className="flex items-center gap-1"><Icons.Loader className="w-3 h-3 animate-spin" /><span className="hidden @min-[480px]:inline">AI 生成中</span></div>
+                        <div className="flex items-center gap-1">
+                            {streamEntry.status === 'done'
+                                ? <><Icons.CheckCircle className="w-3 h-3" /><span className="hidden @min-[480px]:inline">AI 完成</span></>
+                                : <><Icons.Loader className="w-3 h-3 animate-spin" /><span className="hidden @min-[480px]:inline">AI 生成中</span></>
+                            }
+                        </div>
                     </span>
                 ) : hasVisibleAi ? (
                     <button
@@ -392,19 +412,23 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
                         {/* AI Actions */}
                         {!isEditing && (
                             <>
-                                {/* Streaming Preview */}
-                                {streamEntry && streamEntry.status !== 'done' && (
+                                {/* Streaming Preview — visible until clearStream removes it */}
+                                {streamEntry && (
                                     <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
                                         <div className="flex items-center gap-2 mb-3 text-sm text-[var(--color-text-muted)]">
                                             {streamEntry.status === 'error' ? (
                                                 <Icons.AlertCircle className="w-4 h-4 text-red-500" />
+                                            ) : streamEntry.status === 'done' ? (
+                                                <Icons.CheckCircle className="w-4 h-4 text-green-500" />
                                             ) : (
                                                 <Icons.Loader className="w-4 h-4 animate-spin text-[var(--color-primary)]" />
                                             )}
                                             <span>
                                                 {streamEntry.status === 'error'
                                                     ? t('aiSummaryModal.streamError')
-                                                    : t('aiSummaryModal.streamGenerating', { model: streamEntry.model || '...' })}
+                                                    : streamEntry.status === 'done'
+                                                        ? t('aiSummaryModal.streamComplete', { model: streamEntry.model, duration: streamEntry.duration })
+                                                        : t('aiSummaryModal.streamGenerating', { model: streamEntry.model || '...' })}
                                             </span>
                                         </div>
                                         {streamEntry.text && (
@@ -417,7 +441,7 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
                                                 )}
                                             </div>
                                         )}
-                                        {!streamEntry.text && streamEntry.status !== 'error' && (
+                                        {!streamEntry.text && streamEntry.status !== 'error' && streamEntry.status !== 'done' && (
                                             <div className="text-sm text-[var(--color-text-muted)] italic">
                                                 {t('aiSummaryModal.streamGenerating', { model: streamEntry.model || '...' })}
                                             </div>
