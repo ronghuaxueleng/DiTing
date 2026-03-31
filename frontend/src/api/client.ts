@@ -784,6 +784,10 @@ export async function getQAMessages(conversationId: number): Promise<QAMessage[]
     return fetchJson(`${API_BASE}/qa/conversations/${conversationId}/messages`)
 }
 
+export async function deleteQAMessage(messageId: number): Promise<void> {
+    await fetchJson(`${API_BASE}/qa/messages/${messageId}`, { method: 'DELETE' })
+}
+
 export async function askQuestion(conversationId: number, question: string, llmModelId?: number): Promise<{ task_id: number }> {
     return fetchJson(`${API_BASE}/qa/ask`, {
         method: 'POST',

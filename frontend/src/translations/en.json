@@ -890,7 +890,11 @@
             "conversations": "Conversations",
             "emptyHint": "Ask a question about the video",
             "inputPlaceholder": "Type your question...",
-            "selectModel": "Select model"
+            "selectModel": "Select model",
+            "copyMessage": "Copy",
+            "copied": "Copied",
+            "deleteMessage": "Delete",
+            "deleteMessageConfirm": "Are you sure you want to delete this message?"
         }
     },
     "aiSummaryModal": {

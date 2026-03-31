@@ -904,7 +904,11 @@
             "conversations": "会话列表",
             "emptyHint": "针对视频内容提出你的问题",
             "inputPlaceholder": "输入问题...",
-            "selectModel": "选择模型"
+            "selectModel": "选择模型",
+            "copyMessage": "复制",
+            "copied": "已复制",
+            "deleteMessage": "删除",
+            "deleteMessageConfirm": "确定要删除这条消息吗？"
         }
     },
     "aiSummaryModal": {

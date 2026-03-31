@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from app.db.qa import (
     create_conversation, get_conversations_by_source, get_conversation,
     update_conversation_title, delete_conversation, touch_conversation,
-    add_message, get_messages,
+    add_message, get_messages, get_message, delete_message,
 )
 from app.db import get_all_transcriptions_by_source, get_active_model_full, get_llm_model_full_by_id
 from app.services.llm import create_analysis_stream
@@ -215,6 +215,15 @@ async def list_messages(conversation_id: int):
         raise HTTPException(404, "Conversation not found")
     rows = get_messages(conversation_id)
     return [dict(r) for r in rows]
+
+
+@router.delete("/qa/messages/{message_id}")
+async def delete_message_endpoint(message_id: int):
+    msg = get_message(message_id)
+    if not msg:
+        raise HTTPException(404, "Message not found")
+    delete_message(message_id)
+    return {"status": "success"}
 
 
 @router.post("/qa/ask")
