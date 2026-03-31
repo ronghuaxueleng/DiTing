@@ -99,6 +99,9 @@ def init_db():
                 except Exception:
                     pass  # Column already exists
 
+                # Ensure QA tables exist (v0.13.1+)
+                db_schema.create_all(cursor)
+
                 _set_version(cursor, CURRENT_VERSION)
                 logger.info(f"✅ Upgraded to v{CURRENT_VERSION}.")
             else:

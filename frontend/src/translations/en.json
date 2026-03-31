@@ -882,6 +882,15 @@
             "mindmapEmpty": "No headings found in the note. Cannot generate mindmap.",
             "mindmapTsHint": "Click timestamps to seek",
             "mindmapDepthHint": "Show up to level {{level}}"
+        },
+        "qa": {
+            "tab": "Q&A",
+            "title": "AI Q&A",
+            "newConversation": "New Chat",
+            "conversations": "Conversations",
+            "emptyHint": "Ask a question about the video",
+            "inputPlaceholder": "Type your question...",
+            "selectModel": "Select model"
         }
     },
     "aiSummaryModal": {

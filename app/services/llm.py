@@ -136,10 +136,12 @@ async def analyze_text(text: str, prompt: str, llm_model_id: int = None):
         return f"❌ LLM Error: {str(e)}", model
 
 
-def create_analysis_stream(text: str, prompt: str, llm_model_id: int = None):
+def create_analysis_stream(text: str, prompt: str, llm_model_id: int = None, messages_override: list = None):
     """
     Set up streaming LLM analysis.
     Returns (model_name, async_generator_of_text_chunks).
+    If messages_override is provided, it is used directly as the messages array
+    (text and prompt are ignored). This supports custom multi-turn conversations.
     Raises ValueError if no LLM config available.
     """
     db_config = None
@@ -200,12 +202,29 @@ def create_analysis_stream(text: str, prompt: str, llm_model_id: int = None):
 [RAW_TRANSCRIPT_END]
 """
 
+    # Build messages: use override if provided, else default analysis format
+    if messages_override:
+        chat_messages = messages_override
+    else:
+        chat_messages = [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_content}
+        ]
+
     async def _stream():
         if api_type == 'responses':
+            # responses API: extract system from first message if present
+            instructions = sys_prompt
+            inp = user_content
+            if messages_override:
+                sys_msgs = [m for m in messages_override if m["role"] == "system"]
+                instructions = sys_msgs[0]["content"] if sys_msgs else ""
+                non_sys = [m for m in messages_override if m["role"] != "system"]
+                inp = non_sys[-1]["content"] if non_sys else ""
             stream = await client.responses.create(
                 model=model,
-                instructions=sys_prompt,
-                input=user_content,
+                instructions=instructions,
+                input=inp,
                 temperature=0.7,
                 stream=True
             )
@@ -215,10 +234,7 @@ def create_analysis_stream(text: str, prompt: str, llm_model_id: int = None):
         else:
             stream = await client.chat.completions.create(
                 model=model,
-                messages=[
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_content}
-                ],
+                messages=chat_messages,
                 temperature=0.7,
                 stream=True
             )

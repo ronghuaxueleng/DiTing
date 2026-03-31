@@ -188,3 +188,29 @@ def create_all(cursor):
             FOREIGN KEY (source_id) REFERENCES video_meta (source_id) ON DELETE CASCADE
         )
     ''')
+
+    # --- QA Conversations (v0.13.1+) ---
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS qa_conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_id TEXT NOT NULL,
+            title TEXT,
+            llm_model_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (source_id) REFERENCES video_meta (source_id) ON DELETE CASCADE
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS qa_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            model TEXT,
+            response_time REAL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (conversation_id) REFERENCES qa_conversations (id) ON DELETE CASCADE
+        )
+    ''')

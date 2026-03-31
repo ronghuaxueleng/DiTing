@@ -99,6 +99,25 @@ export interface VideoNote {
     updated_at: string
 }
 
+export interface QAConversation {
+    id: number
+    source_id: string
+    title: string | null
+    llm_model_id: number | null
+    created_at: string
+    updated_at: string
+}
+
+export interface QAMessage {
+    id: number
+    conversation_id: number
+    role: 'user' | 'assistant'
+    content: string
+    model: string | null
+    response_time: number | null
+    created_at: string
+}
+
 // Pagination
 export interface PaginatedVideos {
     total: number

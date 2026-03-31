@@ -21,6 +21,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import ImmersiveView from "../components/ImmersiveView";
 import MindmapPanel from "../components/MindmapPanel";
 import NoteView from "../components/NoteView";
+import QAPanel from "../components/QAPanel";
 import RetranscribeModal from "../components/RetranscribeModal";
 import SegmentCard, { type RefineContext } from "../components/SegmentCard";
 import Icons from "../components/ui/Icons";
@@ -78,25 +79,26 @@ export default function Detail() {
     "local",
   );
   const [contentTab, setContentTabRaw] = useState<
-    "segments" | "immersive" | "notes" | "mindmap"
+    "segments" | "immersive" | "notes" | "mindmap" | "qa"
   >(() => {
     const urlTab = searchParams.get("tab");
     if (
       urlTab &&
-      ["segments", "immersive", "notes", "mindmap"].includes(urlTab)
+      ["segments", "immersive", "notes", "mindmap", "qa"].includes(urlTab)
     ) {
-      return urlTab as "segments" | "immersive" | "notes" | "mindmap";
+      return urlTab as "segments" | "immersive" | "notes" | "mindmap" | "qa";
     }
     return (
       (localStorage.getItem("detail-content-tab") as
         | "segments"
         | "immersive"
         | "notes"
-        | "mindmap") || "segments"
+        | "mindmap"
+        | "qa") || "segments"
     );
   });
   const setContentTab = useCallback(
-    (tab: "segments" | "immersive" | "notes" | "mindmap") => {
+    (tab: "segments" | "immersive" | "notes" | "mindmap" | "qa") => {
       setContentTabRaw(tab);
       localStorage.setItem("detail-content-tab", tab);
     },
@@ -842,7 +844,7 @@ export default function Detail() {
                           : `1 1 ${100 - topPanelPct}%`,
                     }}
                   >
-                    {contentTab === "notes" || contentTab === "mindmap" ? (
+                    {contentTab === "notes" || contentTab === "mindmap" || contentTab === "qa" ? (
                       <>
                         {/* Mini tab header */}
                         <div
@@ -1289,6 +1291,17 @@ export default function Detail() {
                       <Icons.GitBranch className="w-3 h-3" />
                       {t("detail.aiNotes.mindmap", "导图")}
                     </button>
+                    <button
+                      onClick={() => setContentTab("qa")}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
+                        contentTab === "qa"
+                          ? "bg-[var(--color-card)] shadow-sm text-[var(--color-text)]"
+                          : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                      }`}
+                    >
+                      <Icons.MessageCircle className="w-3 h-3" />
+                      {t("detail.qa.tab", "问答")}
+                    </button>
                   </div>
                 </div>
                 
@@ -1349,6 +1362,17 @@ export default function Detail() {
                         <Icons.GitBranch className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">{t("detail.aiNotes.mindmap", "导图")}</span>
                       </button>
+                      <button
+                        onClick={() => setContentTab("qa")}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5 ${
+                          contentTab === "qa"
+                            ? "bg-[var(--color-bg)] shadow-sm text-[var(--color-primary)] ring-1 ring-[var(--color-border)]"
+                            : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50"
+                        }`}
+                      >
+                        <Icons.MessageCircle className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{t("detail.qa.tab", "问答")}</span>
+                      </button>
                       <div className="w-px h-6 bg-[var(--color-border)] mx-1 self-center opacity-50 hidden sm:block"></div>
                       <button
                         onClick={() => setIsZenMode(false)}
@@ -1408,6 +1432,18 @@ export default function Detail() {
                   >
                     <MindmapPanel
                       noteContent={activeNote?.content ?? ""}
+                      onSeek={(time) => {
+                        if (playerRef.current) {
+                          playerRef.current.currentTime = time;
+                          playerRef.current.play();
+                        }
+                      }}
+                    />
+                  </div>
+                ) : contentTab === "qa" ? (
+                  <div className="flex-1 overflow-hidden">
+                    <QAPanel
+                      sourceId={sourceId!}
                       onSeek={(time) => {
                         if (playerRef.current) {
                           playerRef.current.currentTime = time;

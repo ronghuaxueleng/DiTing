@@ -27,4 +27,6 @@ api_router.include_router(wizard.router, prefix="/wizard")      # /api/wizard en
 api_router.include_router(tags.router, prefix="")         # /api/tags, /api/videos/{id}/tags
 api_router.include_router(notes.router, prefix="")        # /api/notes/*
 api_router.include_router(note_screenshots.router, prefix="")  # /api/note-screenshots/*
+from app.api.v1.endpoints import qa
+api_router.include_router(qa.router, prefix="")            # /api/qa/*
 

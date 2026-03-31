@@ -140,6 +140,22 @@ from app.db.video_notes import (
     batch_count_notes,
 )
 
+from app.db.qa import (
+    create_conversation,
+    get_conversations_by_source,
+    get_conversation,
+    update_conversation_title,
+    touch_conversation,
+    delete_conversation,
+    delete_conversations_by_source,
+    count_conversations_by_source,
+    add_message,
+    get_messages,
+    get_message,
+    update_message_content,
+    delete_message,
+)
+
 __all__ = [
     # Connection helpers
     "get_connection",
@@ -260,4 +276,19 @@ __all__ = [
     "set_note_active",
     "get_note_by_id",
     "batch_count_notes",
+
+    # QA (v0.13.1+)
+    "create_conversation",
+    "get_conversations_by_source",
+    "get_conversation",
+    "update_conversation_title",
+    "touch_conversation",
+    "delete_conversation",
+    "delete_conversations_by_source",
+    "count_conversations_by_source",
+    "add_message",
+    "get_messages",
+    "get_message",
+    "update_message_content",
+    "delete_message",
 ]

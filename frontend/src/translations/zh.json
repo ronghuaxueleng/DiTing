@@ -896,6 +896,15 @@
             "mindmapEmpty": "笔记中暂无标题层级，无法生成思维导图",
             "mindmapTsHint": "点击时间戳跳转",
             "mindmapDepthHint": "显示到第 {{level}} 级"
+        },
+        "qa": {
+            "tab": "问答",
+            "title": "AI 问答",
+            "newConversation": "新对话",
+            "conversations": "会话列表",
+            "emptyHint": "针对视频内容提出你的问题",
+            "inputPlaceholder": "输入问题...",
+            "selectModel": "选择模型"
         }
     },
     "aiSummaryModal": {

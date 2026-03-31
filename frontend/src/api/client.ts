@@ -693,7 +693,7 @@ export async function batchSetVideoTags(sourceIds: string[], tagIds: number[]): 
 
 // ============ Video Notes API ============
 
-import type { VideoNote } from './types'
+import type { VideoNote, QAConversation, QAMessage } from './types'
 
 export async function generateNote(
     sourceId: string,
@@ -754,4 +754,39 @@ export async function uploadNoteScreenshot(
         throw new Error(error.detail || `HTTP ${response.status}`)
     }
     return response.json()
+}
+
+// ============ QA (Video Q&A) API ============
+
+export async function createQAConversation(sourceId: string, title?: string): Promise<{ id: number }> {
+    return fetchJson(`${API_BASE}/qa/conversations`, {
+        method: 'POST',
+        body: JSON.stringify({ source_id: sourceId, title }),
+    })
+}
+
+export async function getQAConversations(sourceId: string): Promise<QAConversation[]> {
+    return fetchJson(`${API_BASE}/qa/conversations?source_id=${encodeURIComponent(sourceId)}`)
+}
+
+export async function updateQAConversation(conversationId: number, title: string): Promise<void> {
+    await fetchJson(`${API_BASE}/qa/conversations/${conversationId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title }),
+    })
+}
+
+export async function deleteQAConversation(conversationId: number): Promise<void> {
+    await fetchJson(`${API_BASE}/qa/conversations/${conversationId}`, { method: 'DELETE' })
+}
+
+export async function getQAMessages(conversationId: number): Promise<QAMessage[]> {
+    return fetchJson(`${API_BASE}/qa/conversations/${conversationId}/messages`)
+}
+
+export async function askQuestion(conversationId: number, question: string, llmModelId?: number): Promise<{ task_id: number }> {
+    return fetchJson(`${API_BASE}/qa/ask`, {
+        method: 'POST',
+        body: JSON.stringify({ conversation_id: conversationId, question, llm_model_id: llmModelId }),
+    })
 }
