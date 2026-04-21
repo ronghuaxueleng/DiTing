@@ -9,8 +9,10 @@ from app.db import (
     get_transcription_by_source,
     batch_count_ai_summaries, batch_get_cache_counts, batch_get_video_tags,
     delete_video_meta, delete_transcriptions_by_source,
+    delete_all_notes_by_source,
 )
 from app.services.media_cache import MediaCacheService
+from app.utils.datetime_utils import format_datetime_iso, now_local, parse_datetime
 from app.utils.source_utils import normalize_source_id
 
 
@@ -47,14 +49,18 @@ def resolve_effective_source(source_id: str) -> str:
 
 def delete_single_video(source_id: str) -> tuple[bool, int]:
     """
-    Delete a single video's cache, meta, and transcriptions.
+    Delete a single video's cache, meta, transcriptions, notes, and screenshots.
     Returns (meta_deleted: bool, transcription_count: int).
     """
+    from app.api.v1.endpoints.notes import delete_note_screenshots_dir
+
     effective = resolve_effective_source(source_id)
 
     MediaCacheService.delete_cache_for_video(effective)
     meta_deleted = delete_video_meta(effective)
     count = delete_transcriptions_by_source(effective)
+    delete_all_notes_by_source(effective)
+    delete_note_screenshots_dir(effective)
 
     return meta_deleted, count
 
@@ -67,7 +73,13 @@ def compute_embed_url(source_id: str, source_type: str) -> str | None:
             match = re.search(r"BV\w+", source_id)
             bvid = match.group(0) if match else None
         if bvid:
-            return f"//player.bilibili.com/player.html?bvid={bvid}&autoplay=0"
+            # Extract page parameter from _p suffix (e.g. BVxxx_p2 -> bvid=BVxxx, p=2)
+            page_param = ""
+            if "_p" in bvid:
+                parts = bvid.split("_p")
+                bvid = parts[0]
+                page_param = f"&p={parts[1]}"
+            return f"//player.bilibili.com/player.html?bvid={bvid}&autoplay=0{page_param}"
     elif source_type == 'youtube':
         return f"https://www.youtube.com/embed/{source_id}"
     elif source_type == 'douyin':
@@ -113,7 +125,7 @@ def compute_effective_expiry(meta_dict: dict, cache_versions: list[dict]) -> str
     elif global_policy == 'always_keep':
         return '9999-12-31T23:59:59'
     elif global_policy == 'delete_after_asr':
-        return datetime.now().isoformat()
+        return now_local().isoformat()
 
     return None
 
@@ -136,6 +148,7 @@ def build_video_list_row(r, format_cover) -> dict:
     latest_asr_model = r[12]
     subtitle_flag = r[13]
     is_analyzing = bool(r[14])
+    notes_count = r[15] if len(r) > 15 else 0
 
     r_ids = [int(x) for x in row_ids_str.split(',')] if row_ids_str else []
 
@@ -154,6 +167,7 @@ def build_video_list_row(r, format_cover) -> dict:
         "count": count,
         "ai_count": 0,
         "is_analyzing_ai": is_analyzing,
+        "notes_count": notes_count,
         "id": r_ids[0] if r_ids else None,
         "_row_ids": r_ids,
         "is_archived": is_archived,
@@ -165,10 +179,16 @@ def build_video_list_row(r, format_cover) -> dict:
 def enrich_video_list(videos: list[dict], all_source_ids: list[str], all_row_ids: list[int]):
     """Batch-enrich video list with AI counts, cache counts, and tags (in-place)."""
     # AI summary counts
+    from app.db import batch_count_ai_summaries, batch_count_notes
     ai_counts = batch_count_ai_summaries(all_row_ids) if all_row_ids else {}
     for v in videos:
         v['ai_count'] = sum(ai_counts.get(rid, 0) for rid in v['_row_ids'])
         v.pop('_row_ids', None)
+
+    # Note counts
+    note_counts = batch_count_notes(all_source_ids) if all_source_ids else {}
+    for v in videos:
+        v['note_count'] = note_counts.get(v['source_id'], 0)
 
     # Cache entry counts
     cache_counts = batch_get_cache_counts(all_source_ids) if all_source_ids else {}
@@ -193,6 +213,7 @@ def apply_filters(
     is_subtitle: bool = None,
     include_archived: str = None,
     search: str = None,
+    has_notes: bool = None,
 ) -> list[dict]:
     """Apply all filter criteria to the video list."""
     result = video_list
@@ -213,6 +234,8 @@ def apply_filters(
         result = [v for v in result if (v['count'] > 0) == has_segments]
     if has_ai is not None:
         result = [v for v in result if (v['ai_count'] > 0) == has_ai]
+    if has_notes is not None:
+        result = [v for v in result if (v.get('note_count', 0) > 0) == has_notes]
     if has_cached is not None:
         result = [v for v in result if bool(v['media_available']) == has_cached]
     if is_subtitle is not None:
@@ -234,7 +257,7 @@ def apply_filters(
     return result
 
 
-def apply_sorting(video_list: list[dict], sort_by: str = 'time'):
+def apply_sorting(video_list: list[dict], sort_by: str):
     """Sort the video list in-place."""
     if sort_by == 'title':
         video_list.sort(key=lambda x: (x.get('title') or x.get('source_id') or '').lower())
@@ -260,6 +283,7 @@ def build_paginated_video_list(
     is_subtitle: bool = None,
     include_archived: str = None,
     search: str = None,
+    has_notes: bool = None,
 ) -> dict:
     """
     Build a paginated, filtered, sorted video list.
@@ -292,6 +316,7 @@ def build_paginated_video_list(
         is_subtitle=is_subtitle,
         include_archived=include_archived,
         search=search,
+        has_notes=has_notes,
     )
 
     apply_sorting(video_list, sort_by)
@@ -344,12 +369,10 @@ def build_video_detail(source_id: str, format_cover) -> dict | None:
             'video_title': meta['video_title'],
             'video_cover': meta['video_cover'],
             'raw_text': '',
-            'ai_summary': None,
             'ai_status': None,
             'asr_model': None,
             'is_subtitle': 0,
             'is_pinned': 0,
-            'user_prompt': None,
             'segment_start': 0.0,
             'segment_end': None,
             'timestamp': meta['updated_at'] or meta['created_at'],
@@ -383,13 +406,12 @@ def build_video_detail(source_id: str, format_cover) -> dict | None:
         "cover": format_cover(row.get('video_cover')),
         "raw_text": row['raw_text'],
         "text": re.sub(r'<\|.*?\|>', '', row['raw_text']),
-        "ai_summary": row['ai_summary'],
         "ai_status": row.get('ai_status'),
         "latest_status": row.get('status', 'completed'),
         "asr_model": row.get('asr_model'),
         "is_subtitle": row.get('is_subtitle', 0),
         "is_pinned": row.get('is_pinned', 0),
-        "user_prompt": row.get('user_prompt'),
+        "ai_summary": summaries[0]['summary'] if summaries else None,
         "summaries": [dict(s) for s in summaries],
         "segment_start": row['segment_start'],
         "segment_end": row['segment_end'],
@@ -430,17 +452,39 @@ async def refresh_metadata(source_id: str, format_cover, download_cover_fn) -> d
 
     if local_record:
         rec_dict = dict(local_record)
-        source_type = rec_dict.get('source_type') or 'bilibili'
+        source_type = rec_dict.get('source_type') or infer_source_type(source_id)
         actual_source = rec_dict.get('original_source') or rec_dict.get('source') or source_id
     else:
         meta = _get_video_meta(source_id)
         if meta:
             meta_dict = dict(meta)
             actual_source = meta_dict.get('original_source') or source_id
-            source_type = infer_source_type(source_id)
+        source_type = infer_source_type(source_id)
 
     if source_type == 'douyin':
-        raise ValueError("抖音不支持服务器端同步 (请使用浏览器插件)")
+        from app.downloaders.douyin import get_douyin_info
+        # Use original_source URL for extraction; fall back to constructing URL from source_id
+        douyin_url = actual_source
+        if not douyin_url or not douyin_url.startswith('http'):
+            vid = source_id.replace('dy_', '')
+            douyin_url = f"https://www.douyin.com/video/{vid}"
+        info = await get_douyin_info(douyin_url)
+        if not info:
+            raise ValueError("无法获取抖音元数据，可能视频已删除或抖音反爬机制已更新")
+        cover = info.get('cover', '')
+        if cover and (cover.startswith('http') or cover.startswith('//')):
+            cover = await run_in_threadpool(download_cover_fn, cover)
+        title = info.get('title', '')
+        if not title:
+            raise ValueError("抖音元数据获取失败：无标题")
+        update_video_metadata(source_id, title, cover)
+        return {
+            "status": "success",
+            "updated_count": 1,
+            "title": title,
+            "cover": format_cover(cover),
+            "source_type": "douyin",
+        }
 
     if source_type == 'youtube':
         proxy = get_system_config('proxy_url')
@@ -461,7 +505,9 @@ async def refresh_metadata(source_id: str, format_cover, download_cover_fn) -> d
         }
 
     # Default: Bilibili
-    info = get_video_info(source_id)
+    # Strip _p suffix for API call (e.g. BVxxx_p2 -> BVxxx)
+    api_bvid = source_id.split('_p')[0] if source_id.startswith('BV') else source_id
+    info = get_video_info(api_bvid)
     if not info:
         if source_id.startswith('BV'):
             raise ValueError("Bilibili 元数据获取失败")

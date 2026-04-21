@@ -45,12 +45,13 @@ async def lifespan(app: FastAPI):
     async def periodic_gc():
         # Wait 5 minutes before first run to allow startup/transcription to settle
         # Initial next run time
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         from app.db.system_config import get_system_config
+        from app.utils.datetime_utils import now_local
         
         # Determine first run time
         first_delay = 60 * 5
-        MediaCacheService.next_gc_time = datetime.now() + timedelta(seconds=first_delay)
+        MediaCacheService.next_gc_time = now_local() + timedelta(seconds=first_delay)
         
         await asyncio.sleep(first_delay) 
         while True:
@@ -74,7 +75,7 @@ async def lifespan(app: FastAPI):
             # Re-read config in case it changed during execution? 
             # We already read it at start of loop.
             next_run_delay = int(interval_hours * 60 * 60)
-            MediaCacheService.next_gc_time = datetime.now() + timedelta(seconds=next_run_delay)
+            MediaCacheService.next_gc_time = now_local() + timedelta(seconds=next_run_delay)
             await asyncio.sleep(next_run_delay)
 
     asyncio.create_task(periodic_gc())
@@ -125,7 +126,9 @@ app.include_router(api_router, prefix="/api")
 # =============================================================================
 
 # Path to React build directory
-REACT_BUILD_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+# PyInstaller bundles data into sys._MEIPASS; normal dev uses relative path
+_base_dir = getattr(sys, '_MEIPASS', os.path.join(os.path.dirname(__file__), ".."))
+REACT_BUILD_DIR = os.path.join(_base_dir, "frontend", "dist")
 
 # Mount React assets if build exists
 if os.path.exists(REACT_BUILD_DIR):
@@ -150,6 +153,20 @@ if os.path.exists(REACT_BUILD_DIR):
         icon_path = os.path.join(REACT_BUILD_DIR, "icon.png")
         if os.path.exists(icon_path):
             return FileResponse(icon_path, media_type="image/png")
+        return HTMLResponse(content="Not found", status_code=404)
+
+    # Serve wizard.html (Tauri first-run setup) — must be before the SPA catch-all
+    _wizard_html_path = os.path.join(REACT_BUILD_DIR, "wizard.html")
+    _wizard_html_content = None
+    if os.path.exists(_wizard_html_path):
+        with open(_wizard_html_path, "r", encoding="utf-8") as f:
+            _wizard_html_content = f.read()
+
+    @app.get("/app/wizard.html", response_class=HTMLResponse)
+    async def serve_wizard():
+        """Serve wizard page for Tauri first-run setup"""
+        if _wizard_html_content:
+            return HTMLResponse(content=_wizard_html_content)
         return HTMLResponse(content="Not found", status_code=404)
     
     # Serve React app at /app/*

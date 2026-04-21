@@ -13,12 +13,15 @@ export default function SystemTab({ onClose }: { onClose: () => void }) {
 
     const [proxyUrl, setProxyUrl] = useState('')
     const [biliSessdata, setBiliSessdata] = useState('')
-    const [showUvr5, setShowUvr5] = useState(() => localStorage.getItem('diting_show_uvr5') === 'true')
+    const [ytCookies, setYtCookies] = useState('')
+    const [showBiliCookie, setShowBiliCookie] = useState(false)
+    const [showYtCookie, setShowYtCookie] = useState(false)
 
     // Fetch initial data
     useEffect(() => {
         getSystemConfig('proxy_url').then(val => setProxyUrl(val || ''))
         getSystemConfig('bilibili_sessdata').then(val => setBiliSessdata(val || ''))
+        getSystemConfig('youtube_cookies').then(val => setYtCookies(val || ''))
     }, [])
 
     const saveProxyMutation = useMutation({
@@ -31,6 +34,12 @@ export default function SystemTab({ onClose }: { onClose: () => void }) {
         mutationFn: (val: string) => setSystemConfig('bilibili_sessdata', val),
         onSuccess: () => showToast('success', t('settings.system.biliCookieSaved')),
         onError: () => showToast('error', t('settings.system.biliCookieSaveFailed')),
+    })
+
+    const saveYtCookieMutation = useMutation({
+        mutationFn: (val: string) => setSystemConfig('youtube_cookies', val),
+        onSuccess: () => showToast('success', t('settings.system.ytCookieSaved')),
+        onError: () => showToast('error', t('settings.system.ytCookieSaveFailed')),
     })
 
     return (
@@ -70,13 +79,23 @@ export default function SystemTab({ onClose }: { onClose: () => void }) {
                     {t('settings.system.biliCookieTitle')}
                 </h3>
                 <div className="flex gap-2">
-                    <input
-                        type="password"
-                        placeholder={t('settings.system.biliCookiePlaceholder')}
-                        value={biliSessdata}
-                        onChange={(e) => setBiliSessdata(e.target.value)}
-                        className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono"
-                    />
+                    <div className="relative flex-1">
+                        <input
+                            type={showBiliCookie ? "text" : "password"}
+                            placeholder={t('settings.system.biliCookiePlaceholder')}
+                            value={biliSessdata}
+                            onChange={(e) => setBiliSessdata(e.target.value)}
+                            className="w-full px-3 py-2 pr-10 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowBiliCookie(!showBiliCookie)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors rounded-md hover:bg-[var(--color-bg-muted)]"
+                            title={showBiliCookie ? t('common.hide', '隐藏') : t('common.show', '显示')}
+                        >
+                            {showBiliCookie ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
+                        </button>
+                    </div>
                     <button
                         onClick={() => saveBiliCookieMutation.mutate(biliSessdata)}
                         className="px-4 py-2 bg-[var(--color-primary)] text-white text-sm rounded-lg hover:opacity-90"
@@ -91,37 +110,52 @@ export default function SystemTab({ onClose }: { onClose: () => void }) {
 
             <hr className="border-[var(--color-border)]" />
 
-            {/* Feature Toggles */}
+            {/* YouTube Cookie */}
             <div className="space-y-4">
                 <h3 className="font-medium flex items-center gap-2">
-                    <Icons.Settings className="w-5 h-5" />
-                    {t('settings.system.featureToggleTitle')}
+                    <Icons.Lock className="w-5 h-5" />
+                    {t('settings.system.ytCookieTitle')}
                 </h3>
-
-                <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                        <label htmlFor="uvr5-toggle" className="text-sm font-medium cursor-pointer block">
-                            {t('settings.system.showUvr5')}
-                        </label>
-                        <p className="text-xs text-[var(--color-text-muted)] max-w-xl">
-                            {t('settings.system.showUvr5Hint')}
-                        </p>
+                <div className="space-y-2">
+                    <div className="relative">
+                        {showYtCookie ? (
+                            <textarea
+                                rows={4}
+                                placeholder={t('settings.system.ytCookiePlaceholder')}
+                                value={ytCookies}
+                                onChange={(e) => setYtCookies(e.target.value)}
+                                className="w-full px-3 py-2 pr-10 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono resize-y flex-1"
+                            />
+                        ) : (
+                            <input
+                                type="password"
+                                placeholder={t('settings.system.ytCookiePlaceholder')}
+                                value={ytCookies}
+                                onChange={(e) => setYtCookies(e.target.value)}
+                                className="w-full px-3 py-2 pr-10 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono flex-1"
+                            />
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setShowYtCookie(!showYtCookie)}
+                            className="absolute right-2 top-2 p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors rounded-md hover:bg-[var(--color-bg-muted)]"
+                            title={showYtCookie ? t('common.hide', '隐藏') : t('common.show', '显示')}
+                        >
+                            {showYtCookie ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
+                        </button>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                            type="checkbox"
-                            id="uvr5-toggle"
-                            className="sr-only peer"
-                            checked={showUvr5}
-                            onChange={(e) => {
-                                const newValue = e.target.checked
-                                localStorage.setItem('diting_show_uvr5', newValue ? 'true' : 'false')
-                                setShowUvr5(newValue)
-                            }}
-                        />
-                        <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--color-primary)]"></div>
-                    </label>
+                    <div className="flex justify-end">
+                        <button
+                            onClick={() => saveYtCookieMutation.mutate(ytCookies)}
+                            className="px-4 py-2 bg-[var(--color-primary)] text-white text-sm rounded-lg hover:opacity-90"
+                        >
+                            {t('common.save')}
+                        </button>
+                    </div>
                 </div>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                    {t('settings.system.ytCookieHint')}
+                </p>
             </div>
 
             <hr className="border-[var(--color-border)]" />

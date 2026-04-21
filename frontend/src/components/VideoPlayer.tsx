@@ -21,6 +21,7 @@ export interface VideoPlayerProps {
     setShowAppendCacheMenu: (show: boolean) => void
     updatePolicyMutation: any // from React Query
     handleAppendCache: (quality: string) => void
+    isZenMode?: boolean
 }
 
 export default function VideoPlayer({
@@ -40,9 +41,17 @@ export default function VideoPlayer({
     showAppendCacheMenu,
     setShowAppendCacheMenu,
     updatePolicyMutation,
-    handleAppendCache
+    handleAppendCache,
+    isZenMode
 }: VideoPlayerProps) {
     const { t } = useTranslation()
+    const [showCacheBar, setShowCacheBar] = React.useState(() => {
+        return localStorage.getItem('detail-show-cache-bar') === 'true'
+    })
+
+    React.useEffect(() => {
+        localStorage.setItem('detail-show-cache-bar', String(showCacheBar))
+    }, [showCacheBar])
 
     if (!video) return null
 
@@ -171,60 +180,79 @@ export default function VideoPlayer({
     }
 
     const isDouyinEmbedActive = activeTab === 'embed' && video.source_type === 'douyin' && video.embed_url
+    const hasCacheSection = video.media_available || ['bilibili', 'youtube', 'douyin'].includes(video.source_type)
 
     return (
         <div className={`space-y-3 ${mobileLayout === 'split' ? 'mb-2 lg:mb-6' : 'mb-6'}`}>
-            {/* 1. Tab Switcher */}
-            <div className="flex flex-wrap bg-[var(--color-card-muted)] p-1 rounded-lg w-fit gap-1">
-                <button
-                    onClick={() => setActiveTab('local')}
-                    disabled={!video.media_available}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${activeTab === 'local'
-                        ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
-                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] disabled:opacity-50 disabled:cursor-not-allowed'
-                        }`}
-                    title={!video.media_available ? t('detail.player.fileNotFound') : ""}
-                >
-                    <Icons.Folder className="w-4 h-4" />
-                    <span>{t('detail.player.local')}</span>
-                </button>
+            {/* 1. Tab Switcher + compact cache toggle */}
+            {!isZenMode && (
+                <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap bg-[var(--color-card-muted)] p-1 rounded-lg w-fit gap-1">
+                    <button
+                        onClick={() => setActiveTab('local')}
+                        disabled={!video.media_available}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${activeTab === 'local'
+                            ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                            : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] disabled:opacity-50 disabled:cursor-not-allowed'
+                            }`}
+                        title={!video.media_available ? t('detail.player.fileNotFound') : ""}
+                    >
+                        <Icons.Folder className="w-4 h-4" />
+                        <span>{t('detail.player.local')}</span>
+                    </button>
 
-                <button
-                    onClick={() => setActiveTab('stream')}
-                    disabled={!video.stream_url}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${activeTab === 'stream'
-                        ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
-                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] disabled:opacity-50 disabled:cursor-not-allowed'
-                        }`}
-                >
-                    <Icons.Globe className="w-4 h-4" />
-                    <span>{t('detail.player.stream')}</span>
-                    {video.stream_expired && <span className="text-[10px] bg-red-500/10 text-red-500 px-1 rounded">{t('detail.player.expired')}</span>}
-                </button>
+                    <button
+                        onClick={() => setActiveTab('stream')}
+                        disabled={!video.stream_url}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${activeTab === 'stream'
+                            ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                            : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] disabled:opacity-50 disabled:cursor-not-allowed'
+                            }`}
+                    >
+                        <Icons.Globe className="w-4 h-4" />
+                        <span>{t('detail.player.stream')}</span>
+                        {video.stream_expired && <span className="text-[10px] bg-red-500/10 text-red-500 px-1 rounded">{t('detail.player.expired')}</span>}
+                    </button>
 
-                <button
-                    onClick={() => setActiveTab('embed')}
-                    disabled={!video.embed_url && video.source_type !== 'youtube'}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${activeTab === 'embed'
-                        ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
-                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] disabled:opacity-50 disabled:cursor-not-allowed'
-                        }`}
-                >
-                    <Icons.Layout className="w-4 h-4" />
-                    <span>{t('detail.player.embed')}</span>
-                </button>
+                    <button
+                        onClick={() => setActiveTab('embed')}
+                        disabled={!video.embed_url && video.source_type !== 'youtube'}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 transition-all ${activeTab === 'embed'
+                            ? 'bg-[var(--color-card)] shadow-sm text-[var(--color-text)]'
+                            : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] disabled:opacity-50 disabled:cursor-not-allowed'
+                            }`}
+                    >
+                        <Icons.Layout className="w-4 h-4" />
+                        <span>{t('detail.player.embed')}</span>
+                    </button>
+                </div>
+
+                {/* Cache toggle icon */}
+                {hasCacheSection && (
+                    <button
+                        onClick={() => setShowCacheBar(v => !v)}
+                        className={`p-1.5 rounded-md transition-all ${showCacheBar
+                            ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                            : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-card)]'
+                            }`}
+                        title={t('detail.policy.label')}
+                    >
+                        <Icons.Settings className="w-4 h-4" />
+                    </button>
+                )}
             </div>
+            )}
 
             {/* 2. Player Container */}
             <div className={`rounded-xl overflow-hidden bg-black relative group border border-[var(--color-border)] shadow-lg transition-all duration-300 ${isDouyinEmbedActive
-                ? 'aspect-[9/16] max-h-[100vh] mx-auto max-w-[350px]'
-                : 'aspect-video'
+                ? 'aspect-[9/16] w-full max-h-[100vh] mx-auto max-w-[350px]'
+                : 'aspect-video w-full'
                 }`}>
                 {content}
             </div>
 
             {/* 3. Cache Info Bar */}
-            {(video.media_available || ['bilibili', 'youtube', 'douyin'].includes(video.source_type)) && (
+            {!isZenMode && showCacheBar && hasCacheSection && (
                 <div className={`bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm space-y-2 ${mobileLayout === 'split' ? 'hidden lg:block' : ''}`}>
                     {/* Row 1: Cache Policy + Modify */}
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -390,7 +418,7 @@ export default function VideoPlayer({
                                 </div>
                             ) : <div />}
 
-                            {['bilibili', 'youtube'].includes(video.source_type) && (
+                            {['bilibili', 'youtube', 'douyin'].includes(video.source_type) && (
                                 <div className="relative">
                                     <button
                                         onClick={() => setShowAppendCacheMenu(!showAppendCacheMenu)}

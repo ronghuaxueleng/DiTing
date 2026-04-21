@@ -3,10 +3,10 @@ import uuid
 import shutil
 import mimetypes
 from typing import Dict, Any, List
-from datetime import datetime
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Form, UploadFile, File
 
 from app.core.config import settings
+from app.utils.datetime_utils import now_local
 from app.core.logger import logger
 from app.services.storage import storage
 from app.services.transcription.dispatcher import create_and_dispatch
@@ -28,7 +28,6 @@ async def init_upload(
     file_size: int = Form(...),
     total_chunks: int = Form(...),
     task_type: str = Form("transcribe"),
-    use_uvr: bool = Form(False),
     language: str = Form("zh"),
     prompt: str = Form(""),
     output_format: str = Form(None)
@@ -51,10 +50,9 @@ async def init_upload(
         "total_chunks": total_chunks,
         "received_chunks": set(),
         "temp_path": temp_path,
-        "updated_at": datetime.now(),
+        "updated_at": now_local(),
         "metadata": {
             "task_type": task_type,
-            "use_uvr": use_uvr,
             "language": language,
             "prompt": prompt,
             "output_format": output_format
@@ -98,7 +96,7 @@ async def upload_chunk(
             shutil.copyfileobj(file.file, f)
             
         session["received_chunks"].add(index)
-        session["updated_at"] = datetime.now()
+        session["updated_at"] = now_local()
         
         return {"status": "success", "index": index, "received": len(session["received_chunks"])}
     except Exception as e:
@@ -189,7 +187,6 @@ async def finalize_upload(
             title=filename,
             cover=cover,
             task_type=meta["task_type"],
-            use_uvr=meta["use_uvr"],
             language=meta["language"],
             prompt=meta["prompt"],
             output_format=meta["output_format"],

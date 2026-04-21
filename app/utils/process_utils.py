@@ -52,7 +52,7 @@ async def run_cancellable_process(task_id: int, func, *args, **kwargs):
             exitcode = p.exitcode
             if exitcode != 0:
                  raise Exception(f"Process crashed with exit code {exitcode}")
-            return None # Or raise Exception? separate_vocals returns path or None.
+            return None # Or raise Exception? Process returned no result.
             
     except TaskCancelledException:
         if p.is_alive():

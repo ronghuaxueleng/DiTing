@@ -21,9 +21,18 @@ async def get_all_tasks_status():
 
 @router.post("/{task_id}/cancel")
 async def cancel_task_endpoint(task_id: int):
-    """Signal task cancellation"""
+    """Signal task cancellation. For AI tasks, immediately update DB status."""
+    task = task_manager.tasks.get(task_id)
+
     success = task_manager.cancel_task(task_id)
-    if success:
-        return {"status": "success", "message": f"Task {task_id} cancellation signaled"}
-    else:
+    if not success:
         return {"status": "error", "message": "Task not found or unable to cancel"}
+
+    # For AI tasks, immediately update ai_status so VideoCard reflects cancellation
+    if task:
+        meta = task.get("meta", {})
+        if meta.get("type") == "ai" and meta.get("item_id"):
+            from app.db import update_ai_status
+            update_ai_status(meta["item_id"], "cancelled")
+
+    return {"status": "success", "message": f"Task {task_id} cancellation signaled"}

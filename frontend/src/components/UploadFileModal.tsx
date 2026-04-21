@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { useChunkedUpload } from '../hooks/useChunkedUpload'
+import { useTranscriptionPrefs } from '../hooks/useTranscriptionPrefs'
 import Icons from './ui/Icons'
 
 interface UploadFileModalProps {
@@ -18,15 +19,14 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
     const [showTypeMenu, setShowTypeMenu] = useState(false)
     const typeMenuRef = useRef<HTMLDivElement>(null)
 
-    const [language, setLanguage] = useState('zh')
-    const [useUvr, setUseUvr] = useState(false)
+    const { language, setLanguage, saveAll } = useTranscriptionPrefs()
     const [prompt, setPrompt] = useState('')
 
     const [loading, setLoading] = useState(false) // for single file upload
     const [dragActive, setDragActive] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
 
-    const uploadOptions = { taskType, useUvr, language, prompt }
+    const uploadOptions = { taskType, language, prompt }
     const { state: chunkState, start: startChunkUpload, cancel: cancelChunkUpload } = useChunkedUpload()
     const isChunkUploading = chunkState.phase === 'initializing' || chunkState.phase === 'uploading' || chunkState.phase === 'finalizing'
 
@@ -82,6 +82,7 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
         if (file.size > 50 * 1024 * 1024) {
             try {
                 await startChunkUpload(file, uploadOptions)
+                saveAll()
                 onSuccess()
             } catch (e: any) {
                 if (e.message !== 'Aborted' && chunkState.phase !== 'cancelled') {
@@ -99,7 +100,6 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
             formData.append('file', file)
             formData.append('source', file.name)
             formData.append('task_type', taskType)
-            formData.append('use_uvr', String(useUvr))
             formData.append('language', language)
             if (prompt) formData.append('prompt', prompt)
 
@@ -113,6 +113,7 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
                 throw new Error(err.detail || t('upload.uploadFailed'))
             }
 
+            saveAll()
             onSuccess()
         } catch (e) {
             alert(t('upload.uploadFailed') + ': ' + (e as Error).message)
@@ -262,20 +263,6 @@ export default function UploadFileModal({ onClose, onSuccess }: UploadFileModalP
                                 </select>
                             </div>
                             <div className="flex items-center gap-2 pt-5">
-                                {localStorage.getItem('diting_show_uvr5') === 'true' && (
-                                    <>
-                                        <input
-                                            type="checkbox"
-                                            id="use-uvr"
-                                            checked={useUvr}
-                                            onChange={(e) => setUseUvr(e.target.checked)}
-                                            className="rounded"
-                                        />
-                                        <label htmlFor="use-uvr" className="text-sm cursor-pointer">
-                                            {t('upload.enableUVR')}
-                                        </label>
-                                    </>
-                                )}
                             </div>
                         </div>
 

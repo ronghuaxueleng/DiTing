@@ -135,6 +135,17 @@ export function ChevronUp({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps)
     )
 }
 
+// Chevron Left
+export function ChevronLeft({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M15 19l-7-7 7-7" />
+        </svg>
+    )
+}
+
+
+
 // Chevron Right
 export function ChevronRight({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
     return (
@@ -477,6 +488,16 @@ export function Mic({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
     )
 }
 
+// Subtitles / Closed Captions
+export function Subtitles({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <rect x="2" y="4" width="20" height="16" rx="2" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M7 13h4M15 13h2M7 17h2M13 17h4" />
+        </svg>
+    )
+}
+
 // Layout / Embed
 export function Layout({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
     return (
@@ -534,6 +555,17 @@ export function UploadCloud({ className = 'w-4 h-4', strokeWidth = 2 }: IconProp
     )
 }
 
+// Camera / Screenshot
+export function Camera({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth}
+                d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+            <circle cx="12" cy="13" r="4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} />
+        </svg>
+    )
+}
+
 // Export all as namespace for easy usage: Icons.Edit, Icons.Trash, etc.
 const Icons = {
     Edit,
@@ -549,6 +581,7 @@ const Icons = {
     Play,
     ChevronDown,
     ChevronUp,
+    ChevronLeft,
     ChevronRight,
     ArrowLeft,
     Sparkles,
@@ -583,34 +616,36 @@ const Icons = {
     Clock,
     Bot,
     Mic,
+    Subtitles,
     Layout,
     Lightbulb,
     // Square / Unchecked
-    Square: ({ className, strokeWidth }: IconProps) => (
+    Square: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeWidth={strokeWidth} />
         </svg>
     ),
     // CheckSquare / Checked
-    CheckSquare: ({ className, strokeWidth }: IconProps) => (
+    CheckSquare: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeWidth={strokeWidth} />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M9 11l3 3L22 4" />
         </svg>
     ),
     Image,
-    Quote: ({ className, strokeWidth }: IconProps) => (
+    Camera,
+    Quote: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M10 14h4m-2 4v-4m6-10l-2.09 6.26a2 2 0 01-1.91 1.34H11V5.4L13.1 2.3a1 1 0 011.3 0L16 4zM6 9H4v12h12v-2" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M8 9h.01" />
         </svg>
     ),
-    MessageSquare: ({ className, strokeWidth }: IconProps) => (
+    MessageSquare: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
     ),
-    Server: ({ className, strokeWidth }: IconProps) => (
+    Server: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M20 16.2A4.5 4.5 0 0 0 3.2 14M20 7.8A4.5 4.5 0 0 1 3.2 10M2 12h20M12 2v20" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M12 2v20" />
@@ -620,7 +655,7 @@ const Icons = {
             <line x1="6" y1="18" x2="6.01" y2="18" />
         </svg>
     ),
-    MoreVertical: ({ className, strokeWidth }: IconProps) => (
+    MoreVertical: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="1" strokeWidth={strokeWidth} />
             <circle cx="12" cy="5" r="1" strokeWidth={strokeWidth} />
@@ -628,7 +663,7 @@ const Icons = {
         </svg>
     ),
 
-    GitCommit: ({ className, strokeWidth }: IconProps) => (
+    GitCommit: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="3" strokeWidth={strokeWidth} />
             <line x1="1.05" y1="12" x2="7" y2="12" strokeWidth={strokeWidth} strokeLinecap="round" />
@@ -647,6 +682,14 @@ const Icons = {
             <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.68V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v4.68a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
         </svg>
     ),
+    PinOff: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
+        <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+            <line x1="2" y1="2" x2="22" y2="22"></line>
+            <line x1="12" y1="17" x2="12" y2="22"></line>
+            <path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h9"></path>
+            <path d="M15 9.34V6a3 3 0 0 0-5.68-1.33"></path>
+        </svg>
+    ),
     Download,
     Monitor,
     Activity,
@@ -654,33 +697,64 @@ const Icons = {
     EyeOff,
     Upload,
     UploadCloud,
-    List: ({ className, strokeWidth }: IconProps) => (
+    List: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
     ),
-    ListFilter: ({ className, strokeWidth }: IconProps) => (
+    ListFilter: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
         </svg>
     ),
-    Tags: ({ className, strokeWidth }: IconProps) => (
+    Tags: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
         </svg>
     ),
     Archive,
     ArchiveRestore,
-    SplitSquareHorizontal: ({ className, strokeWidth }: IconProps) => (
+    SplitSquareHorizontal: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M8 19H5C3.89543 19 3 18.1046 3 17V7C3 5.89543 3.89543 5 5 5H19C20.1046 5 21 5.89543 21 7V17C21 18.1046 20.1046 19 19 19H16M3 12H21" />
         </svg>
     ),
-    ArrowUpDown: ({ className, strokeWidth }: IconProps) => (
+    ArrowUpDown: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16" />
         </svg>
-    )
+    ),
+    BookOpen: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </svg>
+    ),
+    SlidersHorizontal: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+            <line x1="21" x2="14" y1="4" y2="4" />
+            <line x1="10" x2="3" y1="4" y2="4" />
+            <line x1="21" x2="12" y1="12" y2="12" />
+            <line x1="8" x2="3" y1="12" y2="12" />
+            <line x1="21" x2="16" y1="20" y2="20" />
+            <line x1="12" x2="3" y1="20" y2="20" />
+            <line x1="14" x2="14" y1="2" y2="6" />
+            <line x1="8" x2="8" y1="10" y2="14" />
+            <line x1="16" x2="16" y1="18" y2="22" />
+        </svg>
+    ),
+    GitBranch,
+    Maximize,
+    Minimize: ({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+        </svg>
+    ),
+    Shrink: ({ className, strokeWidth = 2 }: IconProps) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} d="m15 15 6 6m-6-6v6m0-6h6m-6-12l6 6m-6 0V3m0 6h6M9 9L3 3m6 6V3m0 6H3m6 6l-6 6m6-6v6m0-6H3" />
+        </svg>
+    ),
 }
 
 // Database
@@ -787,6 +861,29 @@ export function Archive({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
             <rect width="20" height="5" x="2" y="3" rx="1" />
             <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
             <path d="M10 12h4" />
+        </svg>
+    )
+}
+
+// GitBranch / Mindmap
+export function GitBranch({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+            <line x1="6" y1="3" x2="6" y2="15" />
+            <circle cx="18" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <path d="M18 9a9 9 0 0 1-9 9" />
+        </svg>
+    )
+}
+
+// Maximize / Fit View
+export function Maximize({ className = 'w-4 h-4', strokeWidth = 2 }: IconProps) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
         </svg>
     )
 }

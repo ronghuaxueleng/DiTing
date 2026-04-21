@@ -36,22 +36,26 @@ export default function Header({ onAddVideo, onOpenSettings, onUploadFile }: Hea
     const asrAvailable = (() => {
         if (!asrStatus) return { online: -1, total: 0, tooltip: '' }  // loading
 
-        const { engines, config } = asrStatus
+        const { workers, clouds, config } = asrStatus
         const disabledSet = new Set(config.disabled_engines || [])
 
+        // Build a combined online map from workers + clouds
+        const allEntries: [string, { online: boolean }][] = [
+            ...Object.entries(workers || {}).map(([id, w]) => [id, { online: w.online }] as [string, { online: boolean }]),
+            ...Object.entries(clouds || {}).map(([id, c]) => [id, { online: c.online }] as [string, { online: boolean }]),
+        ]
+
         if (config.strict_mode) {
-            // Strict mode: only the primary (active) engine matters
             const primary = config.active_engine || config.priority?.[0]
             if (!primary) return { online: 0, total: 0 }
-            const eng = engines[primary]
-            const isOnline = eng?.online && !disabledSet.has(primary)
+            const entry = allEntries.find(([k]) => k === primary)
+            const isOnline = entry?.[1]?.online && !disabledSet.has(primary)
             return { online: isOnline ? 1 : 0, total: 1, engineName: primary }
         }
 
-        // Normal mode: count enabled + online engines
-        const enabledEngines = Object.entries(engines).filter(([key]) => !disabledSet.has(key))
-        const onlineCount = enabledEngines.filter(([, e]) => e.online).length
-        return { online: onlineCount, total: enabledEngines.length }
+        const enabledEntries = allEntries.filter(([key]) => !disabledSet.has(key))
+        const onlineCount = enabledEntries.filter(([, e]) => e.online).length
+        return { online: onlineCount, total: enabledEntries.length }
     })()
 
     const asrColor = asrAvailable.online === -1

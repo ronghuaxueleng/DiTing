@@ -12,18 +12,17 @@ import ConfirmModal from './ConfirmModal'
 import type { RefineContext } from './SegmentCard'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { useTranslation } from 'react-i18next'
+import { useStreamingStore } from '../stores/useStreamingStore'
 
 interface AISummaryModalProps {
     isOpen: boolean
     onClose: () => void
     segment: Segment | null
-    onSuccess: () => void
     refineContext?: RefineContext | null
 }
 
-export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, refineContext }: AISummaryModalProps) {
+export default function AISummaryModal({ isOpen, onClose, segment, refineContext }: AISummaryModalProps) {
     const { t } = useTranslation()
-    useEscapeKey(onClose, isOpen)
     const queryClient = useQueryClient()
     const { showToast, showUndoableDelete } = useToast()
 
@@ -36,6 +35,9 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
     const [selectedOverwriteId, setSelectedOverwriteId] = useState<number | ''>('')
     const [showRefineContext, setShowRefineContext] = useState(true)
     const [stripSubtitle, setStripSubtitle] = useState<boolean>(!!segment?.is_subtitle)
+
+    // Escape key: simple close
+    useEscapeKey(onClose, isOpen)
 
     // Sync state when modal opens
     useEffect(() => {
@@ -57,16 +59,6 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
     const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: getCategories, enabled: isOpen })
 
     // Mutations
-    const analyzeMutation = useMutation<any, Error, any>({
-        mutationFn: (params: any) => analyzeSegment(params),
-        onSuccess: () => {
-            showToast('success', t('aiSummaryModal.analysisSent'))
-            onSuccess()
-            onClose()
-        },
-        onError: (e: any) => showToast('error', t('aiSummaryModal.analysisFailed') + e.message)
-    })
-
     const promptMutation = useMutation<any, Error, any>({
         mutationFn: (data: any) => data.id ? updatePrompt(data.id, data.name, data.content, data.category_id) : createPrompt(data.name, data.content, data.category_id),
         onSuccess: () => {
@@ -130,14 +122,21 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
             await deleteSummary(selectedOverwriteId as number)
         }
 
-        analyzeMutation.mutate({
-            transcription_id: segment.id,
-            prompt: customPrompt,
-            llm_model_id: selectedModelId === '' ? undefined : selectedModelId,
-            parent_id: refineContext?.parentId ?? undefined,
-            input_text: refineContext ? refineContext.contextText : undefined,
-            strip_subtitle: stripSubtitle,
-        })
+        try {
+            const { task_id } = await analyzeSegment({
+                transcription_id: segment.id,
+                prompt: customPrompt,
+                llm_model_id: selectedModelId === '' ? undefined : selectedModelId,
+                parent_id: refineContext?.parentId ?? undefined,
+                input_text: refineContext ? refineContext.contextText : undefined,
+                strip_subtitle: stripSubtitle,
+            })
+            useStreamingStore.getState().startStream(segment.id, task_id)
+            showToast('info', t('aiSummaryModal.analysisStarted'))
+            onClose()
+        } catch (e: any) {
+            showToast('error', t('aiSummaryModal.analysisFailed') + e.message)
+        }
     }
 
     const handleDeletePrompt = (id: number, name: string) => {
@@ -147,8 +146,8 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-[var(--color-card)] w-full max-w-5xl h-[85vh] rounded-xl border border-[var(--color-border)] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-[var(--color-card)] w-full max-w-5xl h-[100dvh] md:h-[85vh] rounded-none md:rounded-xl border border-[var(--color-border)] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-[var(--color-border)] flex justify-between items-center bg-[var(--color-bg)]/50">
                     <div>
@@ -160,13 +159,13 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                     <button onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] p-2">✕</button>
                 </div>
 
-                <div className="flex-1 flex overflow-hidden">
-                    {/* Categories Sidebar */}
-                    <div className="w-48 border-r border-[var(--color-border)] bg-[var(--color-bg)]/30 flex flex-col">
-                        <div className="p-2 space-y-1 overflow-y-auto flex-1">
+                <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+                    {/* Categories Sidebar (Horizontal tabs on mobile) */}
+                    <div className="md:w-48 border-b md:border-b-0 md:border-r border-[var(--color-border)] bg-[var(--color-bg)]/30 flex flex-row md:flex-col shrink-0">
+                        <div className="p-2 space-x-2 md:space-x-0 md:space-y-1 overflow-x-auto md:overflow-y-auto flex-1 flex flex-row md:flex-col whitespace-nowrap">
                             <button
                                 onClick={() => setSelectedCategoryId('all')}
-                                className={`w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 ${selectedCategoryId === 'all' ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]'}`}
+                                className={`md:w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 shrink-0 ${selectedCategoryId === 'all' ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]'}`}
                             >
                                 <Icons.Globe className="w-4 h-4" /> {t('aiSummaryModal.all')}
                             </button>
@@ -174,11 +173,11 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                                 <div key={cat.id} className="group relative flex items-center">
                                     <button
                                         onClick={() => setSelectedCategoryId(cat.id)}
-                                        className={`flex-1 text-left px-3 py-2 rounded text-sm truncate flex items-center gap-2 ${selectedCategoryId === cat.id ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]'}`}
+                                        className={`flex-1 text-left px-3 py-2 rounded text-sm truncate flex items-center gap-2 shrink-0 ${selectedCategoryId === cat.id ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]'}`}
                                     >
-                                        <span className="truncate">{cat.name}</span>
+                                        <span className="truncate max-w-[120px] md:max-w-full">{cat.name}</span>
                                     </button>
-                                    <div className="absolute right-1 hidden group-hover:flex gap-0.5 bg-[var(--color-card)] shadow-sm rounded border border-[var(--color-border)] p-0.5">
+                                    <div className="md:absolute md:right-1 flex md:hidden md:group-hover:flex gap-0.5 md:bg-[var(--color-card)] md:shadow-sm md:rounded md:border md:border-[var(--color-border)] p-0.5 ml-1 md:ml-0 opacity-60 md:opacity-100 hidden md:block group-hover:block">
                                         <button className="p-1 hover:text-[var(--color-primary)]" onClick={() => { setEditingCategory(cat); setShowCategoryForm(true); }}><Icons.Edit className="w-3 h-3" /></button>
                                         <button className="p-1 hover:text-red-500" onClick={() => setCategoryDeleteConfirm({ id: cat.id, name: cat.name })}><Icons.Trash className="w-3 h-3" /></button>
                                     </div>
@@ -186,13 +185,13 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                             ))}
                             <button
                                 onClick={() => setSelectedCategoryId('uncategorized')}
-                                className={`w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 ${selectedCategoryId === 'uncategorized' ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]'}`}
+                                className={`md:w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 shrink-0 ${selectedCategoryId === 'uncategorized' ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]'}`}
                             >
                                 <Icons.Folder className="w-4 h-4" /> {t('aiSummaryModal.uncategorized')}
                             </button>
                         </div>
-                        <div className="p-3 border-t border-[var(--color-border)]">
-                            <button onClick={() => { setEditingCategory(null); setShowCategoryForm(true); }} className="w-full py-1.5 text-xs border border-dashed border-[var(--color-border)] text-[var(--color-text-muted)] rounded hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors flex items-center justify-center gap-1">
+                        <div className="p-3 border-l md:border-l-0 md:border-t border-[var(--color-border)] flex items-center shrink-0">
+                            <button onClick={() => { setEditingCategory(null); setShowCategoryForm(true); }} className="w-full h-full md:h-auto md:py-1.5 px-3 border border-dashed border-[var(--color-border)] text-[var(--color-text-muted)] rounded hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors flex items-center justify-center gap-1">
                                 <Icons.Plus className="w-3.5 h-3.5" /> {t('aiSummaryModal.newCategory')}
                             </button>
                         </div>
@@ -200,12 +199,12 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
 
                     {/* Main Content */}
                     <div className="flex-1 flex flex-col p-4 bg-[var(--color-bg)]/10 overflow-hidden relative">
-                        <div className="flex justify-between items-center mb-4">
-                            <div className="relative w-64">
+                        <div className="flex justify-between items-center mb-4 gap-2">
+                            <div className="relative flex-1 md:flex-none md:w-64">
                                 <Icons.Search className="absolute left-2.5 top-2 w-4 h-4 text-[var(--color-text-muted)]" />
                                 <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder={t('aiSummaryModal.searchPromptPlaceholder')} className="w-full pl-8 pr-3 py-1.5 text-sm bg-[var(--color-bg)] border border-[var(--color-border)] rounded-full focus:outline-none focus:border-[var(--color-primary)]" />
                             </div>
-                            <button onClick={() => { setEditingPrompt(null); setShowPromptForm(true); }} className="px-3 py-1.5 text-xs bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 rounded-lg transition-colors flex items-center gap-1">
+                            <button onClick={() => { setEditingPrompt(null); setShowPromptForm(true); }} className="px-3 py-1.5 text-xs bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 rounded-lg transition-colors flex items-center gap-1 shrink-0">
                                 <Icons.Plus className="w-3.5 h-3.5" /> {t('aiSummaryModal.newPrompt')}
                             </button>
                         </div>
@@ -216,8 +215,8 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                                 {filteredPrompts.map(prompt => (
                                     <div key={prompt.id} onClick={() => setCustomPrompt(prompt.content)} className="group relative p-3 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg hover:border-[var(--color-primary)]/50 hover:shadow-md cursor-pointer transition-all active:scale-[0.98]">
                                         <h4 className="text-sm font-semibold text-[var(--color-text)] mb-1 flex items-center justify-between">
-                                            {prompt.name}
-                                            <div className="hidden group-hover:flex gap-0.5" onClick={e => e.stopPropagation()}>
+                                            <span className="truncate pr-2">{prompt.name}</span>
+                                            <div className="flex gap-0.5 opacity-60 md:opacity-0 md:group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                                                 <button className="p-1 hover:text-[var(--color-primary)] rounded bg-[var(--color-bg)]" onClick={() => { setEditingPrompt(prompt); setShowPromptForm(true); }}><Icons.Edit className="w-3.5 h-3.5" /></button>
                                                 <button className="p-1 hover:text-red-500 rounded bg-[var(--color-bg)]" onClick={() => handleDeletePrompt(prompt.id, prompt.name)}><Icons.Trash className="w-3.5 h-3.5" /></button>
                                             </div>
@@ -241,16 +240,16 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                         )}
 
                         {/* Custom Input */}
-                        <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
+                        <div className="mt-4 pt-4 border-t border-[var(--color-border)] shrink-0">
                             <label className="text-xs font-semibold text-[var(--color-text-muted)] mb-2 block">{t('aiSummaryModal.customPromptLabel')}</label>
-                            <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} placeholder={t('aiSummaryModal.customPromptPlaceholder')} className="w-full h-24 p-3 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm resize-none focus:border-[var(--color-primary)] focus:outline-none" />
+                            <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} placeholder={t('aiSummaryModal.customPromptPlaceholder')} className="w-full h-20 md:h-24 p-2 md:p-3 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm resize-none focus:border-[var(--color-primary)] focus:outline-none" />
                         </div>
                     </div>
                 </div>
 
                 {/* Footer Controls */}
-                <div className="p-4 bg-[var(--color-bg)] border-t border-[var(--color-border)] flex flex-wrap gap-4 items-end">
-                    <div className="flex-1 min-w-[150px] space-y-1">
+                <div className="p-3 md:p-4 bg-[var(--color-bg)] border-t border-[var(--color-border)] flex flex-col md:flex-row flex-wrap gap-3 md:gap-4 md:items-end">
+                    <div className="w-full md:flex-1 md:min-w-[150px] space-y-1">
                         <label className="text-xs text-[var(--color-text-muted)] block mb-1">{t('aiSummaryModal.subtitlePreprocessing')}</label>
                         <label
                             className={`flex items-center gap-2 px-3 py-2 text-sm bg-[var(--color-card)] border ${stripSubtitle ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-[var(--color-border)] text-[var(--color-text)]'} rounded cursor-pointer transition-colors hover:border-[var(--color-primary)]/50`}
@@ -266,7 +265,7 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                         </label>
                     </div>
 
-                    <div className="flex-1 min-w-[200px] space-y-1">
+                    <div className="w-full md:flex-1 md:min-w-[200px] space-y-1">
                         <label className="text-xs text-[var(--color-text-muted)] block">{t('aiSummaryModal.modelSelection')}</label>
                         <select value={selectedModelId} onChange={e => setSelectedModelId(e.target.value ? Number(e.target.value) : '')} className="w-full p-2 text-sm bg-[var(--color-card)] border border-[var(--color-border)] rounded focus:border-[var(--color-primary)]">
                             <option value="">{t('aiSummaryModal.defaultModel')}</option>
@@ -276,7 +275,7 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                         </select>
                     </div>
 
-                    <div className="flex-1 max-w-[150px] space-y-1">
+                    <div className="w-full md:flex-1 md:max-w-[150px] space-y-1">
                         <label className="text-xs text-[var(--color-text-muted)] block">{t('aiSummaryModal.processMode')}</label>
                         <select value={overwriteMode} onChange={e => setOverwriteMode(e.target.value as any)} className="w-full p-2 text-sm bg-[var(--color-card)] border border-[var(--color-border)] rounded focus:border-[var(--color-primary)]">
                             <option value="append">{t('aiSummaryModal.appendVersion')}</option>
@@ -285,7 +284,7 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                     </div>
 
                     {overwriteMode === 'overwrite' && (
-                        <div className="flex-1 max-w-[240px] space-y-1">
+                        <div className="w-full md:flex-1 md:max-w-[240px] space-y-1">
                             <label className="text-xs text-[var(--color-text-muted)] block">{t('aiSummaryModal.selectOverwriteVersionLabel')}</label>
                             <select value={selectedOverwriteId} onChange={e => setSelectedOverwriteId(e.target.value ? Number(e.target.value) : '')} className="w-full p-2 text-sm bg-[var(--color-card)] border border-amber-500/50 rounded focus:border-amber-500">
                                 <option value="">{t('aiSummaryModal.pleaseSelect')}</option>
@@ -294,10 +293,10 @@ export default function AISummaryModal({ isOpen, onClose, segment, onSuccess, re
                         </div>
                     )}
 
-                    <div className="flex gap-3 ml-auto">
-                        <button onClick={onClose} className="px-5 py-2 text-sm border rounded-lg hover:bg-[var(--color-bg-hover)]">{t('common.cancel')}</button>
-                        <button onClick={handleAnalyze} disabled={analyzeMutation.isPending || !customPrompt.trim()} className="px-5 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-                            {analyzeMutation.isPending ? <><Icons.Loader className="w-4 h-4 animate-spin" /> {t('aiSummaryModal.requesting')}</> : <><Icons.Sparkles className="w-4 h-4" /> {t('aiSummaryModal.startAnalysis')}</>}
+                    <div className="flex gap-3 w-full md:w-auto md:ml-auto mt-2 md:mt-0">
+                        <button onClick={onClose} className="hidden md:block px-5 py-2 text-sm border rounded-lg hover:bg-[var(--color-bg-hover)]">{t('common.cancel')}</button>
+                        <button onClick={handleAnalyze} disabled={!customPrompt.trim()} className="flex-1 md:flex-none px-5 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm font-medium">
+                            <Icons.Sparkles className="w-4 h-4" /> {t('aiSummaryModal.startAnalysis')}
                         </button>
                     </div>
                 </div>

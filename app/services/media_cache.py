@@ -1,7 +1,7 @@
 import os
 import shutil
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from app.core.config import settings
 from app.db.system_config import get_system_config
 from app.db.connection import get_connection
@@ -11,6 +11,7 @@ from app.db.media_cache_entries import (
     get_cache_stats, get_all_cache_entries,
 )
 from app.core.logger import logger
+from app.utils.datetime_utils import format_datetime_iso, now_local, parse_datetime
 
 class MediaCacheService:
     @staticmethod
@@ -157,28 +158,22 @@ class MediaCacheService:
         conn = get_connection()
         try:
             cursor = conn.cursor()
-            now = datetime.now()
-            
+            now = now_local()
+
             cursor.execute("SELECT cache_policy, cache_expires_at FROM video_meta WHERE source_id = ?", (source_id,))
             meta = cursor.fetchone()
-            
+
             if meta:
                 policy, expires_at = meta
-                if policy == 'custom' and expires_at:
-                    expires_dt = expires_at
-                    if isinstance(expires_at, str):
-                        try:
-                            expires_dt = datetime.fromisoformat(expires_at)
-                        except ValueError:
-                            pass
-                            
-                    if isinstance(expires_dt, datetime) and expires_dt < now:
-                        logger.info(f"🔄 Resetting expired custom policy for {source_id}")
-                        cursor.execute(
-                            "UPDATE video_meta SET cache_policy = NULL, cache_expires_at = NULL WHERE source_id = ?",
-                            (source_id,)
-                        )
-                        conn.commit()
+                expires_dt = parse_datetime(expires_at)
+
+                if policy == 'custom' and expires_dt and expires_dt < now:
+                    logger.info(f"🔄 Resetting expired custom policy for {source_id}")
+                    cursor.execute(
+                        "UPDATE video_meta SET cache_policy = NULL, cache_expires_at = NULL WHERE source_id = ?",
+                        (source_id,)
+                    )
+                    conn.commit()
         except Exception as e:
             logger.error(f"❌ Error resetting policy for {source_id}: {e}")
         finally:
@@ -231,73 +226,60 @@ class MediaCacheService:
         """
         policy, days = MediaCacheService.get_retention_policy()
         candidates = []
-        
+        now = now_local()
+
         conn = get_connection()
         cursor = conn.cursor()
-        
-        now = datetime.now()
-        where_clauses = []
-        params = []
-        
-        # A. Custom Policy Expiry
-        where_clauses.append("(vm.cache_policy = 'custom' AND vm.cache_expires_at < ?)")
-        params.append(now)
-        
-        # B. Global Policy Expiry
-        if policy == "keep_days" and days > 0:
-            cutoff_date = now - timedelta(days=days)
-            where_clauses.append("(vm.cache_policy IS NULL AND e.cached_at < ?)")
-            params.append(cutoff_date)
-            
-        elif policy == "delete_after_asr":
-            cutoff_date = now - timedelta(hours=1)
-            where_clauses.append("(vm.cache_policy IS NULL AND e.cached_at < ?)")
-            params.append(cutoff_date)
-
-        if where_clauses:
-            full_where = " OR ".join(where_clauses)
-            sql = f"""
+        cursor.execute(
+            """
                 SELECT e.source_id, e.quality, e.media_path, e.file_size, e.cached_at,
                        vm.cache_policy, vm.video_title, vm.cache_expires_at
                 FROM media_cache_entries e
                 LEFT JOIN video_meta vm ON e.source_id = vm.source_id
                 WHERE (vm.cache_policy IS NOT 'keep_forever' OR vm.cache_policy IS NULL)
-                AND ({full_where})
             """
-            
-            cursor.execute(sql, tuple(params))
-            expired_rows = cursor.fetchall()
-            
-            for row in expired_rows:
-                source_id, quality, rel_path, file_size, cached_at, vm_policy, title, expires_at = row
-                
-                if vm_policy == 'keep_forever': 
-                    continue
-                    
-                full_path = os.path.join(os.getcwd(), rel_path)
-                size = file_size or 0
-                if size == 0 and os.path.exists(full_path):
-                    size = os.path.getsize(full_path)
-                
-                reason = "Global Policy Expiry"
-                if vm_policy == 'custom':
-                    reason = f"Custom Policy Expired ({expires_at})"
-                elif policy == 'delete_after_asr':
-                    reason = "Global Policy (Delete after ASR)"
-                elif policy == 'keep_days':
-                    reason = f"Global Policy (> {days} days)"
-
-                candidates.append({
-                    "source_id": source_id,
-                    "quality": quality,
-                    "media_path": rel_path,
-                    "filesize": size,
-                    "title": title or source_id,
-                    "reason": reason,
-                    "policy": vm_policy or "global"
-                })
-        
+        )
+        rows = cursor.fetchall()
         conn.close()
+
+        for row in rows:
+            source_id, quality, rel_path, file_size, cached_at, vm_policy, title, expires_at = row
+
+            if vm_policy == 'keep_forever':
+                continue
+
+            cached_dt = parse_datetime(cached_at)
+            expires_dt = parse_datetime(expires_at)
+            reason = None
+
+            if vm_policy == 'custom':
+                if expires_dt and expires_dt < now:
+                    reason = f"Custom Policy Expired ({format_datetime_iso(expires_dt) or expires_at})"
+            elif policy == 'keep_days' and days > 0 and cached_dt:
+                if cached_dt + timedelta(days=days) < now:
+                    reason = f"Global Policy (> {days} days)"
+            elif policy == 'delete_after_asr' and cached_dt:
+                if cached_dt + timedelta(hours=1) < now:
+                    reason = "Global Policy (Delete after ASR)"
+
+            if not reason:
+                continue
+
+            full_path = os.path.join(os.getcwd(), rel_path)
+            size = file_size or 0
+            if size == 0 and os.path.exists(full_path):
+                size = os.path.getsize(full_path)
+
+            candidates.append({
+                "source_id": source_id,
+                "quality": quality,
+                "media_path": rel_path,
+                "filesize": size,
+                "title": title or source_id,
+                "reason": reason,
+                "policy": vm_policy or "global"
+            })
+
         return candidates
 
     @staticmethod
@@ -308,73 +290,59 @@ class MediaCacheService:
         """
         policy, keep_days = MediaCacheService.get_retention_policy()
         candidates = []
-        
+        now = now_local()
+        future_limit = now + timedelta(days=days)
+
         conn = get_connection()
         cursor = conn.cursor()
-        
-        now = datetime.now()
-        future_limit = now + timedelta(days=days)
-        
-        where_clauses = []
-        params = []
-        
-        # A. Custom Policy
-        where_clauses.append("(vm.cache_policy = 'custom' AND vm.cache_expires_at > ? AND vm.cache_expires_at < ?)")
-        params.extend([now, future_limit])
-        
-        # B. Global Policy
-        if policy == "keep_days" and keep_days > 0:
-            min_cached_at = now - timedelta(days=keep_days)
-            max_cached_at = future_limit - timedelta(days=keep_days)
-            
-            where_clauses.append("(vm.cache_policy IS NULL AND e.cached_at > ? AND e.cached_at < ?)")
-            params.extend([min_cached_at, max_cached_at])
-            
-        if where_clauses:
-            full_where = " OR ".join(where_clauses)
-            sql = f"""
+        cursor.execute(
+            """
                 SELECT e.source_id, e.quality, e.media_path, e.file_size, e.cached_at,
                        vm.cache_policy, vm.video_title, vm.cache_expires_at
                 FROM media_cache_entries e
                 LEFT JOIN video_meta vm ON e.source_id = vm.source_id
-                WHERE ({full_where})
+                WHERE vm.cache_policy IS NOT 'keep_forever' OR vm.cache_policy IS NULL
                 ORDER BY vm.cache_expires_at ASC, e.cached_at ASC
             """
-            
-            cursor.execute(sql, tuple(params))
-            rows = cursor.fetchall()
-            
-            for row in rows:
-                source_id, quality, rel_path, file_size, cached_at, vm_policy, title, expires_at = row
-                
-                full_path = os.path.join(os.getcwd(), rel_path)
-                size = file_size or 0
-                if size == 0 and os.path.exists(full_path):
-                    size = os.path.getsize(full_path)
-                
-                expiry_dt = None
-                reason = ""
-                
-                if vm_policy == 'custom':
-                    expiry_dt = expires_at if isinstance(expires_at, datetime) else datetime.fromisoformat(expires_at)
-                    reason = "Custom Policy"
-                else:
-                    expiry_dt = cached_at + timedelta(days=keep_days)
-                    reason = f"Global Policy ({keep_days} days)"
-                
-                if expiry_dt > now:
-                    candidates.append({
-                        "source_id": source_id,
-                        "quality": quality,
-                        "media_path": rel_path,
-                        "filesize": size,
-                        "title": title or source_id,
-                        "reason": reason,
-                        "expires_at": expiry_dt.isoformat(),
-                        "time_left_hours": round((expiry_dt - now).total_seconds() / 3600, 1)
-                    })
-        
+        )
+        rows = cursor.fetchall()
         conn.close()
+
+        for row in rows:
+            source_id, quality, rel_path, file_size, cached_at, vm_policy, title, expires_at = row
+
+            full_path = os.path.join(os.getcwd(), rel_path)
+            size = file_size or 0
+            if size == 0 and os.path.exists(full_path):
+                size = os.path.getsize(full_path)
+
+            cached_dt = parse_datetime(cached_at)
+            expires_dt = parse_datetime(expires_at)
+            reason = ""
+
+            if vm_policy == 'custom':
+                if not expires_dt or expires_dt <= now or expires_dt >= future_limit:
+                    continue
+                reason = "Custom Policy"
+            elif policy == 'keep_days' and keep_days > 0 and cached_dt:
+                expires_dt = cached_dt + timedelta(days=keep_days)
+                if expires_dt <= now or expires_dt >= future_limit:
+                    continue
+                reason = f"Global Policy ({keep_days} days)"
+            else:
+                continue
+
+            candidates.append({
+                "source_id": source_id,
+                "quality": quality,
+                "media_path": rel_path,
+                "filesize": size,
+                "title": title or source_id,
+                "reason": reason,
+                "expires_at": format_datetime_iso(expires_dt),
+                "time_left_hours": round((expires_dt - now).total_seconds() / 3600, 1)
+            })
+
         return candidates
 
     @staticmethod
@@ -564,7 +532,7 @@ class MediaCacheService:
             "fs_total_size_bytes": fs_size,
             "orphan_count": max(0, fs_count - db_stats['total_count']),
             "warning_threshold_gb": 1.0,
-            "next_gc_time": MediaCacheService.next_gc_time.isoformat() if MediaCacheService.next_gc_time else None
+            "next_gc_time": format_datetime_iso(MediaCacheService.next_gc_time) if MediaCacheService.next_gc_time else None
         }
 
     @staticmethod

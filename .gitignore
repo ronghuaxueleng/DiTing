@@ -27,3 +27,15 @@ asr_worker/temp_uploads/
 asr_worker/worker_config.yaml
 tray_config.json
 scripts/worker_manager_config.json
+
+.claude
+.gemini
+CLAUDE.md
+
+# Tauri
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/diting-server-*
+src-tauri-worker/target/
+src-tauri-worker/gen/
+frontend/tsconfig.tsbuildinfo

@@ -1,6 +1,7 @@
 import yt_dlp
 import os
 import uuid
+import tempfile
 from app.core.logger import logger
 from app.core.config import settings
 from app.services.storage import storage
@@ -14,15 +15,52 @@ from app.downloaders._utils import (
 )
 
 
+def _get_youtube_cookies():
+    """Read YouTube cookies text from system config, write to temp file for yt-dlp."""
+    from app.db import get_system_config
+    cookie_text = get_system_config('youtube_cookies')
+    if not cookie_text or not cookie_text.strip():
+        return None
+    try:
+        tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
+        tmp.write(cookie_text)
+        tmp.close()
+        return tmp.name
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to create YouTube cookie file: {e}")
+        return None
+
+
+def _cleanup_cookie_file(cookie_file):
+    """Remove temporary cookie file."""
+    if cookie_file:
+        try:
+            os.remove(cookie_file)
+        except OSError:
+            pass
+
+
+def _is_format_error(e):
+    """Check if an exception is a yt-dlp format availability error (often caused by bad cookies)."""
+    msg = str(e).lower()
+    return 'requested format is not available' in msg
+
+
 def get_youtube_info(url, proxy=None):
     """
     Fetch metadata for a YouTube video.
+    If cookies cause a format error, automatically retries without cookies.
     """
+    cookie_file = _get_youtube_cookies()
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
+        'skip_download': True,
+        'ignore_no_formats_error': True,
         'proxy': proxy,
     }
+    if cookie_file:
+        ydl_opts['cookiefile'] = cookie_file
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -37,8 +75,31 @@ def get_youtube_info(url, proxy=None):
                 'id': info.get('id')
             }
     except Exception as e:
+        # If cookies caused format error, retry without cookies
+        if cookie_file and _is_format_error(e):
+            logger.warning(f"⚠️ yt-dlp format error with cookies (original error: {e}), retrying without cookies...")
+            _cleanup_cookie_file(cookie_file)
+            cookie_file = None
+            try:
+                ydl_opts.pop('cookiefile', None)
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    return {
+                        'title': info.get('title'),
+                        'cover': info.get('thumbnail'),
+                        'duration': info.get('duration'),
+                        'uploader': info.get('uploader'),
+                        'description': info.get('description'),
+                        'view_count': info.get('view_count'),
+                        'id': info.get('id')
+                    }
+            except Exception as e2:
+                logger.error(f"❌ yt-dlp Info Fetch Error (no cookies): {e2}")
+                return None
         logger.error(f"❌ yt-dlp Info Fetch Error: {e}")
         return None
+    finally:
+        _cleanup_cookie_file(cookie_file)
 
 
 def download_youtube_video(url, output_dir=None, proxy=None, task_id=None, check_cancel_func=None, progress_callback=None):
@@ -52,6 +113,7 @@ def download_youtube_video(url, output_dir=None, proxy=None, task_id=None, check
     filename_base = str(uuid.uuid4())
     output_template = os.path.join(output_dir, f"{filename_base}.%(ext)s")
 
+    cookie_file = _get_youtube_cookies()
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': output_template,
@@ -63,12 +125,9 @@ def download_youtube_video(url, output_dir=None, proxy=None, task_id=None, check
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'm4a',
         }],
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android'],
-            }
-        },
     }
+    if cookie_file:
+        ydl_opts['cookiefile'] = cookie_file
 
     @retry_on_network_error(max_retries=3, retry_delay=5)
     def _do_download():
@@ -83,8 +142,25 @@ def download_youtube_video(url, output_dir=None, proxy=None, task_id=None, check
         return _do_download()
     except Exception as e:
         check_and_reraise_cancel(e)
+        # Retry with simpler format on format error (keep cookies for auth)
+        if _is_format_error(e):
+            logger.warning(f"⚠️ yt-dlp format error (original: {e}), retrying with fallback format...")
+            filename_base2 = str(uuid.uuid4())
+            ydl_opts['outtmpl'] = os.path.join(output_dir, f"{filename_base2}.%(ext)s")
+            ydl_opts['format'] = 'bestaudio/best'
+            ydl_opts.pop('postprocessors', None)
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.extract_info(url, download=True)
+                return find_downloaded_file(output_dir, filename_base2)
+            except Exception as e2:
+                check_and_reraise_cancel(e2)
+                logger.error(f"❌ yt-dlp Download Error (fallback format): {e2}")
+                return None
         logger.error(f"❌ yt-dlp Download Error: {e}")
         return None
+    finally:
+        _cleanup_cookie_file(cookie_file)
 
 
 def download_youtube_media(url, quality='best', output_dir=None, proxy=None, task_id=None, check_cancel_func=None, progress_callback=None):
@@ -98,6 +174,7 @@ def download_youtube_media(url, quality='best', output_dir=None, proxy=None, tas
     filename_base = str(uuid.uuid4())
     output_template = os.path.join(output_dir, f"{filename_base}.%(ext)s")
 
+    cookie_file = _get_youtube_cookies()
     ydl_opts = {
         'format': get_video_format_string(quality),
         'outtmpl': output_template,
@@ -106,12 +183,9 @@ def download_youtube_media(url, quality='best', output_dir=None, proxy=None, tas
         'no_warnings': True,
         'proxy': proxy,
         'progress_hooks': [make_progress_hook(task_id, check_cancel_func, progress_callback, label="Downloading Video")],
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android'],
-            }
-        },
     }
+    if cookie_file:
+        ydl_opts['cookiefile'] = cookie_file
 
     @retry_on_network_error(max_retries=3, retry_delay=5)
     def _do_download():
@@ -126,8 +200,24 @@ def download_youtube_media(url, quality='best', output_dir=None, proxy=None, tas
         return _do_download()
     except Exception as e:
         check_and_reraise_cancel(e)
+        # Retry with simpler format on format error (keep cookies for auth)
+        if _is_format_error(e):
+            logger.warning(f"⚠️ yt-dlp video format error (original: {e}), retrying with fallback format...")
+            filename_base2 = str(uuid.uuid4())
+            ydl_opts['outtmpl'] = os.path.join(output_dir, f"{filename_base2}.%(ext)s")
+            ydl_opts['format'] = 'worst' if quality == 'worst' else 'best'
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.extract_info(url, download=True)
+                return find_downloaded_file(output_dir, filename_base2, '.mp4')
+            except Exception as e2:
+                check_and_reraise_cancel(e2)
+                logger.error(f"❌ yt-dlp Video Download Error (fallback format): {e2}")
+                return None
         logger.error(f"❌ yt-dlp Video Download Error: {e}")
         return None
+    finally:
+        _cleanup_cookie_file(cookie_file)
 
 
 def download_youtube_subtitles(url, output_dir=None, proxy=None, language='zh'):
@@ -148,14 +238,45 @@ def download_youtube_subtitles(url, output_dir=None, proxy=None, language='zh'):
     zh_langs = ['zh-Hans', 'zh-CN', 'zh', 'zh-TW', 'zh-Hant']
     en_langs = ['en', 'en-US', 'en-GB']
 
+    cookie_file = _get_youtube_cookies()
+    try:
+        result = _download_subtitles_inner(url, output_dir, proxy, cookie_file, filename_base, output_template, zh_langs, en_langs)
+        if result:
+            return result
+        
+        # If failed with cookies, retry without
+        if cookie_file:
+            logger.warning(f"⚠️ Subtitle fetch failed with cookies, retrying without cookies...")
+            _cleanup_cookie_file(cookie_file)
+            cookie_file = None
+            filename_base = str(uuid.uuid4())
+            output_template = os.path.join(output_dir, f"{filename_base}")
+            result = _download_subtitles_inner(url, output_dir, proxy, None, filename_base, output_template, zh_langs, en_langs)
+            if result:
+                return result
+
+        return None, None
+
+    except Exception as e:
+        logger.error(f"❌ Subtitle download error: {e}")
+        return None, None
+    finally:
+        _cleanup_cookie_file(cookie_file)
+
+
+def _download_subtitles_inner(url, output_dir, proxy, cookie_file, filename_base, output_template, zh_langs, en_langs):
+    """Inner implementation for subtitle download. Returns (path, content) or None on failure."""
     try:
         # Step 1: Fetch metadata to inspect available subtitles
         ydl_opts_meta = {
             'quiet': True,
             'no_warnings': True,
             'skip_download': True,
+            'ignore_no_formats_error': True,
             'proxy': proxy,
         }
+        if cookie_file:
+            ydl_opts_meta['cookiefile'] = cookie_file
 
         target_lang = None
         is_auto = False
@@ -197,11 +318,12 @@ def download_youtube_subtitles(url, output_dir=None, proxy=None, language='zh'):
 
         if not target_lang:
             logger.info("❌ No subtitles found.")
-            return None, None
+            return None
 
         # Step 2: Download specific subtitle
         ydl_opts_down = {
             'skip_download': True,
+            'ignore_no_formats_error': True,
             'writesubtitles': not is_auto,
             'writeautomaticsub': is_auto,
             'subtitleslangs': [target_lang],
@@ -211,6 +333,8 @@ def download_youtube_subtitles(url, output_dir=None, proxy=None, language='zh'):
             'no_warnings': True,
             'proxy': proxy,
         }
+        if cookie_file:
+            ydl_opts_down['cookiefile'] = cookie_file
 
         with yt_dlp.YoutubeDL(ydl_opts_down) as ydl:
             ydl.download([url])
@@ -224,7 +348,10 @@ def download_youtube_subtitles(url, output_dir=None, proxy=None, language='zh'):
                     return expected_file, content
 
     except Exception as e:
+        if _is_format_error(e):
+            logger.warning(f"⚠️ Subtitle fetch format error (likely bad cookies): {e}")
+            return None  # Signal caller to retry without cookies
         logger.error(f"❌ Subtitle download error: {e}")
-        return None, None
+        return None
 
-    return None, None
+    return None

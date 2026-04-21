@@ -1,22 +1,38 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router-dom'
 import Icons from '../components/ui/Icons'
 import OverviewTab from './management/OverviewTab'
+import WorkersTab from './management/WorkersTab'
 import CacheEntriesTab from './management/CacheEntriesTab'
 import BatchCacheTab from './management/BatchCacheTab'
 import CleanupTab from './management/CleanupTab'
+import LogsTab from './management/LogsTab'
 
-type Tab = 'overview' | 'entries' | 'cleanup' | 'batch'
+type Tab = 'overview' | 'entries' | 'cleanup' | 'batch' | 'logs' | 'workers'
 
 export default function Management() {
     const { t } = useTranslation()
-    const [activeTab, setActiveTab] = useState<Tab>('overview')
+    const location = useLocation()
+    const navState = location.state as { tab?: Tab; workerId?: string } | null
+
+    const [activeTab, setActiveTab] = useState<Tab>(navState?.tab || 'overview')
+    const [initialWorkerId] = useState<string | undefined>(navState?.workerId)
+
+    // If navigated here with state.tab, switch to that tab
+    useEffect(() => {
+        if (navState?.tab) {
+            setActiveTab(navState.tab)
+        }
+    }, [navState?.tab])
 
     const tabs = [
         { id: 'overview', label: t('management.tabs.overview'), icon: Icons.LayoutDashboard },
         { id: 'entries', label: t('management.tabs.entries'), icon: Icons.FileVideo },
         { id: 'batch', label: t('management.tabs.batch'), icon: Icons.Database },
         { id: 'cleanup', label: t('management.tabs.cleanup'), icon: Icons.Trash },
+        { id: 'logs', label: t('management.tabs.logs'), icon: Icons.FileText },
+        { id: 'workers', label: t('management.tabs.workers'), icon: Icons.Server },
     ]
 
     return (
@@ -63,6 +79,8 @@ export default function Management() {
                     {activeTab === 'entries' && <CacheEntriesTab />}
                     {activeTab === 'batch' && <BatchCacheTab />}
                     {activeTab === 'cleanup' && <CleanupTab />}
+                    {activeTab === 'logs' && <LogsTab />}
+                    {activeTab === 'workers' && <WorkersTab initialWorkerId={initialWorkerId} />}
                 </div>
             </div>
         </div >

@@ -1,11 +1,16 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Segment } from '../api/types'
-import { updateSegmentText, deleteSegment, deleteSummary, toggleSegmentPin } from '../api'
+import { updateSegmentText, deleteSegment, deleteSummary, toggleSegmentPin, cancelTask } from '../api'
 import { useToast } from '../contexts/ToastContext'
 import { useQueryClient } from '@tanstack/react-query'
 import Icons from './ui/Icons'
-import { cleanEmotionTags, formatTime, buildSummaryTree, stripSubtitleMetadata } from './segmentHelpers'
+import { cleanEmotionTags, formatTime, buildSummaryTree, stripSubtitleMetadata, hasSrtMetadata } from './segmentHelpers'
 import SummaryNode from './SummaryNode'
+import { useStreamObserver } from '../hooks/useStreamObserver'
+import { useStreamingStore } from '../stores/useStreamingStore'
+import { useTranslation } from 'react-i18next'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export interface RefineContext {
     parentId: number
@@ -23,6 +28,7 @@ interface SegmentCardProps {
 
 export default function SegmentCard({ segment, onRefresh, isExpandedDefault = false, onOpenAiModal, highlightText }: SegmentCardProps) {
     const { showUndoableDelete, showToast } = useToast()
+    const { t } = useTranslation()
     const queryClient = useQueryClient()
     const [isExpanded, setIsExpanded] = useState(isExpandedDefault)
     const [isPinned, setIsPinned] = useState(!!segment.is_pinned)
@@ -55,20 +61,69 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
 
     const hasVisibleAi = summaryTree.length > 0
     const [showTranscription, setShowTranscription] = useState(!hasVisibleAi)
-    const [showPreprocessPreview, setShowPreprocessPreview] = useState(false)
-    const previewRef = useRef<HTMLDivElement>(null)
+    const [showPreprocessPreview, setShowPreprocessPreview] = useState(() => {
+        return localStorage.getItem('segment-preprocess-preview') === 'true'
+    })
 
     useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (showPreprocessPreview && previewRef.current && !previewRef.current.contains(event.target as Node)) {
-                setShowPreprocessPreview(false)
-            }
-        }
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
+        localStorage.setItem('segment-preprocess-preview', String(showPreprocessPreview))
     }, [showPreprocessPreview])
 
     const aiSectionRef = useRef<HTMLDivElement>(null)
+    // previewRef removed — preview is now inline, no click-outside needed
+
+    // Streaming state from global store
+    const streamEntry = useStreamObserver(segment.id)
+    const isStreamActive = !!streamEntry && (streamEntry.status === 'connecting' || streamEntry.status === 'streaming')
+    const streamContainerRef = useRef<HTMLDivElement>(null)
+
+    // Auto-scroll streaming content
+    useEffect(() => {
+        if (isStreamActive && streamContainerRef.current) {
+            streamContainerRef.current.scrollTop = streamContainerRef.current.scrollHeight
+        }
+    }, [streamEntry?.text, isStreamActive])
+
+    // When stream completes, refresh data and clear store
+    const streamDoneHandled = useRef(false)
+    const hadStream = useRef(false)
+    useEffect(() => {
+        if (isStreamActive) hadStream.current = true
+    }, [isStreamActive])
+
+    useEffect(() => {
+        if (streamEntry?.status === 'done' && !streamDoneHandled.current) {
+            streamDoneHandled.current = true
+            queryClient.invalidateQueries({ queryKey: ['video-detail'] })
+            // Small delay to let server persist, then clear streaming UI
+            const timer = setTimeout(() => {
+                useStreamingStore.getState().clearStream(segment.id)
+                onRefresh()
+                streamDoneHandled.current = false
+            }, 1500)
+            return () => clearTimeout(timer)
+        }
+        if (!streamEntry || streamEntry.status !== 'done') {
+            streamDoneHandled.current = false
+        }
+    }, [streamEntry?.status, segment.id, queryClient, onRefresh])
+
+    // Auto-select newest summary tab after stream finishes and new data arrives
+    useEffect(() => {
+        if (hadStream.current && !streamEntry && summaryTree.length > 0) {
+            hadStream.current = false
+            // Pick the newest root (last in the tree, highest id)
+            const newest = summaryTree.reduce((a, b) => (b.id > a!.id ? b : a!), summaryTree[0])
+            if (newest) setActiveSummaryRootId(newest.id)
+        }
+    }, [streamEntry, summaryTree])
+
+    const handleCancelStream = () => {
+        if (streamEntry) {
+            cancelTask(streamEntry.taskId)
+            useStreamingStore.getState().clearStream(segment.id)
+        }
+    }
 
     const handleSave = async () => {
         if (text === (segment.text || '')) return setIsEditing(false)
@@ -189,14 +244,31 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
                     title={showTranscription ? '点击收起转录文本' : '点击展开转录文本'}
                 >
                     <div className="flex items-center gap-1">
-                        {segment.asr_model === 'Subtitle' ? <Icons.FileText className="w-3 h-3" /> : <Icons.Mic className="w-3 h-3" />}
+                        {segment.asr_model === 'Subtitle'
+                            ? <Icons.FileText className="w-3 h-3" />
+                            : hasSrtMetadata(segment.text || '')
+                                ? <Icons.Subtitles className="w-3 h-3" />
+                                : <Icons.Mic className="w-3 h-3" />
+                        }
                         <span className="hidden @min-[480px]:inline">{segment.asr_model === 'Subtitle' ? 'Subtitle' : (segment.asr_model || 'Unknown')}</span>
                         {showTranscription ? '▼' : '▶'}
                     </div>
                 </button>
 
                 {/* AI Summary Button */}
-                {hasVisibleAi ? (
+                {streamEntry && streamEntry.status !== 'error' ? (
+                    <span
+                        className={`shrink-0 whitespace-nowrap px-1.5 py-[2px] border rounded-full ${streamEntry.status === 'done' ? 'border-green-500/50 text-green-500' : 'border-[var(--color-primary)]/50 text-[var(--color-primary)]'}`}
+                        style={{ fontSize: '0.65rem' }}
+                    >
+                        <div className="flex items-center gap-1">
+                            {streamEntry.status === 'done'
+                                ? <><Icons.CheckCircle className="w-3 h-3" /><span className="hidden @min-[480px]:inline">AI 完成</span></>
+                                : <><Icons.Loader className="w-3 h-3 animate-spin" /><span className="hidden @min-[480px]:inline">AI 生成中</span></>
+                            }
+                        </div>
+                    </span>
+                ) : hasVisibleAi ? (
                     <button
                         className="shrink-0 whitespace-nowrap px-1.5 py-[2px] border border-emerald-500/50 text-emerald-500 rounded-full hover:bg-emerald-500/10 transition-colors"
                         style={{ fontSize: '0.65rem' }}
@@ -221,47 +293,6 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
                     </button>
                 )}
 
-                {/* Subtitle Badge */}
-                {(segment.is_subtitle === 1 || segment.is_subtitle === true) && (
-                    <div className="relative" ref={previewRef}>
-                        <button
-                            className="shrink-0 whitespace-nowrap text-xs px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded flex items-center gap-1 cursor-pointer hover:bg-green-500/30 transition-colors"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowPreprocessPreview(!showPreprocessPreview);
-                            }}
-                            title="点击预览预处理后的文本（去除序号与时间戳）"
-                        >
-                            <Icons.FileText className="w-3 h-3" /><span className="hidden @min-[480px]:inline">字幕</span>
-                        </button>
-
-                        {showPreprocessPreview && (
-                            <div
-                                className="absolute top-full left-0 mt-2 z-50 w-80 sm:w-96 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <div className="px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-bg)]/50 flex flex-wrap justify-between items-center gap-2">
-                                    <span className="text-xs font-semibold text-[var(--color-text)] flex items-center gap-1">
-                                        <Icons.Sparkles className="w-3.5 h-3.5 text-[var(--color-primary)]" /> 预处理预览
-                                    </span>
-                                    {(() => {
-                                        const originalLen = (segment.text || '').length;
-                                        const newLen = stripSubtitleMetadata(segment.text || '').length;
-                                        const savings = originalLen > 0 ? ((originalLen - newLen) / originalLen * 100).toFixed(1) : '0.0';
-                                        return (
-                                            <span className="text-[10px] text-[var(--color-text-muted)] bg-[var(--color-bg)] px-1.5 py-0.5 rounded border border-[var(--color-border)]">
-                                                节省 <span className="text-emerald-500 font-mono">-{savings}%</span> ({originalLen} → {newLen} 字)
-                                            </span>
-                                        )
-                                    })()}
-                                </div>
-                                <div className="p-3 text-xs leading-5 text-[var(--color-text-muted)] max-h-64 overflow-y-auto whitespace-pre-wrap font-mono select-text cursor-text">
-                                    {stripSubtitleMetadata(segment.text || '') || <span className="italic opacity-50">暂无内容</span>}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
 
                 {/* Right Actions Cluster */}
                 <div className="ml-auto flex items-center" onClick={e => e.stopPropagation()}>
@@ -341,15 +372,93 @@ export default function SegmentCard({ segment, onRefresh, isExpandedDefault = fa
                             </div>
                         ) : showTranscription ? (
                             <div className="mt-4">
-                                <p className="text-sm leading-7 text-[var(--color-text)] whitespace-pre-wrap selection:bg-[var(--color-primary)]/30">
-                                    {highlightText ? highlightedText : cleanEmotionTags(segment.text || '')}
-                                </p>
+                                {/* Preprocess toggle — inline, replaces transcription view */}
+                                {hasSrtMetadata(segment.text || '') && (
+                                    <div className="mb-3 flex items-center gap-2">
+                                        <button
+                                            className={`text-[11px] px-2 py-1 rounded border transition-colors flex items-center gap-1.5 ${showPreprocessPreview
+                                                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                                                    : 'border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]'
+                                                }`}
+                                            onClick={() => setShowPreprocessPreview(!showPreprocessPreview)}
+                                            title={showPreprocessPreview ? '查看原始文本' : '预览去除时间戳后的文本'}
+                                        >
+                                            <Icons.Subtitles className="w-3 h-3" />
+                                            预处理预览
+                                            {(() => {
+                                                const originalLen = (segment.text || '').length
+                                                const newLen = stripSubtitleMetadata(segment.text || '').length
+                                                const pct = originalLen > 0 ? ((originalLen - newLen) / originalLen * 100).toFixed(0) : '0'
+                                                return <span className="text-emerald-500 font-mono">-{pct}%</span>
+                                            })()}
+                                        </button>
+                                        {showPreprocessPreview && (
+                                            <span className="text-[10px] text-[var(--color-text-muted)] opacity-60">已过滤字幕元数据</span>
+                                        )}
+                                    </div>
+                                )}
+                                {showPreprocessPreview ? (
+                                    <p className="text-sm leading-7 text-[var(--color-text-muted)] whitespace-pre-wrap selection:bg-[var(--color-primary)]/30 font-mono">
+                                        {stripSubtitleMetadata(segment.text || '') || <span className="italic opacity-50">暂无内容</span>}
+                                    </p>
+                                ) : (
+                                    <p className="text-sm leading-7 text-[var(--color-text)] whitespace-pre-wrap selection:bg-[var(--color-primary)]/30">
+                                        {highlightText ? highlightedText : cleanEmotionTags(segment.text || '')}
+                                    </p>
+                                )}
                             </div>
                         ) : null}
 
                         {/* AI Actions */}
                         {!isEditing && (
                             <>
+                                {/* Streaming Preview — visible until clearStream removes it */}
+                                {streamEntry && (
+                                    <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
+                                        <div className="flex items-center gap-2 mb-3 text-sm text-[var(--color-text-muted)]">
+                                            {streamEntry.status === 'error' ? (
+                                                <Icons.AlertCircle className="w-4 h-4 text-red-500" />
+                                            ) : streamEntry.status === 'done' ? (
+                                                <Icons.CheckCircle className="w-4 h-4 text-green-500" />
+                                            ) : (
+                                                <Icons.Loader className="w-4 h-4 animate-spin text-[var(--color-primary)]" />
+                                            )}
+                                            <span>
+                                                {streamEntry.status === 'error'
+                                                    ? t('aiSummaryModal.streamError')
+                                                    : streamEntry.status === 'done'
+                                                        ? t('aiSummaryModal.streamComplete', { model: streamEntry.model, duration: streamEntry.duration })
+                                                        : t('aiSummaryModal.streamGenerating', { model: streamEntry.model || '...' })}
+                                            </span>
+                                        </div>
+                                        {streamEntry.text && (
+                                            <div ref={streamContainerRef} className="max-h-96 overflow-y-auto prose prose-sm max-w-none dark:prose-invert text-[var(--color-text)]">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                    {streamEntry.text}
+                                                </ReactMarkdown>
+                                                {isStreamActive && (
+                                                    <span className="inline-block w-1.5 h-4 bg-[var(--color-primary)] animate-pulse rounded-sm ml-0.5 align-text-bottom" />
+                                                )}
+                                            </div>
+                                        )}
+                                        {!streamEntry.text && streamEntry.status !== 'error' && streamEntry.status !== 'done' && (
+                                            <div className="text-sm text-[var(--color-text-muted)] italic">
+                                                {t('aiSummaryModal.streamGenerating', { model: streamEntry.model || '...' })}
+                                            </div>
+                                        )}
+                                        {isStreamActive && (
+                                            <div className="mt-3 flex justify-end">
+                                                <button
+                                                    onClick={handleCancelStream}
+                                                    className="text-xs px-3 py-1.5 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                >
+                                                    {t('aiSummaryModal.streamCancelAnalysis')}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {hasVisibleAi ? (
                                     <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
                                         <div

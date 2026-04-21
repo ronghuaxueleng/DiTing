@@ -4,9 +4,9 @@ CRUD operations for the media_cache_entries table.
 Supports multiple cache versions (quality) per source_id.
 """
 import os
-from datetime import datetime
 from app.db.connection import get_connection, get_connection_with_row
 from app.core.logger import logger
+from app.utils.datetime_utils import now_local_sqlite
 
 
 def get_cache_entries(source_id: str):
@@ -87,7 +87,7 @@ def upsert_cache_entry(source_id: str, quality: str, media_path: str, file_size:
     """
     conn = get_connection()
     cursor = conn.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_local_sqlite()
     
     cursor.execute('''
         INSERT INTO media_cache_entries (source_id, quality, media_path, file_size, cached_at)

@@ -34,11 +34,11 @@ def init_db():
 
         elif state == "legacy_integer":
             # Existing database with old integer version (≤18).
-            # Schema is already correct from previous migrations.
-            # Just upgrade the version column to TEXT and stamp new version.
+            # Run create_all (IF NOT EXISTS) to pick up any new tables, then re-stamp version.
             old_ver = _get_legacy_int_version(cursor)
             logger.info(f"⬆️ Database at v{old_ver} (legacy integer), upgrading to v{CURRENT_VERSION}...")
             _upgrade_version_column(cursor)
+            db_schema.create_all(cursor)
             _set_version(cursor, CURRENT_VERSION)
             logger.info(f"✅ Upgraded to v{CURRENT_VERSION}.")
 
@@ -52,7 +52,56 @@ def init_db():
                     logger.info("  -> Adding use_count column to prompts table")
                     cursor.execute("ALTER TABLE prompts ADD COLUMN use_count INTEGER DEFAULT 0")
                     current = "0.12.1"
-                    
+
+                # Migrations from v0.12.1 -> 0.12.2
+                if current == "0.12.1":
+                    logger.info("  -> Adding api_type column to llm_providers table")
+                    cursor.execute("ALTER TABLE llm_providers ADD COLUMN api_type TEXT DEFAULT 'chat_completions'")
+                    current = "0.12.2"
+
+                # Migrations from v0.12.2 -> 0.12.3
+                if current == "0.12.2":
+                    logger.info("  -> Dropping legacy columns from transcriptions table (ai_summary, user_prompt, llm_model)")
+                    for col in ("ai_summary", "user_prompt", "llm_model"):
+                        try:
+                            cursor.execute(f"ALTER TABLE transcriptions DROP COLUMN {col}")
+                        except Exception as e:
+                            logger.warning(f"  -> Column {col} may not exist, skipping: {e}")
+                    current = "0.12.3"
+
+                # Migrations from v0.12.3 -> 0.12.4
+                if current == "0.12.3":
+                    logger.info("  -> Creating video_notes table for AI-generated whole-video notes")
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS video_notes (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            source_id TEXT NOT NULL,
+                            content TEXT NOT NULL,
+                            original_content TEXT,
+                            prompt TEXT,
+                            model TEXT,
+                            provider_id INTEGER,
+                            style TEXT,
+                            response_time REAL,
+                            is_edited BOOLEAN DEFAULT 0,
+                            is_active BOOLEAN DEFAULT 1,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (source_id) REFERENCES video_meta (source_id) ON DELETE CASCADE
+                        )
+                    ''')
+                    current = "0.12.4"
+
+                # Always ensure gen_params column exists (added post-0.12.4)
+                try:
+                    cursor.execute("ALTER TABLE video_notes ADD COLUMN gen_params TEXT")
+                    logger.info("  -> Added gen_params column to video_notes")
+                except Exception:
+                    pass  # Column already exists
+
+                # Ensure QA tables exist (v0.13.1+)
+                db_schema.create_all(cursor)
+
                 _set_version(cursor, CURRENT_VERSION)
                 logger.info(f"✅ Upgraded to v{CURRENT_VERSION}.")
             else:

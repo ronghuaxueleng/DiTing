@@ -2,9 +2,9 @@
 Video Metadata Database Operations
 CRUD operations for the video_meta table.
 """
-from datetime import datetime
 from app.db.connection import get_connection, get_connection_with_row
 from app.core.logger import logger
+from app.utils.datetime_utils import normalize_cache_expires_at, now_local_sqlite
 
 def get_video_meta(source_id: str):
     """
@@ -57,8 +57,8 @@ def upsert_video_meta(source_id: str, cache_expires_at=None, cache_policy=None, 
     cursor.execute('SELECT 1 FROM video_meta WHERE source_id = ?', (source_id,))
     exists = cursor.fetchone()
     
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+    normalized_cache_expires_at = normalize_cache_expires_at(cache_expires_at) if cache_expires_at is not None else None
+    now = now_local_sqlite()
     if exists:
         # Dynamic update based on provided fields
         updates = []
@@ -72,7 +72,7 @@ def upsert_video_meta(source_id: str, cache_expires_at=None, cache_policy=None, 
             # Only update if provided and NOT resetting
             if cache_expires_at is not None:
                 updates.append("cache_expires_at = ?")
-                params.append(cache_expires_at)
+                params.append(normalized_cache_expires_at)
                 
             if cache_policy is not None:
                 updates.append("cache_policy = ?")
@@ -129,7 +129,7 @@ def upsert_video_meta(source_id: str, cache_expires_at=None, cache_policy=None, 
                                     original_source, is_archived,
                                     created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (source_id, cache_expires_at, cache_policy, notes, 
+        ''', (source_id, normalized_cache_expires_at, cache_policy, notes,
               video_title, video_cover, source_type, stream_url, stream_expired, 
               original_source, is_archived if is_archived is not None else 0,
               now, now))
@@ -161,7 +161,7 @@ def clear_cache_policy(source_id: str):
         UPDATE video_meta 
         SET cache_policy = NULL, cache_expires_at = NULL, updated_at = ?
         WHERE source_id = ?
-    ''', (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), source_id))
+    ''', (now_local_sqlite(), source_id))
     conn.commit()
     conn.close()
 
@@ -189,12 +189,11 @@ def batch_set_archived(source_ids: list[str], archived: bool):
     cursor = conn.cursor()
     
     placeholders = ','.join(['?'] * len(source_ids))
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+    now = now_local_sqlite()
     params = [1 if archived else 0, now] + source_ids
-    
+
     cursor.execute(f'''
-        UPDATE video_meta 
+        UPDATE video_meta
         SET is_archived = ?, updated_at = ?
         WHERE source_id IN ({placeholders})
     ''', params)
@@ -210,10 +209,10 @@ def query_video_list_with_stats(*, source_type: str = None, tag_id: int = None, 
     Query video_meta joined with transcription stats.
     Returns raw rows as tuples for build_video_list_row().
     Pre-filters by source_type, tag_id, exclude_tag_id at the SQL/Python level.
-    
+
     Each row: (source_id, original_source, source_type, video_title, video_cover,
                created_at, updated_at, is_archived, count, row_ids, latest_status,
-               latest_timestamp, latest_asr_model, is_subtitle, is_analyzing_ai)
+               latest_timestamp, latest_asr_model, is_subtitle, is_analyzing_ai, notes_count)
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -231,7 +230,7 @@ def query_video_list_with_stats(*, source_type: str = None, tag_id: int = None, 
 
     query = '''
         WITH ranked_transcriptions AS (
-            SELECT 
+            SELECT
                 source, id, status, asr_model, is_subtitle, ai_status, timestamp,
                 ROW_NUMBER() OVER(PARTITION BY source ORDER BY id DESC) as rn
             FROM transcriptions
@@ -240,25 +239,35 @@ def query_video_list_with_stats(*, source_type: str = None, tag_id: int = None, 
             SELECT * FROM ranked_transcriptions WHERE rn = 1
         ),
         transcription_stats AS (
-            SELECT 
+            SELECT
                 source,
                 COUNT(*) as seg_count,
                 GROUP_CONCAT(id) as row_ids,
                 MAX(CASE WHEN ai_status IN ('queued', 'processing') THEN 1 ELSE 0 END) as has_ai_processing
             FROM transcriptions
             GROUP BY source
+        ),
+        notes_stats AS (
+            SELECT
+                source_id,
+                COUNT(*) as notes_count
+            FROM video_notes
+            WHERE is_active = 1
+            GROUP BY source_id
         )
-        SELECT 
+        SELECT
             vm.source_id, vm.original_source, vm.source_type,
             vm.video_title, vm.video_cover, vm.created_at, vm.updated_at, vm.is_archived,
             COALESCE(ts.seg_count, 0) as count, ts.row_ids,
             lt.status as latest_status, lt.timestamp as latest_timestamp,
             lt.asr_model as latest_asr_model,
             COALESCE(lt.is_subtitle, 0) as is_subtitle,
-            COALESCE(ts.has_ai_processing, 0) as is_analyzing_ai
+            COALESCE(ts.has_ai_processing, 0) as is_analyzing_ai,
+            COALESCE(ns.notes_count, 0) as notes_count
         FROM video_meta vm
         LEFT JOIN transcription_stats ts ON vm.source_id = ts.source
         LEFT JOIN latest_transcriptions lt ON vm.source_id = lt.source
+        LEFT JOIN notes_stats ns ON vm.source_id = ns.source_id
     '''
 
     cursor.execute(query)

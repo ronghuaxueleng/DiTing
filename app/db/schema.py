@@ -23,11 +23,8 @@ def create_all(cursor):
             source TEXT NOT NULL,
             raw_text TEXT NOT NULL,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            ai_summary TEXT,
-            user_prompt TEXT,
             segment_start REAL DEFAULT 0,
             segment_end REAL,
-            llm_model TEXT,
             asr_model TEXT,
             is_subtitle BOOLEAN DEFAULT 0,
             status TEXT DEFAULT 'completed',
@@ -59,6 +56,7 @@ def create_all(cursor):
             name TEXT NOT NULL,
             base_url TEXT NOT NULL,
             api_key TEXT NOT NULL,
+            api_type TEXT DEFAULT 'chat_completions',
             is_active BOOLEAN DEFAULT 0
         )
     ''')
@@ -167,5 +165,52 @@ def create_all(cursor):
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (source_id, tag_id),
             FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # --- Video Notes (AI-generated whole-video notes, v0.12.4+) ---
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS video_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_id TEXT NOT NULL,
+            content TEXT NOT NULL,
+            original_content TEXT,
+            prompt TEXT,
+            model TEXT,
+            provider_id INTEGER,
+            style TEXT,
+            response_time REAL,
+            is_edited BOOLEAN DEFAULT 0,
+            is_active BOOLEAN DEFAULT 1,
+            gen_params TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (source_id) REFERENCES video_meta (source_id) ON DELETE CASCADE
+        )
+    ''')
+
+    # --- QA Conversations (v0.13.1+) ---
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS qa_conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_id TEXT NOT NULL,
+            title TEXT,
+            llm_model_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (source_id) REFERENCES video_meta (source_id) ON DELETE CASCADE
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS qa_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            model TEXT,
+            response_time REAL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (conversation_id) REFERENCES qa_conversations (id) ON DELETE CASCADE
         )
     ''')

@@ -2,8 +2,8 @@
 Transcriptions Database Operations
 CRUD operations for the transcriptions table.
 """
-from datetime import datetime
 from app.db.connection import get_connection, get_connection_with_row
+from app.utils.datetime_utils import now_local_sqlite
 
 
 def save_transcription(source, raw_text, segment_start=0, segment_end=None, 
@@ -15,7 +15,7 @@ def save_transcription(source, raw_text, segment_start=0, segment_end=None,
         INSERT INTO transcriptions (source, raw_text, timestamp, segment_start, segment_end, 
                                     asr_model, is_subtitle, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (source, raw_text, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), segment_start, segment_end, 
+    ''', (source, raw_text, now_local_sqlite(), segment_start, segment_end,
           asr_model, is_subtitle, status))
     conn.commit()
     new_id = cursor.lastrowid
@@ -29,7 +29,7 @@ def get_history():
     cursor = conn.cursor()
     cursor.execute('''
         SELECT t.*, 
-               vm.video_title, vm.video_cover, vm.stream_url, vm.stream_expired,
+               vm.video_title, vm.video_cover, vm.source_type, vm.stream_url, vm.stream_expired,
                vm.cache_expires_at, vm.cache_policy, vm.notes,
                vm.original_source
         FROM transcriptions t
@@ -76,8 +76,8 @@ def update_transcription_timestamp(item_id):
     """Refresh timestamp to bring transcription to top of history."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE transcriptions SET timestamp = ? WHERE id = ?", 
-                   (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), item_id))
+    cursor.execute("UPDATE transcriptions SET timestamp = ? WHERE id = ?",
+                   (now_local_sqlite(), item_id))
     conn.commit()
     conn.close()
 
@@ -88,7 +88,7 @@ def get_transcription_by_source(source_id):
     cursor = conn.cursor()
     cursor.execute('''
         SELECT t.*, 
-               vm.video_title, vm.video_cover, vm.stream_url, vm.stream_expired,
+               vm.video_title, vm.video_cover, vm.source_type, vm.stream_url, vm.stream_expired,
                vm.cache_expires_at, vm.cache_policy, vm.notes,
                vm.original_source
         FROM transcriptions t
@@ -100,20 +100,6 @@ def get_transcription_by_source(source_id):
     row = cursor.fetchone()
     conn.close()
     return row
-
-
-def update_analysis(item_id, prompt, summary, llm_model=None):
-    """Update AI analysis fields (legacy)."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE transcriptions 
-        SET user_prompt = ?, ai_summary = ?, llm_model = ?
-        WHERE id = ?
-    ''', (prompt, summary, llm_model, item_id))
-    conn.commit()
-    conn.close()
-
 
 
 
@@ -145,7 +131,7 @@ def get_transcription(item_id):
     cursor = conn.cursor()
     cursor.execute('''
         SELECT t.*, 
-               vm.video_title, vm.video_cover, vm.stream_url, vm.stream_expired,
+               vm.video_title, vm.video_cover, vm.source_type, vm.stream_url, vm.stream_expired,
                vm.cache_expires_at, vm.cache_policy, vm.notes,
                vm.original_source
         FROM transcriptions t
@@ -181,7 +167,7 @@ def get_all_transcriptions_by_source(source_id):
     cursor = conn.cursor()
     cursor.execute('''
         SELECT t.*, 
-               vm.video_title, vm.video_cover, vm.stream_url, vm.stream_expired,
+               vm.video_title, vm.video_cover, vm.source_type, vm.stream_url, vm.stream_expired,
                vm.cache_expires_at, vm.cache_policy, vm.notes,
                vm.original_source
         FROM transcriptions t

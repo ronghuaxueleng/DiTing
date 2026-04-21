@@ -29,6 +29,8 @@
         "baseUrl": "."
     },
     "include": [
-        "src"
+        "src",
+        "src-wizard",
+        "src-worker-manager"
     ]
 }

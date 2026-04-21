@@ -21,9 +21,8 @@ class TranscribeBilibiliRequest(BaseModel):
     cover: Optional[str] = Field(None, description="Cover image URL")
     
     # Transcription options
-    task_type: str = Field("transcribe", description="transcribe, subtitle, or uvr_transcribe")
+    task_type: str = Field("transcribe", description="transcribe or subtitle")
     quality: Optional[str] = Field("best", description="Download quality (best, medium, worst, audio)")
-    use_uvr: bool = Field(False, description="Enable vocal removal preprocessing")
     language: str = Field("zh", description="Target language code (zh, en, ja, ko)")
     prompt: Optional[str] = Field(None, description="Custom prompt for transcription")
     auto_analyze_prompt: Optional[str] = Field(None, description="Prompt text for automatic AI analysis")
@@ -46,9 +45,8 @@ class TranscribeBilibiliRequest(BaseModel):
 class TranscribeYouTubeRequest(BaseModel):
     """Request schema for YouTube video transcription."""
     url: str = Field(..., description="YouTube video URL")
-    task_type: str = Field("transcribe", description="transcribe or uvr_transcribe")
+    task_type: str = Field("transcribe", description="transcribe or subtitle")
     quality: Optional[str] = Field("best", description="Download quality (best, medium, worst, audio)")
-    use_uvr: bool = Field(False, description="Enable vocal removal preprocessing")
     language: str = Field("zh", description="Target language code")
     prompt: Optional[str] = Field(None, description="Custom prompt for transcription")
     auto_analyze_prompt: Optional[str] = Field(None, description="Prompt text for automatic AI analysis")
@@ -58,6 +56,9 @@ class TranscribeYouTubeRequest(BaseModel):
     bookmark_only: bool = Field(False, description="Save metadata only, do not trigger transcription")
     only_get_subtitles: bool = Field(False, description="Fail if subtitles are not available")
     force_transcription: bool = Field(False, description="Ignore subtitles and force ASR")
+    # Metadata (client-provided fallback when yt-dlp cannot fetch)
+    title: Optional[str] = Field(None, description="Video title (scraped from page)")
+    cover: Optional[str] = Field(None, description="Cover image URL (scraped from page)")
 
 
 class TranscribeNetworkRequest(BaseModel):
@@ -66,7 +67,6 @@ class TranscribeNetworkRequest(BaseModel):
     title: Optional[str] = Field(None, description="Optional custom title")
     task_type: str = Field("transcribe", description="transcribe or subtitle")
     quality: Optional[str] = Field("best", description="Download quality (best, medium, worst, audio)")
-    use_uvr: bool = Field(False, description="Enable vocal removal preprocessing")
     language: str = Field("zh", description="Target language code")
     prompt: Optional[str] = Field(None, description="Custom prompt for transcription")
     auto_analyze_prompt: Optional[str] = Field(None, description="Prompt text for automatic AI analysis")
@@ -84,9 +84,8 @@ class TranscribeFileRequest(BaseModel):
     """Request schema for file upload transcription (Form data).
     Note: This is used with Form(...) parameters, not Body(...)."""
     source: str = Field("未知来源", description="Source description")
-    task_type: str = Field("transcribe", description="transcribe or uvr_transcribe")
+    task_type: str = Field("transcribe", description="transcribe or subtitle")
     quality: Optional[str] = Field("best", description="Download quality (best, medium, worst, audio)")
-    use_uvr: bool = Field(False, description="Enable vocal removal preprocessing")
     language: str = Field("zh", description="Target language code")
     prompt: Optional[str] = Field(None, description="Custom prompt for transcription")
     auto_analyze_prompt: Optional[str] = Field(None, description="Prompt text for automatic AI analysis")
@@ -103,9 +102,8 @@ class TranscribeDouyinRequest(BaseModel):
     stream_url: Optional[str] = Field(None, description="Alternative stream URL")
     title: Optional[str] = Field(None, description="Video title")
     cover: Optional[str] = Field(None, description="Cover image URL")
-    task_type: str = Field("transcribe", description="transcribe, cache_only, or uvr_transcribe")
+    task_type: str = Field("transcribe", description="transcribe or cache_only")
     quality: Optional[str] = Field("best", description="Download quality (best, medium, worst, audio)")
-    use_uvr: bool = Field(False, description="Enable vocal removal preprocessing")
     language: str = Field("zh", description="Target language code")
     prompt: Optional[str] = Field(None, description="Custom prompt for transcription")
     auto_analyze_prompt: Optional[str] = Field(None, description="Prompt text for automatic AI analysis")
@@ -121,12 +119,13 @@ class RetranscribeRequest(BaseModel):
     """Request schema for unified re-transcription."""
     source_id: str = Field(..., description="Source ID of the video to re-transcribe")
     language: str = Field("zh", description="Target language code")
-    use_uvr: bool = Field(False, description="Enable vocal removal preprocessing")
     prompt: Optional[str] = Field(None, description="Custom prompt for transcription")
     auto_analyze_prompt: Optional[str] = Field(None, description="Prompt text for automatic AI analysis")
     auto_analyze_prompt_id: Optional[int] = Field(None, description="Prompt ID for use count tracking")
     auto_analyze_strip_subtitle: bool = Field(True, description="Strip subtitle metadata before AI analysis")
     output_format: Optional[str] = Field(None, description="Output format: text, srt, srt_char")
+    only_get_subtitles: bool = Field(False, description="Fail if subtitles are not available")
+    force_transcription: bool = Field(False, description="Ignore subtitles and force ASR")
 
 
 class TranscribeResponse(BaseModel):
@@ -139,7 +138,6 @@ class TranscribeResponse(BaseModel):
     # For cached responses
     text: Optional[str] = None
     raw_text: Optional[str] = None
-    ai_summary: Optional[str] = None
     cached: bool = False
     is_subtitle: bool = False
 

@@ -27,29 +27,33 @@ from app.services.transcription import (
 from app.api.v1.endpoints.covers import download_and_cache_cover
 
 def get_current_asr_info():
-    """Resolve ASR engine info from settings and client availability"""
+    """Resolve ASR engine info from settings and client availability.
+
+    Returns: (engine_key, display_name) — unchanged interface.
+    """
     try:
-        engine_key = asr_client.select_worker()
+        _worker_id, engine_key = asr_client.select_worker()
         display_name = f"{engine_key.capitalize()}"
-        if engine_key in ["bailian", "paraformer"]:
-            if engine_key == "bailian":
-                try:
-                    from app.db.asr_config import get_active_model_for_engine
-                    import json
-                    db_config = get_active_model_for_engine("bailian")
-                    if db_config:
-                        cfg = json.loads(db_config["config"])
-                        model_name = cfg.get("model_name", "paraformer-realtime-v2")
+        if engine_key in ["bailian", "paraformer", "openai_asr"]:
+            try:
+                from app.db.asr_config import get_active_model_for_engine
+                import json
+                db_config = get_active_model_for_engine(engine_key)
+                if db_config:
+                    cfg = json.loads(db_config["config"])
+                    badge = cfg.get("badge", "") or db_config.get("name", "")
+                    if badge:
+                        display_name = badge
+                    else:
+                        model_name = cfg.get("model_name", "")
                         if model_name:
-                            display_name = f"Bailian ({model_name})"
+                            display_name = f"{engine_key.capitalize()} ({model_name})"
                         else:
                             display_name += " (Cloud)"
-                    else:
-                        display_name += " (Cloud)"
-                except Exception as e:
-                    logger.warning(f"Error getting Bailian model name: {e}")
+                else:
                     display_name += " (Cloud)"
-            else:
+            except Exception as e:
+                logger.warning(f"Error getting cloud ASR display name: {e}")
                 display_name += " (Cloud)"
         return engine_key, display_name
     except Exception:
@@ -66,7 +70,6 @@ async def create_and_dispatch(
     task_type: str = "transcribe",
     bookmark_only: bool = False,
     # ASR params
-    use_uvr: bool = False,
     language: str = "zh",
     prompt: str = None,
     auto_analyze_prompt: str = None,
@@ -201,7 +204,6 @@ async def create_and_dispatch(
             segment_start or 0.0,
             segment_end, # range_end
             task_type,
-            use_uvr,
             language,
             prompt,
             output_format,
@@ -218,7 +220,6 @@ async def create_and_dispatch(
             transcription_id,
             original_source, # url
             task_type,
-            use_uvr,
             language,
             prompt,
             output_format,
@@ -236,7 +237,6 @@ async def create_and_dispatch(
             transcription_id,
             direct_url,
             task_type,
-            use_uvr,
             output_format,
             source_id=normalized_source,
             local_file_path=local_file_path,
@@ -254,7 +254,6 @@ async def create_and_dispatch(
             original_source, # url
             file_path,
             task_type,
-            use_uvr,
             language,
             prompt,
             output_format,
@@ -275,7 +274,6 @@ async def create_and_dispatch(
             source_type,
             cover,
             covers_dir,
-            use_uvr,
             language,
             prompt,
             output_format,

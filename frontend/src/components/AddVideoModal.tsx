@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { transcribeBilibili, transcribeYoutube, transcribeDouyin, transcribeNetwork, getPrompts } from '../api'
 import type { Prompt } from '../api/types'
 import { useEscapeKey } from '../hooks/useEscapeKey'
+import { useTranscriptionPrefs } from '../hooks/useTranscriptionPrefs'
 import Icons from './ui/Icons'
 
 interface AddVideoModalProps {
@@ -60,20 +61,15 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
     const { t } = useTranslation()
     const [mode, setMode] = useState<'transcribe' | 'cache' | 'bookmark'>('transcribe')
     const [url, setUrl] = useState('')
-    const [useUvr, setUseUvr] = useState(false)
-    const [subtitleMode, setSubtitleMode] = useState<'auto' | 'only_sub' | 'force_asr'>('auto')
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [showHintDetails, setShowHintDetails] = useState(false)
-    const [language, setLanguage] = useState('zh')
     const [quality, setQuality] = useState('best')
-    const [outputFormat, setOutputFormat] = useState('text') // text | srt | srt_char
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [clipboardHint, setClipboardHint] = useState('')
-    const [autoAnalyze, setAutoAnalyze] = useState(() => localStorage.getItem('diting_auto_analyze') === 'true')
-    const [selectedPromptId, setSelectedPromptId] = useState<number | ''>('')
     const [prompts, setPrompts] = useState<Prompt[]>([])
-    const [stripSubtitle, setStripSubtitle] = useState(true)
+    const prefs = useTranscriptionPrefs()
+    const { language, setLanguage, subtitleMode, setSubtitleMode, outputFormat, setOutputFormat, autoAnalyze, setAutoAnalyze, selectedPromptId, setSelectedPromptId, stripSubtitle, setStripSubtitle, saveAll } = prefs
     const inputRef = useRef<HTMLInputElement>(null)
 
     // Load prompts
@@ -81,11 +77,13 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
         getPrompts().then(data => {
             setPrompts(data)
             if (data && data.length > 0 && data[0]?.id) {
-                // Ensure the most used prompt is selected by default
-                setSelectedPromptId(data[0].id)
+                // If no saved prompt preference, select the most used prompt by default
+                if (selectedPromptId === '') {
+                    setSelectedPromptId(data[0].id)
+                }
             }
         }).catch(err => console.error("Failed to load prompts:", err))
-    }, [])
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Helper: extract a clean URL from clipboard text (handles share text like B站/抖音)
     const extractUrl = (text: string): string => {
@@ -139,10 +137,6 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                 if (text?.trim()) {
                     const cleaned = extractUrl(text)
                     setUrl(cleaned)
-                    // Auto-switch to bookmark if Douyin
-                    if (detectPlatform(cleaned) === 'douyin') {
-                        setMode('bookmark')
-                    }
                 }
             }).catch(() => {
                 // Permission denied — can't refocus here (gesture context already lost)
@@ -159,12 +153,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
 
     const platform = url ? detectPlatform(url) : null
 
-    // Auto-switch mode when url is manual-typed
-    useEffect(() => {
-        if (platform === 'douyin' && mode !== 'bookmark') {
-            setMode('bookmark');
-        }
-    }, [platform]);
+    // (no auto-switch needed)
 
     const handleSubmit = async () => {
         if (!url.trim()) {
@@ -187,7 +176,6 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
 
             const request = {
                 url: url.trim(),
-                use_uvr: useUvr,
                 language,
                 task_type: task_type as 'transcribe' | 'subtitle' | 'cache_only',
                 quality,
@@ -217,6 +205,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                 await transcribeNetwork(request)
             }
 
+            saveAll()
             onSuccess()
         } catch (e) {
             setError((e as Error).message)
@@ -305,8 +294,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                     <div className="flex bg-[var(--color-bg)] p-1 rounded-xl border border-[var(--color-border)]">
                         <button
                             onClick={() => setMode('transcribe')}
-                            disabled={platform === 'douyin'}
-                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${mode === 'transcribe'
+                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all ${mode === 'transcribe'
                                 ? 'bg-[var(--color-card)] text-[var(--color-primary)] shadow-sm'
                                 : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
                                 }`}
@@ -316,8 +304,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                         </button>
                         <button
                             onClick={() => setMode('cache')}
-                            disabled={platform === 'douyin'}
-                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${mode === 'cache'
+                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all ${mode === 'cache'
                                 ? 'bg-[var(--color-card)] text-blue-500 shadow-sm'
                                 : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
                                 }`}
@@ -336,20 +323,6 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                             {t('addVideo.mode.bookmark')}
                         </button>
                     </div>
-
-                    {/* Platform Hint (Only for Douyin) */}
-                    {platform === 'douyin' && (
-                        <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg overflow-hidden">
-                            <div className="w-full p-3 flex items-start gap-3 text-left">
-                                <Icons.Info className="w-5 h-5 text-cyan-500 shrink-0 mt-0.5" />
-                                <div className="flex-1">
-                                    <p className="text-sm text-cyan-600 dark:text-cyan-400">
-                                        {t('addVideo.douyinHint')}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                     {/* Options Area */}
                     {(mode === 'transcribe' || mode === 'cache') && (
@@ -495,18 +468,6 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                                                 </div>
                                             )}
 
-                                            {/* UVR Checkbox */}
-                                            {localStorage.getItem('diting_show_uvr5') === 'true' && (
-                                                <label className="flex items-center gap-2 cursor-pointer mt-4">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={useUvr}
-                                                        onChange={(e) => setUseUvr(e.target.checked)}
-                                                        className="w-4 h-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                                                    />
-                                                    <span className="text-sm">{t('addVideo.enableUVR')}</span>
-                                                </label>
-                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -521,11 +482,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                                 <input
                                     type="checkbox"
                                     checked={autoAnalyze}
-                                    onChange={(e) => {
-                                        const checked = e.target.checked
-                                        setAutoAnalyze(checked)
-                                        localStorage.setItem('diting_auto_analyze', checked ? 'true' : 'false')
-                                    }}
+                                    onChange={(e) => setAutoAnalyze(e.target.checked)}
                                     className="w-4 h-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                                 />
                                 <span className="text-sm font-medium">{t('addVideo.autoAnalyze')}</span>
@@ -574,7 +531,7 @@ export default function AddVideoModal({ onClose, onSuccess }: AddVideoModalProps
                 <div className="px-6 py-4 border-t border-[var(--color-border)] flex gap-3 bg-[var(--color-bg)]/50">
                     <button
                         onClick={handleSubmit}
-                        disabled={loading || !platform || (platform === 'douyin' && mode !== 'bookmark')}
+                        disabled={loading || !platform}
                         className={`flex-1 px-4 py-3 rounded-xl font-medium disabled:opacity-50 transition-all shadow-lg flex items-center justify-center gap-2 ${mode === 'transcribe'
                             ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] shadow-[var(--color-primary)]/20'
                             : mode === 'cache'

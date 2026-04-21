@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import {
     getASRStatus,
     updateASRConfig,
@@ -9,6 +10,8 @@ import {
     updateASRModel,
     deleteASRModel,
     setActiveASRModel,
+    addASRWorkerUrl,
+    deleteASRWorker,
 } from '../../api'
 import { ASRModel } from '../../api/types'
 import { useToast } from '../../contexts/ToastContext'
@@ -18,6 +21,7 @@ import ConfirmModal from '../ConfirmModal'
 export default function ASRTab() {
     const { t } = useTranslation()
     const queryClient = useQueryClient()
+    const navigate = useNavigate()
     const { showToast } = useToast()
 
     // Fetch Status & Config
@@ -35,10 +39,13 @@ export default function ASRTab() {
 
     const [showModelForm, setShowModelForm] = useState(false)
     const [editingModel, setEditingModel] = useState<ASRModel | null>(null)
-    const [modelForm, setModelForm] = useState({ name: '', engine: 'bailian', config: '' })
+    const [modelForm, setModelForm] = useState({ name: '', engine: 'bailian', config: '', badge: '' })
 
     // Structured form fields for cloud model config
     const [cloudForm, setCloudForm] = useState({ api_key: '', model_name: 'paraformer-realtime-v2' })
+
+    // Structured form fields for OpenAI-compatible ASR config
+    const [openaiForm, setOpenaiForm] = useState({ api_key: '', base_url: 'https://api.openai.com/v1', model_name: 'whisper-1' })
 
     // Supported DashScope models grouped by API type
     const DASHSCOPE_MODELS = [
@@ -97,7 +104,33 @@ export default function ASRTab() {
         }
     })
 
+    // ── Worker URL management ──
+    const [showWorkerForm, setShowWorkerForm] = useState(false)
+    const [workerUrlInput, setWorkerUrlInput] = useState('http://localhost:8001')
+
+    const addWorkerMutation = useMutation({
+        mutationFn: (url: string) => addASRWorkerUrl(url),
+        onSuccess: (data) => {
+            queryClient.setQueryData(['asr-status'], data)
+            setShowWorkerForm(false)
+            setWorkerUrlInput('http://localhost:8001')
+            showToast('success', t('settings.asr.workerSaved'))
+        },
+        onError: (e) => showToast('error', t('settings.asr.workerSaveFailed') + ': ' + e.message)
+    })
+
+    const removeWorkerMutation = useMutation({
+        mutationFn: (workerId: string) => deleteASRWorker(workerId),
+        onSuccess: (data) => {
+            queryClient.setQueryData(['asr-status'], data)
+            setDeleteConfirmWorkerId(null)
+            showToast('success', t('settings.asr.workerRemoved'))
+        },
+        onError: (e) => showToast('error', t('settings.asr.workerRemoveFailed') + ': ' + e.message)
+    })
+
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
+    const [deleteConfirmWorkerId, setDeleteConfirmWorkerId] = useState<string | null>(null)
 
     const handleDeleteModel = (id: number) => {
         setDeleteConfirmId(null)
@@ -106,31 +139,61 @@ export default function ASRTab() {
 
     const handleEditModel = (model: ASRModel) => {
         setEditingModel(model)
-        setModelForm({ name: model.name, engine: model.engine, config: model.config })
+        let badge = ''
+        try {
+            const cfg = JSON.parse(model.config)
+            badge = cfg.badge || ''
+        } catch { /* ignore */ }
+        setModelForm({ name: model.name, engine: model.engine, config: model.config, badge })
         // Parse existing config into structured form
         try {
             const cfg = JSON.parse(model.config)
-            setCloudForm({ api_key: cfg.api_key || '', model_name: cfg.model_name || 'paraformer-realtime-v2' })
+            if (model.engine === 'openai_asr') {
+                setOpenaiForm({ api_key: cfg.api_key || '', base_url: cfg.base_url || 'https://api.openai.com/v1', model_name: cfg.model_name || 'whisper-1' })
+            } else {
+                setCloudForm({ api_key: cfg.api_key || '', model_name: cfg.model_name || 'paraformer-realtime-v2' })
+            }
         } catch {
             setCloudForm({ api_key: '', model_name: 'paraformer-realtime-v2' })
+            setOpenaiForm({ api_key: '', base_url: 'https://api.openai.com/v1', model_name: 'whisper-1' })
         }
         setShowModelForm(true)
     }
 
     const handleSaveModel = () => {
-        // Build JSON config from structured form
-        let apiKey = cloudForm.api_key
-        // When editing, preserve existing API key if field is left blank
-        if (editingModel && !apiKey) {
-            try {
-                const existingCfg = JSON.parse(editingModel.config)
-                apiKey = existingCfg.api_key || ''
-            } catch { /* ignore */ }
+        const isOpenAI = modelForm.engine === 'openai_asr'
+        const badge = modelForm.badge.trim()
+
+        let configJson: string
+        if (isOpenAI) {
+            let apiKey = openaiForm.api_key
+            if (editingModel && !apiKey) {
+                try {
+                    const existingCfg = JSON.parse(editingModel.config)
+                    apiKey = existingCfg.api_key || ''
+                } catch { /* ignore */ }
+            }
+            configJson = JSON.stringify({
+                api_key: apiKey,
+                base_url: openaiForm.base_url || 'https://api.openai.com/v1',
+                model_name: openaiForm.model_name,
+                ...(badge && { badge }),
+            })
+        } else {
+            let apiKey = cloudForm.api_key
+            if (editingModel && !apiKey) {
+                try {
+                    const existingCfg = JSON.parse(editingModel.config)
+                    apiKey = existingCfg.api_key || ''
+                } catch { /* ignore */ }
+            }
+            configJson = JSON.stringify({
+                api_key: apiKey,
+                model_name: cloudForm.model_name,
+                ...(badge && { badge }),
+            })
         }
-        const configJson = JSON.stringify({
-            api_key: apiKey,
-            model_name: cloudForm.model_name,
-        })
+
         const payload = { ...modelForm, config: configJson }
         if (editingModel) {
             updateModelMutation.mutate({ id: editingModel.id, ...payload })
@@ -162,10 +225,10 @@ export default function ASRTab() {
         showToast('success', t('settings.asr.statusRefreshed'))
     }
 
-    const handleMove = (engine: string, direction: 'up' | 'down') => {
+    const handleMove = (key: string, direction: 'up' | 'down') => {
         if (!statusData?.config?.priority) return
         const current = [...statusData.config.priority]
-        const idx = current.indexOf(engine)
+        const idx = current.indexOf(key)
         if (idx === -1) return
 
         if (direction === 'up' && idx > 0) {
@@ -185,25 +248,57 @@ export default function ASRTab() {
         configMutation.mutate({ strict_mode: !statusData.config.strict_mode })
     }
 
-    const toggleEngineEnabled = (engine: string) => {
+    const toggleEnabled = (key: string) => {
         if (!statusData?.config) return
         const disabled = new Set(statusData.config.disabled_engines || [])
-        if (disabled.has(engine)) {
-            disabled.delete(engine)
+        if (disabled.has(key)) {
+            disabled.delete(key)
         } else {
-            disabled.add(engine)
+            disabled.add(key)
         }
         configMutation.mutate({ disabled_engines: Array.from(disabled) })
     }
 
     if (statusLoading || modelsLoading) return <div className="text-center py-10 text-[var(--color-text-muted)]">{t('common.loading')}</div>
 
-    const engines = statusData?.engines || {}
+    const workers = statusData?.workers || {}
+    const clouds = statusData?.clouds || {}
     const config = statusData?.config || { priority: [], strict_mode: false, active_engine: null, disabled_engines: [] }
-    const priority = config.priority || Object.keys(engines)
+    const priority = config.priority || [...Object.keys(workers), ...Object.keys(clouds)]
     const strictMode = config.strict_mode || false
     const activeEngine = config.active_engine || (priority.length > 0 ? priority[0] : null)
     const disabledEngines = new Set(config.disabled_engines || [])
+
+    // Helper: is a priority item a cloud engine or a worker?
+    const isCloud = (key: string) => key in clouds
+    const isWorker = (key: string) => key in workers
+
+    // Get display info for a priority item
+    const getItemInfo = (key: string) => {
+        if (isCloud(key)) {
+            const cloud = clouds[key]
+            return {
+                type: 'cloud' as const,
+                online: cloud?.online ?? false,
+                latency: 0,
+                displayName: cloud?.badge || key,
+                subtitle: key,
+                engine: key,
+            }
+        }
+        if (isWorker(key)) {
+            const w = workers[key]
+            return {
+                type: 'worker' as const,
+                online: w?.online ?? false,
+                latency: w?.latency ?? -1,
+                displayName: key,
+                subtitle: w?.engine ? `${w.engine}${w.model_id ? ` / ${w.model_id}` : ''}` : t('settings.asr.idle'),
+                engine: w?.engine || null,
+            }
+        }
+        return null
+    }
 
     return (
         <div className="space-y-6">
@@ -217,6 +312,7 @@ export default function ASRTab() {
                     {t('settings.asr.refresh')}
                 </button>
             </div>
+
 
             {/* Strict Mode Toggle */}
             <div className="bg-[var(--color-bg)] p-4 rounded-lg flex items-center justify-between border border-[var(--color-border)]">
@@ -238,23 +334,19 @@ export default function ASRTab() {
                 </button>
             </div>
 
-            {/* Engine List (Ordered by Priority) */}
+            {/* Priority List (Workers + Clouds mixed) */}
             <div className="space-y-3">
                 <div className="text-sm font-medium text-[var(--color-text-muted)] px-1">{t('settings.asr.priority')}</div>
-                {priority.map((engineName, index) => {
-                    const info = engines[engineName]
+                {priority.map((key, index) => {
+                    const info = getItemInfo(key)
                     if (!info) return null
 
-                    const isOnline = info.online
-                    const latency = info.latency
-
-                    const isActive = activeEngine === engineName
-                    const isCloud = info.type === 'cloud'
-                    const isDisabled = disabledEngines.has(engineName)
+                    const isActive = activeEngine === key
+                    const isDisabled = disabledEngines.has(key)
 
                     return (
                         <div
-                            key={engineName}
+                            key={key}
                             className={`
                                     relative p-4 rounded-lg border flex items-center gap-4 transition-all duration-200
                                     ${isActive && strictMode
@@ -268,10 +360,10 @@ export default function ASRTab() {
                                 {index + 1}
                             </div>
 
-                            {/* Enable/Disable Toggle - Only visible in Non-Strict Mode or if not active */}
+                            {/* Enable/Disable Toggle */}
                             <div className="flex items-center justify-center w-8">
                                 <button
-                                    onClick={() => toggleEngineEnabled(engineName)}
+                                    onClick={() => toggleEnabled(key)}
                                     className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${!isDisabled ? 'bg-green-500' : 'bg-[var(--color-border)]'
                                         }`}
                                     title={isDisabled ? t('settings.asr.enableTooltip') : t('settings.asr.disableTooltip')}
@@ -289,7 +381,7 @@ export default function ASRTab() {
                                     type="radio"
                                     name="active_engine"
                                     checked={isActive}
-                                    onChange={() => configMutation.mutate({ active_engine: engineName })}
+                                    onChange={() => configMutation.mutate({ active_engine: key })}
                                     className="w-4 h-4 text-[var(--color-primary)] bg-[var(--color-bg)] border-[var(--color-border)] focus:ring-[var(--color-primary)] cursor-pointer"
                                     title={t('settings.asr.setPrimaryTooltip')}
                                 />
@@ -298,8 +390,8 @@ export default function ASRTab() {
                             {/* Info */}
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <span className={`font-medium capitalize ${isActive && strictMode ? 'text-[var(--color-primary)]' : ''}`}>
-                                        {engineName}
+                                    <span className={`font-medium ${isActive && strictMode ? 'text-[var(--color-primary)]' : ''}`}>
+                                        {info.displayName}
                                     </span>
 
                                     {/* Badges */}
@@ -314,27 +406,32 @@ export default function ASRTab() {
                                                 Disabled
                                             </span>
                                         )}
-                                        <span className={`px-2 py-0.5 rounded text-[10px] ${isCloud ? 'bg-blue-500/10 text-blue-500' : 'bg-purple-500/10 text-purple-500'
+                                        <span className={`px-2 py-0.5 rounded text-[10px] ${info.type === 'cloud' ? 'bg-blue-500/10 text-blue-500' : 'bg-purple-500/10 text-purple-500'
                                             }`}>
-                                            {isCloud ? 'Cloud' : 'Local'}
+                                            {info.type === 'cloud' ? 'Cloud' : 'Worker'}
                                         </span>
+                                        {info.type === 'worker' && !info.engine && (
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-500">
+                                                {t('settings.asr.idle')}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="text-xs text-[var(--color-text-muted)] mt-1 flex items-center gap-2 truncate">
-                                    {info.url && <span className="truncate">URL: {info.url}</span>}
+                                <div className="text-xs text-[var(--color-text-muted)] mt-1 truncate">
+                                    {info.subtitle}
                                 </div>
                             </div>
 
                             {/* Status */}
                             <div className="flex flex-col items-end gap-1 min-w-[80px]">
-                                <div className={`flex items-center gap-1.5 text-xs font-medium ${isOnline ? 'text-green-500' : 'text-red-500'
+                                <div className={`flex items-center gap-1.5 text-xs font-medium ${info.online ? 'text-green-500' : 'text-red-500'
                                     }`}>
-                                    <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
-                                    {isOnline ? 'Online' : 'Offline'}
+                                    <div className={`w-2 h-2 rounded-full ${info.online ? 'bg-green-500' : 'bg-red-500'}`} />
+                                    {info.online ? 'Online' : 'Offline'}
                                 </div>
-                                {isOnline && latency >= 0 && (
+                                {info.online && info.latency >= 0 && info.type === 'worker' && (
                                     <div className="text-[10px] text-[var(--color-text-muted)]">
-                                        {latency.toFixed(0)} ms
+                                        {info.latency.toFixed(0)} ms
                                     </div>
                                 )}
                             </div>
@@ -342,14 +439,14 @@ export default function ASRTab() {
                             {/* Reorder Controls */}
                             <div className="flex flex-col gap-1 pl-2 border-l border-[var(--color-border)]">
                                 <button
-                                    onClick={() => handleMove(engineName, 'up')}
+                                    onClick={() => handleMove(key, 'up')}
                                     disabled={index === 0}
                                     className="p-1 hover:bg-[var(--color-bg-hover)] rounded text-[var(--color-text-muted)] disabled:opacity-30"
                                 >
                                     <Icons.ChevronDown className="w-3.5 h-3.5 rotate-180" />
                                 </button>
                                 <button
-                                    onClick={() => handleMove(engineName, 'down')}
+                                    onClick={() => handleMove(key, 'down')}
                                     disabled={index === priority.length - 1}
                                     className="p-1 hover:bg-[var(--color-bg-hover)] rounded text-[var(--color-text-muted)] disabled:opacity-30"
                                 >
@@ -359,6 +456,166 @@ export default function ASRTab() {
                         </div>
                     )
                 })}
+            </div>
+
+            {/* ── Workers Section ── */}
+            <div className="pt-4 border-t border-[var(--color-border)]">
+                <div className="flex items-center justify-between mb-3">
+                    <div>
+                        <h4 className="font-medium flex items-center gap-2">
+                            <Icons.Cpu className="w-4 h-4 text-purple-500" />
+                            {t('settings.asr.workerEndpoints')}
+                        </h4>
+                        <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{t('settings.asr.workerEndpointsHint')}</p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setWorkerUrlInput('http://localhost:8001')
+                            setShowWorkerForm(true)
+                        }}
+                        className="flex items-center gap-1 text-sm text-[var(--color-primary)] hover:underline shrink-0"
+                    >
+                        <Icons.Plus className="w-4 h-4" />
+                        {t('settings.asr.addWorker')}
+                    </button>
+                </div>
+
+                {/* Worker List */}
+                <div className="space-y-2">
+                    {Object.keys(workers).length === 0 && (
+                        <div className="text-sm text-[var(--color-text-muted)] text-center py-4 bg-[var(--color-bg)] rounded-lg border border-[var(--color-border)] border-dashed">
+                            {t('settings.asr.noWorkers')}
+                        </div>
+                    )}
+                    {Object.entries(workers).map(([workerId, info]) => (
+                        <div key={workerId} className="bg-[var(--color-bg)] p-3 rounded-lg border border-[var(--color-border)] flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-medium font-mono text-sm">{workerId}</span>
+                                    {info.registered ? (
+                                        <span className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] px-1.5 py-0.5 rounded">{t('settings.asr.registered')}</span>
+                                    ) : (
+                                        <span className="bg-purple-500/10 text-purple-500 text-[10px] px-1.5 py-0.5 rounded">{t('settings.asr.manual')}</span>
+                                    )}
+                                    <span className={`flex items-center gap-1 text-[10px] font-medium ${info.online ? 'text-green-500' : 'text-red-500'}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${info.online ? 'bg-green-500' : 'bg-red-500'}`} />
+                                        {info.online ? 'Online' : 'Offline'}
+                                    </span>
+                                </div>
+                                <div className="text-xs text-[var(--color-text-muted)] mt-0.5 font-mono truncate">{info.url}</div>
+                                {info.online && (
+                                    <div className="text-[10px] mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                                        {info.engine ? (
+                                            <span className="text-[var(--color-text-secondary)] font-medium">
+                                                Engine: {info.engine}
+                                            </span>
+                                        ) : (
+                                            <span className="text-amber-500 font-medium">
+                                                {t('settings.asr.idle')}
+                                            </span>
+                                        )}
+                                        {info.gpu && (
+                                            <span className="text-[var(--color-text-secondary)]" title={`${info.gpu.name} (${info.gpu.total_gb}GB)`}>
+                                                GPU: {info.gpu.name} ({info.gpu.total_gb}GB)
+                                            </span>
+                                        )}
+                                        {info.device && (
+                                            <span className="text-[var(--color-text-muted)]">
+                                                Device: {info.device}
+                                            </span>
+                                        )}
+                                        {info.model_id && (
+                                            <span className="text-[var(--color-text-muted)]">
+                                                Model: {info.model_id}
+                                            </span>
+                                        )}
+                                        {info.shared_paths && info.shared_paths.length > 0 ? (
+                                            <span className="text-green-600 dark:text-green-400" title={info.shared_paths.map((p: any) => typeof p === 'string' ? p : `${p.server} → ${p.worker}`).join(', ')}>
+                                                {t('settings.asr.pathMode')} ({info.shared_paths.length})
+                                            </span>
+                                        ) : (
+                                            <span className="text-[var(--color-text-muted)]" title="No shared directories configured — files will be uploaded to worker">
+                                                {t('settings.asr.uploadMode')}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                                {info.online && info.management && (
+                                    <button
+                                        onClick={() => navigate('/management', { state: { tab: 'workers', workerId } })}
+                                        className="text-xs px-2 py-1 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded hover:bg-[var(--color-primary)]/20"
+                                        title={t('settings.asr.manage')}
+                                    >
+                                        {t('settings.asr.manage')}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setDeleteConfirmWorkerId(workerId)}
+                                    className="p-1.5 text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-500/10 rounded"
+                                    title={t('settings.asr.deleteWorker')}
+                                >
+                                    <Icons.Trash className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Add Worker Form Modal */}
+                {showWorkerForm && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" onClick={() => setShowWorkerForm(false)}>
+                        <div className="bg-[var(--color-card)] p-6 rounded-lg w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+                            <h3 className="font-medium text-lg">
+                                {t('settings.asr.addWorker')}
+                            </h3>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-sm font-medium block mb-1">{t('settings.asr.workerUrlLabel')}</label>
+                                    <input
+                                        type="text"
+                                        value={workerUrlInput}
+                                        onChange={e => setWorkerUrlInput(e.target.value)}
+                                        placeholder={t('settings.asr.addWorkerUrlPlaceholder')}
+                                        className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                        autoFocus
+                                    />
+                                    <div className="text-xs text-[var(--color-text-muted)] mt-1">{t('settings.asr.workerUrlHint')}</div>
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    onClick={() => setShowWorkerForm(false)}
+                                    className="px-4 py-2 text-sm bg-[var(--color-border)] rounded-lg hover:opacity-80"
+                                >
+                                    {t('common.cancel')}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const url = workerUrlInput.trim()
+                                        if (!url || !url.startsWith('http')) return
+                                        addWorkerMutation.mutate(url)
+                                    }}
+                                    disabled={addWorkerMutation.isPending}
+                                    className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                                >
+                                    {t('common.save')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete Worker Confirm */}
+                <ConfirmModal
+                    isOpen={deleteConfirmWorkerId !== null}
+                    title={t('settings.asr.deleteWorker')}
+                    message={t('settings.asr.confirmDeleteWorker', { worker: deleteConfirmWorkerId ?? '' })}
+                    variant="danger"
+                    onConfirm={() => deleteConfirmWorkerId && removeWorkerMutation.mutate(deleteConfirmWorkerId)}
+                    onCancel={() => setDeleteConfirmWorkerId(null)}
+                />
             </div>
 
             {/* Cloud Models Configuration */}
@@ -371,8 +628,9 @@ export default function ASRTab() {
                     <button
                         onClick={() => {
                             setEditingModel(null)
-                            setModelForm({ name: '', engine: 'bailian', config: '' })
+                            setModelForm({ name: '', engine: 'bailian', config: '', badge: '' })
                             setCloudForm({ api_key: '', model_name: 'paraformer-realtime-v2' })
+                            setOpenaiForm({ api_key: '', base_url: 'https://api.openai.com/v1', model_name: 'whisper-1' })
                             setShowModelForm(true)
                         }}
                         className="flex items-center gap-1 text-sm text-[var(--color-primary)] hover:underline"
@@ -389,11 +647,14 @@ export default function ASRTab() {
                             {t('settings.asr.noCloudModels')}
                         </div>
                     )}
-                    {models?.filter((m: ASRModel) => m.engine === 'bailian').map((model: ASRModel) => (
+                    {models?.filter((m: ASRModel) => m.engine === 'bailian' || m.engine === 'openai_asr').map((model: ASRModel) => (
                         <div key={model.id} className="bg-[var(--color-bg)] p-3 rounded-lg border border-[var(--color-border)] flex items-center justify-between">
                             <div>
                                 <div className="font-medium flex items-center gap-2">
                                     {model.name}
+                                    <span className="bg-blue-500/10 text-blue-500 text-[10px] px-1.5 py-0.5 rounded">
+                                        {model.engine === 'openai_asr' ? 'OpenAI' : 'Bailian'}
+                                    </span>
                                     {Boolean(model.is_active) && <span className="bg-green-500/10 text-green-500 text-[10px] px-1.5 py-0.5 rounded">Active</span>}
                                 </div>
                                 <div className="text-xs text-[var(--color-text-muted)] mt-1 flex items-center gap-2">
@@ -405,6 +666,7 @@ export default function ASRTab() {
                                                     <span className="font-mono bg-[var(--color-bg-hover)] px-1.5 py-0.5 rounded">{cfg.model_name || t('settings.asr.unknownModel')}</span>
                                                     <span>·</span>
                                                     <span>{cfg.api_key ? `Key: ${cfg.api_key.slice(0, 6)}...` : t('settings.asr.noKey')}</span>
+                                                    {cfg.base_url && <><span>·</span><span className="truncate max-w-[200px]">{cfg.base_url}</span></>}
                                                 </>
                                             )
                                         } catch {
@@ -452,7 +714,7 @@ export default function ASRTab() {
                                     type="text"
                                     value={modelForm.name}
                                     onChange={e => setModelForm({ ...modelForm, name: e.target.value })}
-                                    placeholder={t('settings.asr.configNamePlaceholder')}
+                                    placeholder={modelForm.engine === 'openai_asr' ? t('settings.asr.openaiConfigNamePlaceholder') : t('settings.asr.configNamePlaceholder')}
                                     className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm"
                                 />
                             </div>
@@ -460,89 +722,151 @@ export default function ASRTab() {
                                 <label className="text-sm font-medium block mb-1">{t('settings.asr.engineType')}</label>
                                 <select
                                     value={modelForm.engine}
-                                    disabled
-                                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm opacity-50"
+                                    onChange={e => setModelForm({ ...modelForm, engine: e.target.value })}
+                                    disabled={!!editingModel}
+                                    className={`w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm ${editingModel ? 'opacity-50' : ''}`}
                                 >
                                     <option value="bailian">Aliyun Bailian / DashScope</option>
+                                    <option value="openai_asr">OpenAI Compatible</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="text-sm font-medium block mb-1">{t('settings.asr.dashscopeKey')}</label>
+                                <label className="text-sm font-medium block mb-1">{t('settings.asr.badge')}</label>
                                 <input
-                                    type="password"
-                                    value={cloudForm.api_key}
-                                    onChange={e => setCloudForm({ ...cloudForm, api_key: e.target.value })}
-                                    placeholder={editingModel ? t('settings.asr.leaveBlank') : 'sk-...'}
-                                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                    type="text"
+                                    value={modelForm.badge}
+                                    onChange={e => setModelForm({ ...modelForm, badge: e.target.value })}
+                                    placeholder={t('settings.asr.badgePlaceholder')}
+                                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm"
+                                    maxLength={20}
                                 />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium block mb-1">{t('settings.asr.model')}</label>
-                                {(() => {
-                                    const allModels = DASHSCOPE_MODELS.flatMap(g => g.models.map(m => m.value))
-                                    const isCustom = !allModels.includes(cloudForm.model_name)
-                                    const selectValue = isCustom ? 'custom' : cloudForm.model_name
-
-                                    return (
-                                        <select
-                                            value={selectValue}
-                                            onChange={e => {
-                                                const val = e.target.value
-                                                setCloudForm({
-                                                    ...cloudForm,
-                                                    model_name: val === 'custom' ? '' : val
-                                                })
-                                            }}
-                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm"
-                                        >
-                                            {DASHSCOPE_MODELS.map(group => (
-                                                <optgroup key={group.group} label={group.group}>
-                                                    {group.models.map(m => (
-                                                        <option key={m.value} value={m.value}>{m.label}</option>
-                                                    ))}
-                                                </optgroup>
-                                            ))}
-                                            <option value="custom">{t('settings.asr.customModel')}</option>
-                                        </select>
-                                    )
-                                })()}
-
-                                {/* Custom Model Input */}
-                                {(() => {
-                                    const allModels = DASHSCOPE_MODELS.flatMap(g => g.models.map(m => m.value))
-                                    const isCustom = !allModels.includes(cloudForm.model_name)
-
-                                    if (isCustom) {
-                                        return (
-                                            <div className="mt-2">
-                                                <input
-                                                    type="text"
-                                                    value={cloudForm.model_name === 'custom' ? '' : cloudForm.model_name}
-                                                    onChange={e => setCloudForm({ ...cloudForm, model_name: e.target.value })}
-                                                    placeholder={t('settings.asr.customModelPlaceholder')}
-                                                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono focus:border-[var(--color-primary)] outline-none"
-                                                    autoFocus
-                                                />
-                                                <div className="text-xs text-[var(--color-text-muted)] mt-1">
-                                                    {t('settings.asr.customModelHint')}
-                                                </div>
-                                            </div>
-                                        )
-                                    }
-                                    return null
-                                })()}
-
-                                <div className="text-xs text-[var(--color-text-muted)] mt-1 flex flex-col gap-1">
-                                    <div className="flex items-center gap-1.5">
-                                        <Icons.Zap className="w-3 h-3 text-amber-500" />
-                                        <span>{t('settings.asr.realtimeHint')}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <Icons.Cpu className="w-3 h-3 text-blue-500" />
-                                        <span>{t('settings.asr.multimodalHint')}</span>
-                                    </div>
+                                <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                                    {t('settings.asr.badgeHint')}
                                 </div>
                             </div>
+                            {/* OpenAI-Compatible fields */}
+                            {modelForm.engine === 'openai_asr' && (
+                                <>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">{t('settings.asr.openaiBaseUrl')}</label>
+                                        <input
+                                            type="text"
+                                            value={openaiForm.base_url}
+                                            onChange={e => setOpenaiForm({ ...openaiForm, base_url: e.target.value })}
+                                            placeholder="https://api.openai.com/v1"
+                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                        />
+                                        <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                                            {t('settings.asr.openaiBaseUrlHint')}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">API Key</label>
+                                        <input
+                                            type="password"
+                                            value={openaiForm.api_key}
+                                            onChange={e => setOpenaiForm({ ...openaiForm, api_key: e.target.value })}
+                                            placeholder={editingModel ? t('settings.asr.leaveBlank') : 'sk-...'}
+                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">{t('settings.asr.model')}</label>
+                                        <input
+                                            type="text"
+                                            value={openaiForm.model_name}
+                                            onChange={e => setOpenaiForm({ ...openaiForm, model_name: e.target.value })}
+                                            placeholder="whisper-1"
+                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                        />
+                                        <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                                            {t('settings.asr.openaiModelHint')}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                            {/* Bailian/DashScope fields */}
+                            {modelForm.engine === 'bailian' && (
+                                <>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">{t('settings.asr.dashscopeKey')}</label>
+                                        <input
+                                            type="password"
+                                            value={cloudForm.api_key}
+                                            onChange={e => setCloudForm({ ...cloudForm, api_key: e.target.value })}
+                                            placeholder={editingModel ? t('settings.asr.leaveBlank') : 'sk-...'}
+                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium block mb-1">{t('settings.asr.model')}</label>
+                                        {(() => {
+                                            const allModels = DASHSCOPE_MODELS.flatMap(g => g.models.map(m => m.value))
+                                            const isCustom = !allModels.includes(cloudForm.model_name)
+                                            const selectValue = isCustom ? 'custom' : cloudForm.model_name
+
+                                            return (
+                                                <select
+                                                    value={selectValue}
+                                                    onChange={e => {
+                                                        const val = e.target.value
+                                                        setCloudForm({
+                                                            ...cloudForm,
+                                                            model_name: val === 'custom' ? '' : val
+                                                        })
+                                                    }}
+                                                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm"
+                                                >
+                                                    {DASHSCOPE_MODELS.map(group => (
+                                                        <optgroup key={group.group} label={group.group}>
+                                                            {group.models.map(m => (
+                                                                <option key={m.value} value={m.value}>{m.label}</option>
+                                                            ))}
+                                                        </optgroup>
+                                                    ))}
+                                                    <option value="custom">{t('settings.asr.customModel')}</option>
+                                                </select>
+                                            )
+                                        })()}
+
+                                        {/* Custom Model Input */}
+                                        {(() => {
+                                            const allModels = DASHSCOPE_MODELS.flatMap(g => g.models.map(m => m.value))
+                                            const isCustom = !allModels.includes(cloudForm.model_name)
+
+                                            if (isCustom) {
+                                                return (
+                                                    <div className="mt-2">
+                                                        <input
+                                                            type="text"
+                                                            value={cloudForm.model_name === 'custom' ? '' : cloudForm.model_name}
+                                                            onChange={e => setCloudForm({ ...cloudForm, model_name: e.target.value })}
+                                                            placeholder={t('settings.asr.customModelPlaceholder')}
+                                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md text-sm font-mono focus:border-[var(--color-primary)] outline-none"
+                                                            autoFocus
+                                                        />
+                                                        <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                                                            {t('settings.asr.customModelHint')}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            }
+                                            return null
+                                        })()}
+
+                                        <div className="text-xs text-[var(--color-text-muted)] mt-1 flex flex-col gap-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <Icons.Zap className="w-3 h-3 text-amber-500" />
+                                                <span>{t('settings.asr.realtimeHint')}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Icons.Cpu className="w-3 h-3 text-blue-500" />
+                                                <span>{t('settings.asr.multimodalHint')}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                         <div className="flex justify-end gap-2 pt-2">
                             <button
@@ -556,7 +880,7 @@ export default function ASRTab() {
                                 disabled={createModelMutation.isPending || updateModelMutation.isPending}
                                 className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
                             >
-                                {editingModel ? t('common.save') : t('common.save')}
+                                {t('common.save')}
                             </button>
                         </div>
                     </div>

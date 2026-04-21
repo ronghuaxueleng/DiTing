@@ -19,8 +19,8 @@ def infer_source_type(source_id: str) -> str:
     if s.startswith("BV") or "bilibili.com" in s or "b23.tv" in s:
         return 'bilibili'
         
-    # Douyin (prefix or domain)
-    if s.startswith("dy_") or "douyin.com" in s:
+    # Douyin (prefix or domain, including share text)
+    if s.startswith("dy_") or "douyin.com" in s or "v.douyin.com" in s:
         return 'douyin'
         
     # Network (prefix)
@@ -99,13 +99,17 @@ def normalize_source_id(raw_source: str, source_type: str = 'auto') -> str:
         return raw_source
 
     # 3. Douyin (Aweme ID)
-    # Try to extract numeric ID from URL path: /video/7458617091420114236
-    douyin_match = re.search(r"/video/(\d{19})", raw_source)
+    # Extract URL from share text first (e.g. "7.08 来看看 https://v.douyin.com/xxx/")
+    douyin_url_in_text = re.search(r"https?://[^\s]*douyin\.com[^\s]*", raw_source)
+    douyin_input = douyin_url_in_text.group(0) if douyin_url_in_text else raw_source
+
+    # Try to extract numeric ID from URL path: /video/xxx or /note/xxx
+    douyin_match = re.search(r"/(?:video|note)/(\d{15,})", douyin_input)
     if douyin_match:
         return f"dy_{douyin_match.group(1)}"
-        
-    # If input is just the numeric ID (19 digits)
-    if re.match(r"^\d{19}$", raw_source):
+
+    # If input is just the numeric ID (15+ digits)
+    if re.match(r"^\d{15,}$", raw_source):
          return f"dy_{raw_source}"
 
     # 4. Fallback Hashing for everything else
@@ -151,54 +155,61 @@ def reconstruct_url(source_id: str, original_source: str = None) -> str:
     # Return the ID itself as a fallback or empty string
     return ""
 
-def resolve_bilibili_bvid(url_or_bvid: str) -> str | None:
+def resolve_bilibili_id(url_or_bvid: str) -> str | None:
     """
-    Extract BV ID from URL, b23.tv short link, or raw BV ID string.
+    Extract normalized BV ID (including _p suffix) from URL, b23.tv short link, or raw BV ID string.
     """
     if not url_or_bvid:
         return None
         
     url_or_bvid = url_or_bvid.strip()
     
-    # 1. Check for BV match directly
-    bv_match = re.search(r'(BV[a-zA-Z0-9]{10})', url_or_bvid)
-    if bv_match:
-        return bv_match.group(1)
-        
-    # 2. Check for b23.tv short link
+    # 1. Check for b23.tv short link
     if "b23.tv" in url_or_bvid:
         try:
             import requests
             # Resolve short URL
             resp = requests.head(url_or_bvid, allow_redirects=True, timeout=5)
-            # Check resolved URL
-            bv_match = re.search(r'(BV[a-zA-Z0-9]{10})', resp.url)
-            if bv_match:
-                return bv_match.group(1)
+            normalized = normalize_source_id(resp.url, "bilibili")
+            if normalized and normalized.startswith("BV"):
+                return normalized
         except Exception:
             pass
+            
+    # 2. Extract directly
+    normalized = normalize_source_id(url_or_bvid, "bilibili")
+    if normalized and normalized.startswith("BV"):
+        return normalized
             
     return None
 
 def resolve_douyin_url(url: str) -> str:
     """
     Resolve a Douyin short link (v.douyin.com/xxx) to the full URL (douyin.com/video/xxx).
+    Also handles share text like "7.08 来看看 https://v.douyin.com/xxx/".
     Returns the resolved URL, or the original URL if resolution fails.
     """
     if not url:
         return url
-    
+
     url = url.strip()
-    
+
+    # Extract URL from share text (e.g. "7.08 来看看 https://v.douyin.com/xxx/")
+    url_match = re.search(r"https?://[^\s]+", url)
+    if url_match:
+        extracted = url_match.group(0)
+    else:
+        extracted = url
+
     # Only resolve v.douyin.com short links
-    if "v.douyin.com" not in url:
-        return url
-    
+    if "v.douyin.com" not in extracted:
+        return extracted
+
     try:
         import requests
         resp = requests.head(
-            url, 
-            allow_redirects=True, 
+            extracted,
+            allow_redirects=True,
             timeout=5,
             headers={
                 "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
@@ -208,8 +219,8 @@ def resolve_douyin_url(url: str) -> str:
             return resp.url
     except Exception:
         pass
-    
-    return url
+
+    return extracted
 
 
 def resolve_youtube_video_id(url: str) -> str | None:

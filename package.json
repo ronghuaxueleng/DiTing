@@ -1,0 +1,14 @@
+{
+  "name": "diting",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:worker:dev": "cd src-tauri-worker && npx @tauri-apps/cli dev",
+    "tauri:worker:build": "cd src-tauri-worker && npx @tauri-apps/cli build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

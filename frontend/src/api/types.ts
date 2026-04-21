@@ -16,6 +16,7 @@ export interface Video {
     count: number                    // Backend field name (not segment_count)
     segment_count?: number           // Alternative field name
     ai_count: number                 // AI summary count
+    notes_count?: number             // AI notes count
     is_subtitle: number | boolean    // Has subtitle (0/1 or boolean)
     media_path?: string
     stream_url?: string
@@ -77,6 +78,46 @@ export interface AISummary {
     children?: AISummary[]
 }
 
+export interface VideoNote {
+    id: number
+    source_id: string
+    content: string
+    original_content: string | null
+    prompt: string | null
+    model: string | null
+    style: string | null
+    response_time: number | null
+    is_edited: boolean
+    is_active: boolean
+    gen_params?: {
+        user_prompt?: string
+        screenshot_density?: string
+        transcription_version?: string
+        stages?: { name: string, duration: number }[]
+    } | null
+    created_at: string
+    updated_at: string
+}
+
+export interface QAConversation {
+    id: number
+    source_id: string
+    title: string | null
+    llm_model_id: number | null
+    created_at: string
+    updated_at: string
+}
+
+export interface QAMessage {
+    id: number
+    conversation_id: number
+    role: 'user' | 'assistant'
+    content: string
+    model: string | null
+    response_time: number | null
+    created_at: string
+}
+
 // Pagination
 export interface PaginatedVideos {
     total: number
@@ -91,6 +132,10 @@ export interface Task {
     status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'cancelling'
     progress: number
     message: string
+    stages?: { name: string, duration: number }[]
+    meta?: Record<string, any>
+    created_at?: string
+    updated_at?: string
 }
 
 // LLM Config types
@@ -99,6 +144,7 @@ export interface LLMProvider {
     name: string
     base_url: string
     api_key: string
+    api_type?: string
     models: LLMModel[]
 }
 
@@ -136,21 +182,36 @@ export interface PromptCategory {
     sort_order: number
 }
 
-// ASR Status Types
+// ASR Status Types — Worker-centric (Phase 2)
+export interface WorkerInfo {
+    url: string
+    engine: string | null      // null if idle (no model loaded)
+    model_id: string | null
+    online: boolean
+    latency: number
+    management: boolean
+    gpu?: { name: string; total_gb: number } | null
+    device?: string
+    shared_paths?: any[]
+    registered?: boolean
+}
+
+export interface CloudInfo {
+    online: boolean
+    badge: string
+}
+
 export interface ASRStatus {
-    engines: Record<string, {
-        type: string
-        online: boolean
-        latency: number
-        url?: string
-    }>
+    workers: Record<string, WorkerInfo>    // worker_id → info
+    clouds: Record<string, CloudInfo>      // "bailian" | "openai_asr" → info
     config: {
-        priority: string[]
+        priority: string[]                 // worker_ids + cloud names
         strict_mode: boolean
         active_engine: string | null
-        active_model?: string | null
         disabled_engines: string[]
     }
+    // DEPRECATED backward compat — merges workers + clouds
+    engines?: Record<string, any>
 }
 
 // GC Candidate
@@ -216,4 +277,16 @@ export interface FSOrphan {
 export interface IntegrityReport {
     db_orphans: DBOrphan[]
     fs_orphans: FSOrphan[]
+}
+
+// Log Entry
+export interface LogEntry {
+    timestamp: string
+    level: string
+    name: string
+    message: string
+    trace_id: string | null
+    module: string
+    line: number
+    exception?: string
 }

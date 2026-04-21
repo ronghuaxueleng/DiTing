@@ -1,0 +1,347 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      build_worker_manager:
+        description: "Build Worker Manager"
+        type: boolean
+        default: true
+      build_tauri:
+        description: "Build Tauri Desktop"
+        type: boolean
+        default: true
+      build_docker:
+        description: "Build Docker Image"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────
+  # Job 1: Tauri Worker Manager — standalone ASR Worker installer/manager
+  # Produces: DiTing-Worker-Manager_*_x64-setup.exe
+  # ─────────────────────────────────────────────────────────────────────
+  tauri-worker-manager:
+    name: Tauri Worker Manager - ${{ matrix.os_name }}
+    if: >-
+      github.event_name == 'push' ||
+      inputs.build_worker_manager
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            os_name: Windows
+            artifact_suffix: windows-x64
+            rust_target: x86_64-pc-windows-msvc
+          # ── macOS (uncomment when ready) ──
+          # - os: macos-latest
+          #   os_name: macOS-ARM64
+          #   artifact_suffix: macos-arm64
+          #   rust_target: aarch64-apple-darwin
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri-worker -> target
+
+      - name: Install Tauri CLI
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install tauri-cli
+        run: cargo binstall tauri-cli --version "^2" --no-confirm
+
+      - name: Build Tauri Worker Manager
+        working-directory: src-tauri-worker
+        run: cargo tauri build --target ${{ matrix.rust_target }} --config '{"build":{"beforeBuildCommand":""}}'
+
+      - name: Upload NSIS installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-worker-manager-${{ matrix.artifact_suffix }}
+          path: src-tauri-worker/target/${{ matrix.rust_target }}/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Job 2: Tauri Desktop — full DiTing app (server sidecar + React UI)
+  # Pipeline: Python sidecar → Frontend → Rust/Tauri → NSIS installer
+  # ─────────────────────────────────────────────────────────────────────
+  tauri-desktop:
+    name: Tauri Desktop - ${{ matrix.os_name }}
+    if: >-
+      github.event_name == 'push' ||
+      inputs.build_tauri
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            os_name: Windows
+            artifact_suffix: windows-x64
+            rust_target: x86_64-pc-windows-msvc
+          # ── macOS (uncomment when ready) ──
+          # - os: macos-latest
+          #   os_name: macOS-ARM64
+          #   artifact_suffix: macos-arm64
+          #   rust_target: aarch64-apple-darwin
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Stage 1: Python sidecar ──
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install Python dependencies
+        run: uv sync --extra tauri
+
+      - name: Build Python sidecar
+        run: uv run python scripts/build_sidecar.py
+
+      - name: Verify sidecar binary
+        shell: bash
+        run: |
+          ls -la src-tauri/diting-server-* || { echo "ERROR: Sidecar binary not found"; exit 1; }
+
+      # ── Stage 2: Frontend ──
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Build Python sidecar
+        run: uv run python scripts/build_sidecar.py
+
+      - name: Verify sidecar binary
+        shell: bash
+        run: |
+          ls -la src-tauri/diting-server-* || { echo "ERROR: Sidecar binary not found"; exit 1; }
+
+      # ── Stage 3: Rust / Tauri ──
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install Tauri CLI
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install tauri-cli
+        run: cargo binstall tauri-cli --version "^2" --no-confirm
+
+      - name: Build Tauri app
+        run: cargo tauri build --target ${{ matrix.rust_target }}
+
+      # ── Upload ──
+      - name: Upload NSIS installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-desktop-${{ matrix.artifact_suffix }}
+          path: src-tauri/target/${{ matrix.rust_target }}/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+      # macOS: uncomment when ready
+      # - name: Upload DMG
+      #   if: runner.os == 'macOS'
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: tauri-desktop-${{ matrix.artifact_suffix }}
+      #     path: src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg/*.dmg
+      #     if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Job 3: Docker Image (optional, reuses existing docker-image workflow
+  # logic but integrated here for unified release)
+  # ─────────────────────────────────────────────────────────────────────
+  docker-image:
+    name: Docker Image
+    # Only on manual dispatch — tag pushes use docker-image.yml
+    if: inputs.build_docker == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Job 4: Publish GitHub Release
+  # Collects all build artifacts and creates a release
+  # ─────────────────────────────────────────────────────────────────────
+  release:
+    name: Publish Release
+    needs: [tauri-worker-manager, tauri-desktop]
+    if: >-
+      always() &&
+      !cancelled() &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      (needs.tauri-worker-manager.result == 'success' || needs.tauri-desktop.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+
+      - name: List artifacts
+        run: find all-artifacts -type f | head -50
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find all-artifacts -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" \) \
+            -exec cp {} release/ \;
+          echo "=== Release assets ==="
+          ls -lh release/
+
+      - name: Detect beta release
+        id: beta
+        run: |
+          if [[ "${{ github.ref_name }}" == *"beta"* ]] || [[ "${{ github.ref_name }}" == *"rc"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: DiTing ${{ github.ref_name }}
+          draft: ${{ steps.beta.outputs.is_prerelease == 'true' }}
+          prerelease: ${{ steps.beta.outputs.is_prerelease == 'true' }}
+          body: |
+            ## 下载
+
+            | 文件 | 说明 | 适用场景 |
+            |---|---|---|
+            | `DiTing-Worker-Manager_*_x64-setup.exe` | ASR Worker 安装管理器 | 仅需安装 ASR 语音识别服务 |
+            | `DiTing_*_x64-setup.exe` | DiTing 桌面端安装包 | 完整桌面应用（含服务端 + Web 界面） |
+
+            ## Worker Manager
+
+            独立的 ASR Worker 图形化安装工具（Tauri 原生应用）：
+            - 硬件自动检测（GPU / VRAM / CUDA）
+            - 支持 Whisper、SenseVoice、Qwen3-ASR 三种引擎
+            - 一键安装：Python 环境 → 依赖 → 模型下载
+            - 支持跳过模型下载，手动放置模型文件
+
+            ## DiTing Desktop
+
+            完整的桌面客户端，包含：
+            - Web 服务端（FastAPI sidecar）
+            - React 前端界面
+            - 系统托盘 + 首次引导设置
+
+            ## Docker
+
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+            ```
+
+            ---
+            完整更新日志请查看 [commits](https://github.com/${{ github.repository }}/compare/...v${{ steps.version.outputs.version }})
+          files: release/*

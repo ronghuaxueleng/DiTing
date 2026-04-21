@@ -3,17 +3,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
     getPrompts,
-    createPrompt,
-    updatePrompt,
     deletePrompt,
     getCategories,
     createCategory,
     updateCategory,
     deleteCategory,
 } from '../../api'
+import type { Prompt } from '../../api/types'
 import { useToast } from '../../contexts/ToastContext'
 import Icons from '../ui/Icons'
 import ConfirmModal from '../ConfirmModal'
+import PromptFormModal from './PromptFormModal'
 
 export default function PromptTab() {
     const { t } = useTranslation()
@@ -21,48 +21,23 @@ export default function PromptTab() {
     const { showUndoableDelete, showToast } = useToast()
     const [search, setSearch] = useState('')
     const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
-    const [showPromptForm, setShowPromptForm] = useState(false)
     const [showCategoryForm, setShowCategoryForm] = useState(false)
-    const [editingPrompt, setEditingPrompt] = useState<{ id: number; name: string; content: string; category_id: number | null } | null>(null)
     const [editingCategory, setEditingCategory] = useState<{ id: number; name: string } | null>(null)
-    const [promptForm, setPromptForm] = useState({ name: '', content: '', category_id: null as number | null })
     const [categoryForm, setCategoryForm] = useState({ name: '', key: '' })
     const [hiddenPrompts, setHiddenPrompts] = useState<Set<number>>(new Set())
+    const [categoryDeleteConfirm, setCategoryDeleteConfirm] = useState<{ id: number; name: string } | null>(null)
+
+    // Modal state
+    const [promptModal, setPromptModal] = useState<{ isOpen: boolean; prompt: Prompt | null }>({ isOpen: false, prompt: null })
 
     const { data: prompts, isLoading: promptsLoading } = useQuery({
         queryKey: ['prompts'],
         queryFn: getPrompts,
     })
 
-    const [categoryDeleteConfirm, setCategoryDeleteConfirm] = useState<{ id: number; name: string } | null>(null)
-
     const { data: categories, isLoading: categoriesLoading } = useQuery({
         queryKey: ['categories'],
         queryFn: getCategories,
-    })
-
-    // Prompt mutations
-    const createPromptMutation = useMutation({
-        mutationFn: ({ name, content, category_id }: { name: string; content: string; category_id: number | null }) =>
-            createPrompt(name, content, category_id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['prompts'] })
-            setShowPromptForm(false)
-            setPromptForm({ name: '', content: '', category_id: null })
-            showToast('success', t('settings.prompt.createSuccess'))
-        },
-        onError: (e) => showToast('error', t('settings.prompt.createFailed') + ': ' + e.message),
-    })
-
-    const updatePromptMutation = useMutation({
-        mutationFn: ({ id, name, content, category_id }: { id: number; name: string; content: string; category_id: number | null }) =>
-            updatePrompt(id, name, content, category_id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['prompts'] })
-            setEditingPrompt(null)
-            showToast('success', t('settings.prompt.updateSuccess'))
-        },
-        onError: (e) => showToast('error', t('settings.prompt.updateFailed') + ': ' + e.message),
     })
 
     const deletePromptMutation = useMutation({
@@ -123,26 +98,6 @@ export default function PromptTab() {
         )
     }
 
-    const handleEditPrompt = (prompt: any) => {
-        setEditingPrompt(prompt)
-        setPromptForm({ name: prompt.name, content: prompt.content, category_id: prompt.category_id })
-        setShowPromptForm(false)
-    }
-
-    const handleSavePrompt = () => {
-        if (editingPrompt) {
-            updatePromptMutation.mutate({ id: editingPrompt.id, ...promptForm })
-        } else {
-            createPromptMutation.mutate(promptForm)
-        }
-    }
-
-    const handleCancelPromptEdit = () => {
-        setEditingPrompt(null)
-        setShowPromptForm(false)
-        setPromptForm({ name: '', content: '', category_id: null })
-    }
-
     const filteredPrompts = prompts?.filter(p => {
         if (hiddenPrompts.has(p.id)) return false
         const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -167,7 +122,7 @@ export default function PromptTab() {
                         {t('settings.prompt.manageCategories')}
                     </button>
                     <button
-                        onClick={() => { setShowPromptForm(true); setEditingPrompt(null); setPromptForm({ name: '', content: '', category_id: null }) }}
+                        onClick={() => setPromptModal({ isOpen: true, prompt: null })}
                         className="flex items-center gap-1 text-sm text-[var(--color-primary)] hover:underline"
                     >
                         <Icons.Plus className="w-4 h-4" />
@@ -243,51 +198,6 @@ export default function PromptTab() {
                 </div>
             )}
 
-            {/* Prompt Form */}
-            {(showPromptForm || editingPrompt) && (
-                <div className="bg-[var(--color-bg)] p-4 rounded-lg border border-[var(--color-border)] space-y-3">
-                    <div className="text-sm font-medium">{editingPrompt ? t('settings.prompt.editPromptTitle') : t('settings.prompt.addPromptTitle')}</div>
-                    <input
-                        type="text"
-                        placeholder={t('settings.prompt.promptNamePlaceholder')}
-                        value={promptForm.name}
-                        onChange={(e) => setPromptForm({ ...promptForm, name: e.target.value })}
-                        className="w-full px-3 py-2 text-sm bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg"
-                    />
-                    <textarea
-                        placeholder={t('settings.prompt.promptContentPlaceholder')}
-                        value={promptForm.content}
-                        onChange={(e) => setPromptForm({ ...promptForm, content: e.target.value })}
-                        rows={4}
-                        className="w-full px-3 py-2 text-sm bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg resize-none"
-                    />
-                    <div className="flex items-center justify-between">
-                        <select
-                            value={promptForm.category_id ?? ''}
-                            onChange={(e) => setPromptForm({ ...promptForm, category_id: e.target.value ? Number(e.target.value) : null })}
-                            className="px-3 py-1.5 text-sm bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg"
-                        >
-                            <option value="">{t('settings.prompt.noCategory')}</option>
-                            {categories?.map((cat: any) => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ))}
-                        </select>
-                        <div className="flex gap-2">
-                            <button onClick={handleCancelPromptEdit} className="px-3 py-1.5 text-sm bg-[var(--color-border)] rounded-lg">
-                                {t('common.cancel')}
-                            </button>
-                            <button
-                                onClick={handleSavePrompt}
-                                disabled={!promptForm.name || !promptForm.content || createPromptMutation.isPending || updatePromptMutation.isPending}
-                                className="px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white rounded-lg disabled:opacity-50"
-                            >
-                                {editingPrompt ? t('common.save') : t('common.save')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Category filter + Search */}
             <div className="flex flex-wrap items-center gap-2">
                 <div className="flex gap-1 flex-wrap">
@@ -336,7 +246,7 @@ export default function PromptTab() {
                                         <span className="text-xs bg-[var(--color-border)] px-2 py-0.5 rounded mr-2">{prompt.category_name}</span>
                                     )}
                                     <button
-                                        onClick={() => handleEditPrompt(prompt)}
+                                        onClick={() => setPromptModal({ isOpen: true, prompt })}
                                         className="p-1 opacity-0 group-hover:opacity-100 rounded-full text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-all"
                                     >
                                         <Icons.Edit className="w-3.5 h-3.5" />
@@ -357,6 +267,13 @@ export default function PromptTab() {
                     )}
                 </div>
             )}
+
+            {/* Prompt Add/Edit Modal */}
+            <PromptFormModal
+                isOpen={promptModal.isOpen}
+                onClose={() => setPromptModal({ isOpen: false, prompt: null })}
+                prompt={promptModal.prompt}
+            />
 
             {/* Category Delete Confirm */}
             <ConfirmModal

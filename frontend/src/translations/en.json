@@ -88,6 +88,8 @@
             "noSegments": "No Transcript",
             "hasAI": "Has AI",
             "noAI": "No AI",
+            "hasNotes": "Has Notes",
+            "noNotes": "No Notes",
             "hasCached": "Cached",
             "noCached": "Not Cached",
             "isSubtitle": "Has Subtitle",
@@ -106,8 +108,9 @@
             "includeLabel": "IS"
         },
         "view": {
-            "grid": "Grid",
-            "list": "List"
+            "grid": "Grid View",
+            "list": "List View",
+            "notes": "Notes View"
         },
         "sourceBadge": {
             "bilibili": "Bilibili",
@@ -164,7 +167,31 @@
             "updateSuccess": "Provider updated successfully",
             "updateFailed": "Failed to update",
             "deleteSuccess": "Provider deleted",
-            "deleteFailed": "Failed to delete"
+            "deleteFailed": "Failed to delete",
+            "apiType": "API Protocol",
+            "apiTypeChatCompletions": "Chat Completions (Standard)",
+            "apiTypeResponses": "Responses (New)",
+            "testConnection": "Test Connection",
+            "testSuccess": "Connected ({{ms}}ms)",
+            "testFailed": "Connection failed",
+            "fetchModels": "Fetch Models",
+            "fetchingModels": "Fetching...",
+            "fetchModelsSuccess": "Successfully added {{count}} models",
+            "fetchModelsFailed": "Failed to fetch models",
+            "noModelsFound": "No available models found",
+            "addSelected": "Add Selected",
+            "alreadyAdded": "Already added",
+            "baseUrlHint": "Most OpenAI-compatible APIs require a /v1 suffix",
+            "endpointPreview": "Endpoint Preview",
+            "selectAll": "Select All",
+            "deselectAll": "Deselect All",
+            "searchModelsPlaceholder": "Search models...",
+            "discoverModels": "Discover Models",
+            "selectedCount": "{{selected}} / {{total}} selected",
+            "testAll": "Test All",
+            "batchTestResult": "Test complete: {{passed}}/{{total}} passed",
+            "selectProvider": "Select a provider to view details",
+            "noProviders": "No providers yet. Click above to add one."
         },
         "asr": {
             "title": "ASR Model Configuration",
@@ -175,7 +202,7 @@
             "enableTooltip": "Click to Enable",
             "disableTooltip": "Click to Disable",
             "setPrimaryTooltip": "Set as Primary in Strict Mode",
-            "cloudModels": "Cloud Models (Bailian/DashScope)",
+            "cloudModels": "Cloud Models",
             "addConfig": "Add Model Config",
             "noCloudModels": "No cloud model configurations found",
             "unknownModel": "Unknown Model",
@@ -185,10 +212,17 @@
             "addConfigTitle": "Add Model Config",
             "configName": "Config Name",
             "configNamePlaceholder": "e.g. My Bailian Key",
+            "openaiConfigNamePlaceholder": "e.g. Groq Whisper / SiliconFlow",
             "engineType": "Engine Type",
+            "badge": "Badge",
+            "badgePlaceholder": "e.g. Groq, SiliconFlow",
+            "badgeHint": "Custom label shown in the engine priority list. Defaults to config name if empty.",
             "dashscopeKey": "DashScope API Key",
             "leaveBlank": "Leave blank to keep unchanged",
             "model": "ASR Model",
+            "openaiBaseUrl": "API Base URL",
+            "openaiBaseUrlHint": "OpenAI-compatible endpoint. e.g. https://api.groq.com/openai/v1, https://api.siliconflow.cn/v1",
+            "openaiModelHint": "Model ID varies by provider. e.g. whisper-large-v3, whisper-1",
             "customModel": "✨ Custom Model ID...",
             "customModelPlaceholder": "Enter Model ID (e.g. qwen-audio-turbo)",
             "customModelHint": "Ensure the Model ID is valid on DashScope/Bailian platform.",
@@ -215,7 +249,38 @@
             "confirmDelete": "Are you sure you want to delete this config?",
             "configUpdated": "ASR config updated",
             "configUpdateFailed": "Failed to update config",
-            "statusRefreshed": "Status refreshed"
+            "statusRefreshed": "Status refreshed",
+            "workerEndpoints": "Local Worker Endpoints",
+            "workerEndpointsHint": "Addresses of the locally-running ASR worker processes. Changes take effect immediately.",
+            "addWorker": "Add Worker",
+            "editWorker": "Edit Worker URL",
+            "deleteWorker": "Remove",
+            "confirmDeleteWorker": "Remove worker \"{{worker}}\"?",
+            "workerEngine": "Engine Name",
+            "workerEnginePlaceholder": "e.g. sensevoice, whisper, qwen3asr",
+            "workerUrl": "Worker URL",
+            "workerUrlPlaceholder": "http://localhost:8001",
+            "workerUrlHint": "HTTP address the server uses to reach this worker. Use localhost for local workers, or IP/hostname for remote GPU servers.",
+            "workerSaved": "Worker endpoint added",
+            "workerSaveFailed": "Failed to add worker",
+            "workerRemoved": "Worker removed",
+            "workerRemoveFailed": "Failed to remove worker",
+            "noWorkers": "No local workers configured",
+            "enginePresets": "SenseVoice (8001)",
+            "enginePresetsList": [
+                "sensevoice",
+                "whisper",
+                "qwen3asr"
+            ],
+            "registered": "Registered",
+            "manual": "Manual",
+            "pathMode": "Path Mode",
+            "uploadMode": "Upload Mode",
+            "idle": "Idle",
+            "manage": "Manage",
+            "workerUrlLabel": "Worker URL",
+            "addWorkerUrl": "Add Worker URL",
+            "addWorkerUrlPlaceholder": "http://localhost:8001"
         },
         "prompt": {
             "title": "Prompt Management",
@@ -265,9 +330,12 @@
             "biliCookieHint": "Required for fetching Bilibili AI-generated subtitles and accessing HD/Member quality (1080P+). Copy SESSDATA from browser cookies.",
             "biliCookieSaved": "Bilibili cookie saved",
             "biliCookieSaveFailed": "Failed to save",
-            "featureToggleTitle": "Feature Toggles",
-            "showUvr5": "Show UVR5 Vocal Separation Option",
-            "showUvr5Hint": "UVR5 is resource-intensive. When enabled, this option will be visible in Add Video, Retranscribe, and Upload Modal dialogs."
+            "ytCookieTitle": "YouTube Cookie",
+            "ytCookiePlaceholder": "Paste Netscape-format cookies.txt content...",
+            "ytCookieHint": "Required for accessing age-restricted, region-locked, or member-only videos. Export YouTube cookies using a browser extension (e.g. Get cookies.txt LOCALLY) and paste the full content here. Leave blank to skip.",
+            "ytCookieSaved": "YouTube cookie saved",
+            "ytCookieSaveFailed": "Failed to save",
+            "featureToggleTitle": "Feature Toggles"
         },
         "about": {
             "title": "About",
@@ -325,7 +393,6 @@
             "srt": "Subtitles (SRT)",
             "srt_char": "Verbatim Subtitles (Char)"
         },
-        "enableUVR": "Enable Vocal Separation (UVR)",
         "startTranscribe": "Start Transcription",
         "cacheOnly": "Cache Only",
         "cacheOnlyTooltip": "Download media only, skip transcription",
@@ -339,7 +406,7 @@
         "startCache": "Start Cache",
         "addToLibrary": "Add to Library",
         "advancedOptions": "Advanced Options",
-        "douyinHint": "Please note: Direct downloading and transcribing from Douyin URLs is temporarily disabled in the web app. Please use the Tampermonkey script provided on the homepage to add videos directly from Douyin.",
+        "douyinHint": "Douyin videos can be transcribed by pasting the link directly, or via the Tampermonkey script.",
         "subtitlePriorityHint": "Bilibili and YouTube prioritize fetching existing subtitles instead of downloading/transcribing.",
         "forceASRHint": "Tip: You can choose to only fetch subtitles or force transcription in the advanced transcription options.",
         "clipboardAutoFilled": "Auto-filled from clipboard",
@@ -396,6 +463,7 @@
         "select": "Select",
         "selected": "Selected",
         "summary": "Summary",
+        "aiNotes": "AI Notes",
         "subtitle": "Subtitle",
         "moreActions": "More Actions",
         "retranscribe": "Retranscribe",
@@ -413,7 +481,6 @@
         "supportHint": "Supports audio/video files, drag or click to select",
         "dropHint": "Click or drag file here",
         "languageLabel": "Language",
-        "enableUVR": "🔮 UVR5 Vocal Separation",
         "promptLabel": "Initial Prompt (Optional, Whisper)",
         "promptPlaceholder": "e.g. This is a technical meeting...",
         "generateSubtitle": "📝 Generate Subtitles",
@@ -476,7 +543,9 @@
             "overview": "Overview",
             "entries": "Cache Files",
             "batch": "Batch Cache",
-            "cleanup": "Cleanup"
+            "cleanup": "Cleanup",
+            "logs": "Logs",
+            "workers": "Workers"
         },
         "overview": {
             "totalSize": "Total Cache Size",
@@ -606,6 +675,24 @@
             "confirmMessage": "Are you sure you want to delete the selected {{count}} cover images?",
             "cleanDone": "Cleanup complete: deleted {{count}} files, freed {{mb}} MB",
             "cleanFailed": "Cleanup failed"
+        },
+        "logs": {
+            "fileInfo": "Info Log",
+            "fileError": "Error Log",
+            "fileAccess": "Access Log",
+            "allLevels": "All Levels",
+            "lines": "lines",
+            "entries": "entries",
+            "empty": "No log entries found",
+            "live": "Live",
+            "paused": "Paused",
+            "pauseRefresh": "Pause auto-refresh",
+            "resumeRefresh": "Resume auto-refresh",
+            "clearHighlight": "Clear highlight",
+            "refreshingEvery": "Auto-refreshing every {{seconds}}s",
+            "refreshPaused": "Auto-refresh paused",
+            "autoScrollOn": "Auto-scroll: ON",
+            "autoScrollOff": "Auto-scroll: OFF (scrolled up)"
         }
     },
     "detailPanel": {
@@ -659,7 +746,7 @@
             "fileNotFound": "File not found"
         },
         "policy": {
-            "label": "Cache Policy:",
+            "label": "Cache Policy",
             "notCached": "Not Cached",
             "keepForever": "Keep Forever",
             "custom": "Keep until {{date}}",
@@ -690,7 +777,7 @@
             }
         },
         "notes": {
-            "title": "📝 Notes",
+            "title": "AI Notes",
             "edit": "Edit",
             "cancel": "Cancel",
             "save": "Save",
@@ -701,13 +788,19 @@
         },
         "transcription": {
             "title": "Transcription",
-            "listMode": "List",
+            "listMode": "Transcript Summary",
             "immersiveMode": "Immersive",
+            "noteMode": "AI Notes",
             "empty": "No transcription segments yet"
+        },
+        "refPanel": {
+            "title": "Transcript Reference"
         },
         "layout": {
             "split": "Split Screen",
-            "scroll": "Scroll Mode"
+            "scroll": "Scroll Mode",
+            "expandLeft": "Expand player panel",
+            "expandRight": "Expand transcription panel"
         },
         "confirm": {
             "deleteCacheTitle": "Delete Cache File",
@@ -721,6 +814,87 @@
             "noUrl": "Cannot append cache: Missing original URL",
             "success": "Added to background download queue",
             "failed": "Failed to add"
+        },
+        "aiNotes": {
+            "generate": "Generate AI Notes",
+            "generating": "Generating...",
+            "regenerate": "Regenerate",
+            "edit": "Edit",
+            "save": "Save",
+            "cancel": "Cancel",
+            "resetToOriginal": "Reset to AI Version",
+            "resetConfirm": "Reset note to the original AI-generated content? Your edits will be lost.",
+            "emptyTitle": "No AI Notes Yet",
+            "emptyDesc": "Generate a structured note from this video's transcript using AI.",
+            "style": "Note Style",
+            "styleConcise": "Concise (Key Points)",
+            "styleDetailed": "Detailed (Full Content)",
+            "styleOutline": "Outline (Headings Only)",
+            "version": "Version",
+            "versionLabel": "History",
+            "deleteVersion": "Delete this version",
+            "deleteConfirm": "Delete this note version?",
+            "editedBadge": "Edited",
+            "generatedSuccess": "AI note generation started",
+            "generateFailed": "Failed to start note generation",
+            "saveFailed": "Failed to save note",
+            "deleteFailed": "Failed to delete note",
+            "exportMd": "Export Markdown",
+            "model": "Model",
+            "defaultModel": "(Default Model)",
+            "startGenerate": "Start Generating",
+            "cancelGenerate": "Cancel",
+            "genStageProcessing": "Processing...",
+            "toc": "Outline",
+            "screenshots": "Screenshots",
+            "screenshotsDesc": "Auto-capture keyframes at key moments",
+            "densityOff": "Off",
+            "densityFew": "Few",
+            "densityModerate": "Normal",
+            "densityDense": "Dense",
+            "exportFailed": "Export failed",
+            "transVersion": "Transcription Source",
+            "transVersionAuto": "Auto (Default)",
+            "transSource": "Transcription Source",
+            "transSourcePinned": "Pinned",
+            "transSourceAllConcat": "All concatenated ({{count}} segments)",
+            "transSourceSegments": "All Segments",
+            "noTranscription": "No transcription found",
+            "noTranscriptionDesc": "Please transcribe the video first to generate AI notes.",
+            "autoTranscribe": "Auto Transcribe",
+            "autoTranscribeHint": "Prefer subtitles, fallback to standard ASR",
+            "onlyGetSubtitles": "Get Subtitles Only",
+            "onlyGetSubtitlesHint": "Only fetch existing subtitles from platform",
+            "transcribeUnsupported": "Transcription from here is not supported for this source type",
+            "transcribeStarted": "Transcription task started",
+            "customPrompt": "Additional Instructions",
+            "customPromptPlaceholder": "Optional: add custom instructions, e.g. add timestamps to all sections, focus on price comparison, etc.",
+            "captureScreenshot": "Capture screenshot",
+            "captureUploading": "Uploading screenshot...",
+            "captureSuccess": "Screenshot inserted into note",
+            "captureFailed": "Screenshot failed",
+            "captureVideoOnly": "Screenshot only works in video mode",
+            "mindmap": "Mindmap",
+            "mindmapFit": "Fit View",
+            "mindmapExport": "Export SVG",
+            "mindmapAiOptimize": "AI Optimize",
+            "mindmapAiComingSoon": "AI Optimize Mindmap (Coming Soon)",
+            "mindmapEmpty": "No headings found in the note. Cannot generate mindmap.",
+            "mindmapTsHint": "Click timestamps to seek",
+            "mindmapDepthHint": "Show up to level {{level}}"
+        },
+        "qa": {
+            "tab": "Q&A",
+            "title": "AI Q&A",
+            "newConversation": "New Chat",
+            "conversations": "Conversations",
+            "emptyHint": "Ask a question about the video",
+            "inputPlaceholder": "Type your question...",
+            "selectModel": "Select model",
+            "copyMessage": "Copy",
+            "copied": "Copied",
+            "deleteMessage": "Delete",
+            "deleteMessageConfirm": "Are you sure you want to delete this message?"
         }
     },
     "aiSummaryModal": {
@@ -729,6 +903,7 @@
         "desc": "Select a prompt template or enter custom instructions for analysis",
         "descRefine": "Follow up based on existing summaries, the result will be saved as a sub-version",
         "analysisSent": "Analysis request sent",
+        "analysisStarted": "AI analysis started",
         "analysisFailed": "Analysis failed: ",
         "all": "All",
         "uncategorized": "Uncategorized",
@@ -761,6 +936,364 @@
         "deleteCategory": "Delete Category",
         "deleteCategoryConfirm": "Are you sure you want to delete category \"{{name}}\"?",
         "deleteCategoryAndClean": "Delete Category & Clean",
-        "selectWarning": "Please select a version to overwrite"
+        "selectWarning": "Please select a version to overwrite",
+        "streamGenerating": "Generating with {{model}}...",
+        "streamComplete": "Complete · {{model}} · {{duration}}s",
+        "streamError": "Generation failed",
+        "streamDone": "Done",
+        "streamCancel": "Cancel",
+        "streamCancelAnalysis": "Cancel Analysis",
+        "streamContinueBackground": "AI analysis will continue in the background. Check Task Center for progress."
+    },
+    "workerManager": {
+        "title": "DiTing Worker Manager",
+        "subtitle": "Hybrid worker setup and management for local ASR engines",
+        "language": {
+            "zh": "中文",
+            "en": "EN"
+        },
+        "common": {
+            "yes": "Yes",
+            "no": "No",
+            "na": "n/a",
+            "notSet": "Not set"
+        },
+        "actions": {
+            "refresh": "Refresh",
+            "start": "Start",
+            "starting": "Starting…",
+            "stop": "Stop",
+            "stopping": "Stopping…",
+            "check": "Check",
+            "checking": "Checking…",
+            "unloadModel": "Unload model",
+            "unloading": "Unloading…",
+            "uninstall": "Uninstall",
+            "confirmUninstall": "Confirm uninstall?",
+            "uninstalling": "Uninstalling…",
+            "addEngine": "Add engine",
+            "addAnotherEngine": "Add another engine",
+            "openDashboard": "Open dashboard",
+            "next": "Next",
+            "back": "Back",
+            "cancel": "Cancel"
+        },
+        "theme": {
+            "toggle": "Toggle theme (current: {{theme}})",
+            "options": {
+                "auto": "Auto",
+                "light": "Light",
+                "dark": "Dark"
+            }
+        },
+        "hardware": {
+            "title": "Hardware",
+            "summaryDescription": "Detected hardware drives the recommended engine, device, and initial model defaults.",
+            "detecting": "Detecting…",
+            "cpu": "CPU",
+            "ram": "RAM",
+            "cuda": "CUDA",
+            "mps": "MPS",
+            "recommended": "Recommended",
+            "computeKey": "Compute key",
+            "cores": "cores",
+            "cpuOnly": "CPU only",
+            "appleSilicon": "Apple Silicon"
+        },
+        "engine": {
+            "installStatus": "Install status",
+            "installedState": "Installed",
+            "notInstalledState": "Not installed",
+            "installDir": "Install dir",
+            "noStatus": "No status yet."
+        },
+        "catalog": {
+            "engines": {
+                "whisper-openai": {
+                    "description": "OpenAI Whisper local worker with flexible model choices."
+                },
+                "sensevoice": {
+                    "description": "FunASR SenseVoice with built-in VAD and fast multilingual speech recognition."
+                },
+                "qwen3asr": {
+                    "description": "Qwen3-ASR speech recognition with forced aligner for high-quality timestamps."
+                }
+            },
+            "models": {
+                "whisper_tiny": {
+                    "label": "Tiny",
+                    "description": "Fastest Whisper option with the smallest footprint for lightweight or CPU-first setups."
+                },
+                "whisper_small": {
+                    "label": "Small",
+                    "description": "Balanced Whisper model for lighter hardware and faster local transcription."
+                },
+                "whisper_medium": {
+                    "label": "Medium",
+                    "description": "Mid-sized Whisper model with a stronger accuracy / speed trade-off."
+                },
+                "whisper_large_v3": {
+                    "label": "Large V3",
+                    "description": "Highest-accuracy Whisper Large V3 model for users who prefer the standard non-turbo variant."
+                },
+                "whisper_large_v3_turbo": {
+                    "label": "Large V3 Turbo",
+                    "description": "Recommended Whisper Large V3 Turbo model for strong accuracy with faster local inference."
+                },
+                "sensevoice_small": {
+                    "label": "SenseVoice Small",
+                    "description": "Compact multilingual SenseVoice model with built-in VAD and fast recognition."
+                },
+                "qwen3_asr": {
+                    "label": "Qwen3-ASR 1.7B",
+                    "description": "Qwen3-ASR 1.7B model with forced aligner for precise timestamp generation."
+                },
+                "__none__": {
+                    "label": "Skip download (place manually)"
+                }
+            }
+        },
+        "tags": {
+            "recommended": "Recommended",
+            "multilingual": "Multilingual",
+            "fast": "Fast",
+            "balanced": "Balanced",
+            "accurate": "Accurate",
+            "lightweight": "Lightweight"
+        },
+        "dashboard": {
+            "title": "Dashboard",
+            "description": "View and manage installed speech recognition engines.",
+            "installedEngines": "Installed engines",
+            "listDescription": "{{count}} engines installed.",
+            "selected": "Selected",
+            "overviewTitle": "Overview",
+            "summaryTitle": "Engine summary",
+            "summaryDescription": "Overview of the current engine.",
+            "engineDescription": "View engine status, manage models and settings.",
+            "sidebarHint": "Click to switch between engines.",
+            "commandCenterTitle": "Command bar",
+            "commandCenterDescription": "Engine configuration and status.",
+            "recentActivityTitle": "Recent activity",
+            "installRuntimeTitle": "Install & runtime info",
+            "installRuntimeDescription": "Installation location, runtime device, and service configuration.",
+            "engineId": "Engine ID",
+            "workerStatusTitle": "Worker status",
+            "workerStatusDescription": "Current worker runtime status.",
+            "workerUrl": "Worker URL",
+            "loadedModel": "Loaded model",
+            "loadedDevice": "Runtime device",
+            "installedModelsLabel": "Installed models",
+            "configuredPortLabel": "Configured port",
+            "quickFactsTitle": "Quick facts",
+            "lastStartedLabel": "Last started",
+            "neverStarted": "Never started",
+            "tabs": {
+                "overview": "Overview",
+                "models": "Models",
+                "network": "Network",
+                "advanced": "Advanced"
+            },
+            "advancedTitle": "Advanced details",
+            "advancedDescription": "View engine details or perform operations like uninstall.",
+            "networkSettingsTitle": "Network settings",
+            "networkSettingsDescription": "Configure the worker's port and network addresses.",
+            "networkSaving": "Saving…",
+            "networkSaved": "Network settings saved.",
+            "networkSaveFailed": "Failed to save network settings: {{error}}",
+            "modelManagementDescription": "View and manage available speech recognition models.",
+            "inventoryHint": "Manage all models in a compact list.",
+            "inventoryReady": "Model operations are available for this running managed worker.",
+            "inventoryColumns": {
+                "model": "Model",
+                "footprint": "Footprint",
+                "status": "Status",
+                "actions": "Actions"
+            },
+            "modelMeta": {
+                "size": "Size",
+                "vram": "VRAM"
+            },
+            "modelState": {
+                "compatibility": "Compatibility",
+                "mps": "MPS",
+                "dependencies": "Dependencies"
+            },
+            "dangerZoneTitle": "Danger zone",
+            "uninstallHint": "Uninstall removes the local engine installation and its manager record.",
+            "badges": {
+                "running": "Running",
+                "healthy": "Healthy",
+                "loaded": "Loaded",
+                "management": "Management"
+            },
+            "emptySelection": "Select an installed engine to continue."
+        },
+        "wizard": {
+            "title": "Add engine wizard",
+            "steps": {
+                "hardware": "Hardware",
+                "engine": "Engine",
+                "install": "Install",
+                "complete": "Complete"
+            },
+            "stepStates": {
+                "current": "Current step",
+                "done": "Done",
+                "upcoming": "Upcoming"
+            },
+            "stepRailTitle": "Setup flow",
+            "summaryTitle": "Context summary",
+            "summaryDescription": "Configuration overview during installation.",
+            "summary": {
+                "currentEngine": "Engine",
+                "model": "Initial model",
+                "device": "Device",
+                "port": "Port",
+                "workerUrl": "Worker URL",
+                "serverUrl": "Server URL",
+                "target": "Target folder",
+                "installedEngines": "Installed engines",
+                "stage": "Stage monitor",
+                "logCount": "Latest {{count}} updates"
+            },
+            "hardwareDescription": "Review the detected hardware first, then continue with the recommended device or adjust it on the next step.",
+            "hardwareSummaryTitle": "Hardware summary",
+            "hardwareSummaryDescription": "Detected CPU, memory, and GPU information.",
+            "hardwareLead": "Review your hardware. The next step will recommend an engine and device based on these results.",
+            "hardwareRecommendationTitle": "Recommended starting point",
+            "hardwareRecommendationDescription": "Recommended configuration based on your hardware. You can adjust in the next step.",
+            "engineDescription": "Choose an engine, install path, device, and initial model.",
+            "engineFitTitle": "Engine & hardware fit",
+            "engineFitDescription": "Select an engine and a matching device and model will be recommended.",
+            "enginePrimaryTitle": "1. Pick the engine",
+            "enginePrimaryDescription": "Choose the engine to install, then set the initial model and device.",
+            "engineSecondaryTitle": "2. Configure runtime and downloads",
+            "engineSecondaryDescription": "Configure port, network addresses, install location, and download options.",
+            "runtimeConfigTitle": "Runtime config",
+            "runtimeConfigDescription": "Configure the worker port and the Server URL it should talk back to.",
+            "downloadInstallTitle": "Download & install",
+            "downloadInstallDescription": "Choose install location, mirrors, and proxy settings for dependency and model downloads.",
+            "installDescription": "Installing {{engine}}. This may take a while depending on Python packages and model downloads.",
+            "installLead": "Progress and recent logs are shown below.",
+            "installRecentLogsTitle": "Recent install log",
+            "completeTitle": "Engine installation complete",
+            "completeDescription": "{{engine}} is ready. You can return to the dashboard or continue adding another engine.",
+            "completeNextTitle": "Next actions",
+            "completeNextDescription": "Return to the dashboard to manage your engines, or continue installing another.",
+            "completePrimaryAction": "Open dashboard",
+            "completeSecondaryAction": "Install another engine",
+            "selected": "Selected",
+            "noAvailableEngines": "All currently supported local engines are already installed."
+        },
+        "status": {
+            "details": "URL: {{url}} | model={{model}} | device={{device}}"
+        },
+        "install": {
+            "locationTitle": "Runtime root",
+            "browse": "Browse…",
+            "browseDialogTitle": "Choose runtime root",
+            "locationHint": "This path is the root for the whole worker runtime. If you set it manually, uv, engines, downloaded models, and manager_state.json all live under this directory; the app install location stays separate.",
+            "protectedLocationWarning": "This folder is under a Windows protected location. Installation may require administrator permission, and writes can fail if the app cannot create files there.",
+            "protectedLocationExamples": "Common protected locations include Program Files and the Windows directory.",
+            "defaultBase": "Default runtime root: {{path}}",
+            "appInstallDir": "App install location: {{path}}",
+            "currentTarget": "Current runtime root",
+            "runtimeRoot": "Runtime root",
+            "engineInstallDir": "Engine directory",
+            "uvPath": "uv path",
+            "managerStatePath": "Manager state file",
+            "latestStage": "Current stage",
+            "phaseLabel": "Phase",
+            "progressLabel": "Progress",
+            "targetLabel": "Target directory",
+            "logTitle": "Install log",
+            "logHint": "Raw log output stays in a secondary details area for troubleshooting.",
+            "logEntries": "log entries",
+            "port": "Port",
+            "initialModel": "Initial model",
+            "device": "Device",
+            "serverUrl": "Server URL",
+            "serverUrlPlaceholder": "http://127.0.0.1:5023",
+            "workerUrl": "Worker URL",
+            "workerUrlPlaceholder": "http://localhost:8001",
+            "workerUrlHint": "HTTP address the server uses to reach this worker. Use localhost for local workers, or IP/hostname for remote GPU servers.",
+            "effectiveWorkerUrl": "Effective worker URL",
+            "useMirror": "Use China mirrors",
+            "mirrorDetailsTitle": "Mirror details",
+            "mirrorDetailsHint": "When enabled, installs and model downloads will use the mirror endpoints below.",
+            "mirrorPython": "Python / uv mirror",
+            "mirrorPyPI": "PyPI mirror",
+            "mirrorHuggingFace": "Hugging Face mirror",
+            "mirrorPyTorch": "PyTorch wheel index",
+            "mirrorPyTorchDefault": "Default upstream",
+            "useProxy": "Use proxy (optional)",
+            "proxy": "Proxy URL",
+            "proxyPlaceholder": "http://127.0.0.1:7890",
+            "sharedPaths": "Shared path mappings",
+            "sharedPathsHint": "When the Worker and Server are on different machines, configure shared path mappings to use path mode for audio file transfer instead of uploading over the network. Each mapping links a Server path to the equivalent path on the Worker.",
+            "sharedPathServer": "Server path",
+            "sharedPathWorker": "Worker path",
+            "sharedPathAdd": "Add path mapping",
+            "sharedPathRemove": "Remove",
+            "sharedPathServerPlaceholder": "/app/data/media_cache",
+            "sharedPathWorkerPlaceholder": "D:\\shared\\media_cache",
+            "install": "Install",
+            "installing": "Installing…",
+            "preparing": "Preparing installation…",
+            "failed": "Install failed",
+            "complete": "Install complete",
+            "step": "Step {{current}} / {{total}}",
+            "targetDirectory": "Target directory: {{path}}",
+            "steps": {
+                "uv": "Prepare uv",
+                "python": "Install Python",
+                "venv": "Create virtualenv",
+                "deps": "Install dependencies",
+                "model": "Download model",
+                "worker": "Copy worker files",
+                "config": "Write configuration",
+                "state": "Save manager state",
+                "failed": "Install failed"
+            }
+        },
+        "modelManagement": {
+            "title": "Model management",
+            "summary": "{{installed}} / {{total}} models installed",
+            "refresh": "Refresh models",
+            "refreshing": "Refreshing…",
+            "collapse": "Collapse",
+            "expand": "Expand",
+            "startWorkerHint": "Start the worker to manage models.",
+            "noManagementHint": "This worker did not report management API support yet.",
+            "operation": "Operation: {{type}} ({{status}})",
+            "idMeta": "id={{id}}",
+            "sizeMeta": "size≈{{size}}MB",
+            "accuracy": "Accuracy",
+            "accuracyAriaLabel": "Accuracy {{value}} stars out of 5",
+            "speed": "Speed",
+            "speedAriaLabel": "Speed {{value}} bars out of 5",
+            "installed": "Installed",
+            "active": "Active",
+            "notCompatible": "Not compatible",
+            "download": "Download",
+            "downloading": "Downloading…",
+            "activate": "Activate",
+            "activating": "Activating…",
+            "delete": "Delete",
+            "deleting": "Deleting…",
+            "empty": "No models available.",
+            "messages": {
+                "pollingFailed": "Operation polling failed: {{error}}",
+                "downloading": "Downloading {{modelId}}...",
+                "downloadFailed": "Download failed: {{error}}",
+                "activating": "Activating {{modelId}}...",
+                "activateFailed": "Activate failed: {{error}}",
+                "deleted": "Deleted {{modelId}}.",
+                "deleteFailed": "Delete failed: {{error}}",
+                "unloaded": "Model unloaded.",
+                "unloadFailed": "Unload failed: {{error}}"
+            }
+        }
     }
 }

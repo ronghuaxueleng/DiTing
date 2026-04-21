@@ -17,7 +17,6 @@ from app.db.transcriptions import (
     update_transcription_text,
     update_transcription_timestamp,
     get_transcription_by_source,
-    update_analysis,
     update_task_status,
     update_ai_status,
     get_transcription,
@@ -52,6 +51,7 @@ from app.db.llm_config import (
     set_active_model,
     get_active_model_full,
     get_llm_model_full_by_id,
+    batch_add_models,
 )
 
 # ASR Configuration
@@ -127,6 +127,35 @@ from app.db.tags import (
     batch_get_video_tags,
 )
 
+from app.db.video_notes import (
+    add_video_note,
+    get_active_note,
+    get_all_notes,
+    update_note_content,
+    reset_note_to_original,
+    delete_video_note,
+    delete_all_notes_by_source,
+    set_note_active,
+    get_note_by_id,
+    batch_count_notes,
+)
+
+from app.db.qa import (
+    create_conversation,
+    get_conversations_by_source,
+    get_conversation,
+    update_conversation_title,
+    touch_conversation,
+    delete_conversation,
+    delete_conversations_by_source,
+    count_conversations_by_source,
+    add_message,
+    get_messages,
+    get_message,
+    update_message_content,
+    delete_message,
+)
+
 __all__ = [
     # Connection helpers
     "get_connection",
@@ -143,7 +172,6 @@ __all__ = [
     "update_transcription_text",
     "update_transcription_timestamp",
     "get_transcription_by_source",
-    "update_analysis",
     "update_task_status",
     "update_ai_status",
     "get_transcription",
@@ -174,6 +202,7 @@ __all__ = [
     "set_active_model",
     "get_active_model_full",
     "get_llm_model_full_by_id",
+    "batch_add_models",
     
     # ASR Configuration
     "add_asr_model",
@@ -235,4 +264,31 @@ __all__ = [
     "add_tag_to_video",
     "remove_tag_from_video",
     "batch_get_video_tags",
+
+    # Video Notes (v0.12.4+)
+    "add_video_note",
+    "get_active_note",
+    "get_all_notes",
+    "update_note_content",
+    "reset_note_to_original",
+    "delete_video_note",
+    "delete_all_notes_by_source",
+    "set_note_active",
+    "get_note_by_id",
+    "batch_count_notes",
+
+    # QA (v0.13.1+)
+    "create_conversation",
+    "get_conversations_by_source",
+    "get_conversation",
+    "update_conversation_title",
+    "touch_conversation",
+    "delete_conversation",
+    "delete_conversations_by_source",
+    "count_conversations_by_source",
+    "add_message",
+    "get_messages",
+    "get_message",
+    "update_message_content",
+    "delete_message",
 ]

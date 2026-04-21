@@ -2,7 +2,7 @@
  * API Client for DiTing Backend
  * Uses RESTful endpoints
  */
-import type { PaginatedVideos, Segment, Video, Task, LLMProvider, ASRModel, Prompt, PromptCategory, ASRStatus, GCCandidate, CoverGCCandidate, CacheEntry, CacheStats, IntegrityReport, Tag } from './types'
+import type { PaginatedVideos, Segment, Video, Task, LLMProvider, ASRModel, Prompt, PromptCategory, ASRStatus, GCCandidate, CoverGCCandidate, CacheEntry, CacheStats, IntegrityReport, Tag, LogEntry } from './types'
 
 // ... (skipping to the end of file)
 
@@ -41,6 +41,7 @@ export interface GetVideosParams {
     sortBy?: string
     hasSegments?: boolean
     hasAI?: boolean
+    hasNotes?: boolean
     hasCached?: boolean
     isSubtitle?: boolean
     includeArchived?: string
@@ -57,6 +58,7 @@ export async function getVideos({
     sortBy,
     hasSegments,
     hasAI,
+    hasNotes,
     hasCached,
     isSubtitle,
     includeArchived,
@@ -71,6 +73,7 @@ export async function getVideos({
     if (sortBy) params.set('sort_by', sortBy)
     if (hasSegments !== undefined) params.set('has_segments', String(hasSegments))
     if (hasAI !== undefined) params.set('has_ai', String(hasAI))
+    if (hasNotes !== undefined) params.set('has_notes', String(hasNotes))
     if (hasCached !== undefined) params.set('has_cached', String(hasCached))
     if (isSubtitle !== undefined) params.set('is_subtitle', String(isSubtitle))
     if (includeArchived) params.set('include_archived', includeArchived)
@@ -169,7 +172,6 @@ export async function toggleSegmentPin(segmentId: number, isPinned: boolean): Pr
 export interface TranscribeUrlRequest {
     url: string
     source_id?: string
-    use_uvr?: boolean
     language?: string
     prompt?: string
     task_type?: 'transcribe' | 'subtitle' | 'cache_only'
@@ -205,7 +207,6 @@ export async function transcribeDouyin(request: TranscribeUrlRequest): Promise<{
 export interface TranscribeNetworkRequest {
     url: string
     title?: string
-    use_uvr?: boolean
     language?: string
     prompt?: string
     task_type?: 'transcribe' | 'subtitle' | 'cache_only'
@@ -227,12 +228,13 @@ export async function transcribeNetwork(request: TranscribeNetworkRequest): Prom
 export interface RetranscribeRequest {
     source_id: string
     language?: string
-    use_uvr?: boolean
     prompt?: string
     output_format?: string
     auto_analyze_prompt?: string
     auto_analyze_prompt_id?: number
     auto_analyze_strip_subtitle?: boolean
+    only_get_subtitles?: boolean
+    force_transcription?: boolean
 }
 
 export async function retranscribe(request: RetranscribeRequest): Promise<{ id: number }> {
@@ -269,7 +271,7 @@ export interface AnalyzeRequest {
     strip_subtitle?: boolean
 }
 
-export async function analyzeSegment(request: AnalyzeRequest): Promise<{ summary_id: number }> {
+export async function analyzeSegment(request: AnalyzeRequest): Promise<{ task_id: number; status: string }> {
     return fetchJson(`${API_BASE}/analyze`, {
         method: 'POST',
         body: JSON.stringify(request),
@@ -308,7 +310,7 @@ export async function getLLMProviders(): Promise<LLMProvider[]> {
     return fetchJson(`${API_BASE}/settings/llm/providers`)
 }
 
-export async function addLLMProvider(data: { name: string; base_url: string; api_key: string }): Promise<{ id: number }> {
+export async function addLLMProvider(data: { name: string; base_url: string; api_key: string; api_type?: string }): Promise<{ id: number }> {
     return fetchJson(`${API_BASE}/settings/llm/providers`, { method: 'POST', body: JSON.stringify(data) })
 }
 
@@ -316,7 +318,7 @@ export async function deleteLLMProvider(id: number): Promise<void> {
     await fetchJson(`${API_BASE}/settings/llm/providers/${id}`, { method: 'DELETE' })
 }
 
-export async function updateLLMProvider(id: number, data: { name: string; base_url: string; api_key: string }): Promise<void> {
+export async function updateLLMProvider(id: number, data: { name: string; base_url: string; api_key: string; api_type?: string }): Promise<void> {
     await fetchJson(`${API_BASE}/settings/llm/providers/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 }
 
@@ -340,6 +342,21 @@ export async function updateLLMModel(modelId: number, modelName: string): Promis
 
 export async function setActiveModel(modelId: number): Promise<void> {
     await fetchJson(`${API_BASE}/settings/llm/models/${modelId}/activate`, { method: 'POST' })
+}
+
+export async function testLLMModel(providerId: number, modelId: number): Promise<{ success: boolean; message: string; latency_ms: number }> {
+    return fetchJson(`${API_BASE}/settings/llm/providers/${providerId}/models/${modelId}/test`, { method: 'POST' })
+}
+
+export async function fetchAvailableModels(providerId: number): Promise<{ success: boolean; models: { id: string; owned_by: string; already_added: boolean }[]; message: string }> {
+    return fetchJson(`${API_BASE}/settings/llm/providers/${providerId}/available-models`)
+}
+
+export async function batchAddModels(providerId: number, modelNames: string[]): Promise<{ status: string; added: number }> {
+    return fetchJson(`${API_BASE}/settings/llm/providers/${providerId}/models/batch`, {
+        method: 'POST',
+        body: JSON.stringify({ model_names: modelNames }),
+    })
 }
 
 // ASR Models
@@ -420,7 +437,7 @@ export async function deleteCategory(id: number, deletePrompts: boolean = false)
 // ============ System API ============
 
 export async function getSystemConfig(key: string): Promise<string | null> {
-    const response = await fetchJson<{ proxy_url?: string; bilibili_sessdata?: string }>(`${API_BASE}/system/settings`)
+    const response = await fetchJson<{ proxy_url?: string; bilibili_sessdata?: string; youtube_cookies?: string }>(`${API_BASE}/system/settings`)
     return response[key as keyof typeof response] ?? null
 }
 
@@ -533,6 +550,19 @@ export async function checkSystemUpdate(): Promise<{ update_available: boolean; 
     return fetchJson(`${API_BASE}/system/check-update`)
 }
 
+// System Logs
+export async function getSystemLogs(params: {
+    file?: 'info' | 'error' | 'access',
+    lines?: number,
+    level?: string
+} = {}): Promise<{ entries: LogEntry[], file: string, total: number }> {
+    const searchParams = new URLSearchParams()
+    if (params.file) searchParams.set('file', params.file)
+    if (params.lines) searchParams.set('lines', String(params.lines))
+    if (params.level) searchParams.set('level', params.level)
+    return fetchJson(`${API_BASE}/system/logs?${searchParams}`)
+}
+
 // ============ Search API ============
 
 export interface SearchResult {
@@ -574,17 +604,47 @@ export async function updateASRConfig(config: { priority?: string[], strict_mode
     await fetchJson(`${API_BASE}/asr/config`, { method: 'POST', body: JSON.stringify(config) })
 }
 
+export async function updateASRWorkers(workers: Record<string, any>): Promise<ASRStatus> {
+    return fetchJson(`${API_BASE}/asr/workers`, { method: 'PUT', body: JSON.stringify({ workers }) })
+}
+
+export async function addASRWorkerUrl(url: string): Promise<ASRStatus> {
+    return fetchJson(`${API_BASE}/asr/workers`, { method: 'POST', body: JSON.stringify({ url }) })
+}
+
+export async function deleteASRWorker(workerId: string): Promise<ASRStatus> {
+    return fetchJson(`${API_BASE}/asr/workers/${encodeURIComponent(workerId)}`, { method: 'DELETE' })
+}
+
+// Bulk update ASR workers (array of {url})
+export async function bulkUpdateASRWorkers(workers: { url: string }[]): Promise<ASRStatus> {
+    // Assuming backend supports POST /asr/workers/bulk
+    return fetchJson(`${API_BASE}/asr/workers/bulk`, { method: 'POST', body: JSON.stringify({ workers }) })
+}
+
+// Proxy worker management helper
+export async function proxyWorkerManagement(workerKey: string, path: string, method: string = 'GET', body?: any): Promise<any> {
+    const url = `${API_BASE}/asr/workers/${encodeURIComponent(workerKey)}/management/${path}`
+    const options: RequestInit = { method }
+    if (body !== undefined) {
+        options.body = JSON.stringify(body)
+        options.headers = { 'Content-Type': 'application/json' }
+    }
+    return fetchJson(url, options)
+}
+
+
 export async function toggleASRStrict(strict: boolean): Promise<void> {
     await updateASRConfig({ strict_mode: strict })
 }
 
-export async function toggleASREngineEnabled(engine: string, enabled: boolean): Promise<void> {
+export async function toggleASREngineEnabled(key: string, enabled: boolean): Promise<void> {
     const status = await getASRStatus()
     let disabled = status.config.disabled_engines || []
     if (enabled) {
-        disabled = disabled.filter(e => e !== engine)
+        disabled = disabled.filter(e => e !== key)
     } else {
-        if (!disabled.includes(engine)) disabled.push(engine)
+        if (!disabled.includes(key)) disabled.push(key)
     }
     await updateASRConfig({ disabled_engines: disabled })
 }
@@ -628,5 +688,109 @@ export async function batchSetVideoTags(sourceIds: string[], tagIds: number[]): 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source_ids: sourceIds, tag_ids: tagIds })
+    })
+}
+
+// ============ Video Notes API ============
+
+import type { VideoNote, QAConversation, QAMessage } from './types'
+
+export async function generateNote(
+    sourceId: string,
+    options?: { prompt?: string; llmModelId?: number; style?: 'concise' | 'detailed' | 'outline'; screenshotDensity?: string; transcriptionVersion?: string }
+): Promise<{ status: string; task_id: number }> {
+    return fetchJson(`${API_BASE}/notes/generate`, {
+        method: 'POST',
+        body: JSON.stringify({
+            source_id: sourceId,
+            prompt: options?.prompt,
+            llm_model_id: options?.llmModelId,
+            style: options?.style,
+            screenshot_density: options?.screenshotDensity || null,
+            transcription_version: options?.transcriptionVersion || null,
+        }),
+    })
+}
+
+export async function getNotes(sourceId: string): Promise<VideoNote[]> {
+    return fetchJson(`${API_BASE}/notes?source_id=${encodeURIComponent(sourceId)}`)
+}
+
+export async function getActiveNote(sourceId: string): Promise<VideoNote | null> {
+    return fetchJson(`${API_BASE}/notes/active?source_id=${encodeURIComponent(sourceId)}`)
+}
+
+export async function updateNote(noteId: number, content: string): Promise<void> {
+    await fetchJson(`${API_BASE}/notes/${noteId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content }),
+    })
+}
+
+export async function resetNote(noteId: number): Promise<void> {
+    await fetchJson(`${API_BASE}/notes/${noteId}/reset`, { method: 'PATCH' })
+}
+
+export async function activateNote(noteId: number): Promise<void> {
+    await fetchJson(`${API_BASE}/notes/${noteId}/activate`, { method: 'PATCH' })
+}
+
+export async function deleteNote(noteId: number): Promise<void> {
+    await fetchJson(`${API_BASE}/notes/${noteId}`, { method: 'DELETE' })
+}
+
+export async function uploadNoteScreenshot(
+    sourceId: string,
+    blob: Blob
+): Promise<{ url: string; filename: string }> {
+    const form = new FormData()
+    form.append('file', blob, 'screenshot.jpg')
+    const response = await fetch(`${API_BASE}/note-screenshots/${encodeURIComponent(sourceId)}/upload`, {
+        method: 'POST',
+        body: form,
+    })
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Upload failed' }))
+        throw new Error(error.detail || `HTTP ${response.status}`)
+    }
+    return response.json()
+}
+
+// ============ QA (Video Q&A) API ============
+
+export async function createQAConversation(sourceId: string, title?: string): Promise<{ id: number }> {
+    return fetchJson(`${API_BASE}/qa/conversations`, {
+        method: 'POST',
+        body: JSON.stringify({ source_id: sourceId, title }),
+    })
+}
+
+export async function getQAConversations(sourceId: string): Promise<QAConversation[]> {
+    return fetchJson(`${API_BASE}/qa/conversations?source_id=${encodeURIComponent(sourceId)}`)
+}
+
+export async function updateQAConversation(conversationId: number, title: string): Promise<void> {
+    await fetchJson(`${API_BASE}/qa/conversations/${conversationId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title }),
+    })
+}
+
+export async function deleteQAConversation(conversationId: number): Promise<void> {
+    await fetchJson(`${API_BASE}/qa/conversations/${conversationId}`, { method: 'DELETE' })
+}
+
+export async function getQAMessages(conversationId: number): Promise<QAMessage[]> {
+    return fetchJson(`${API_BASE}/qa/conversations/${conversationId}/messages`)
+}
+
+export async function deleteQAMessage(messageId: number): Promise<void> {
+    await fetchJson(`${API_BASE}/qa/messages/${messageId}`, { method: 'DELETE' })
+}
+
+export async function askQuestion(conversationId: number, question: string, llmModelId?: number): Promise<{ task_id: number }> {
+    return fetchJson(`${API_BASE}/qa/ask`, {
+        method: 'POST',
+        body: JSON.stringify({ conversation_id: conversationId, question, llm_model_id: llmModelId }),
     })
 }

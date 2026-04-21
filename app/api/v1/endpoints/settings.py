@@ -4,12 +4,12 @@ Unified settings management: LLM providers, ASR models, Prompts
 RESTful API design under /api/settings/*
 """
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 
 from app.db import (
     # LLM
     get_all_providers, add_provider, update_provider, delete_provider,
-    add_model, update_model, delete_model, set_active_model,
+    add_model, update_model, delete_model, set_active_model, batch_add_models,
     # ASR
     get_asr_models, add_asr_model, update_asr_model, delete_asr_model, set_active_asr_model,
     # Prompts
@@ -17,6 +17,7 @@ from app.db import (
     get_all_categories, add_category, update_category, delete_category
 )
 from app.core.logger import logger
+from app.asr.client import asr_client
 from app.schemas import (
     LLMProviderCreate,
     LLMModelCreate,
@@ -39,14 +40,14 @@ async def get_llm_providers():
 @router.post("/llm/providers")
 async def create_llm_provider(provider: LLMProviderCreate):
     """Create a new LLM provider"""
-    new_id = add_provider(provider.name, provider.base_url, provider.api_key)
+    new_id = add_provider(provider.name, provider.base_url, provider.api_key, provider.api_type)
     return {"id": new_id, "status": "success"}
 
 
 @router.put("/llm/providers/{provider_id}")
 async def update_llm_provider(provider_id: int, provider: LLMProviderCreate):
     """Update an existing LLM provider"""
-    update_provider(provider_id, provider.name, provider.base_url, provider.api_key)
+    update_provider(provider_id, provider.name, provider.base_url, provider.api_key, provider.api_type)
     return {"status": "success"}
 
 
@@ -85,6 +86,61 @@ async def activate_llm_model(model_id: int):
     return {"status": "success"}
 
 
+@router.post("/llm/providers/{provider_id}/models/{model_id}/test")
+async def test_llm_model(provider_id: int, model_id: int):
+    """Test connectivity for a specific LLM model"""
+    from app.db import get_llm_model_full_by_id
+    from app.services.llm import test_llm_connection
+    
+    model_info = get_llm_model_full_by_id(model_id)
+    if not model_info:
+        raise HTTPException(status_code=404, detail="Model not found")
+    
+    result = await test_llm_connection(
+        api_key=model_info['api_key'],
+        base_url=model_info['base_url'],
+        model=model_info['model_name'],
+        api_type=model_info.get('api_type', 'chat_completions')
+    )
+    return result
+
+
+@router.get("/llm/providers/{provider_id}/available-models")
+async def fetch_provider_models(provider_id: int):
+    """Fetch available models from a provider's remote API (OpenAI-compatible /models endpoint)"""
+    from app.db import get_llm_model_full_by_id
+    from app.services.llm import fetch_available_models
+    
+    providers = get_all_providers(include_models=True)
+    provider = next((p for p in providers if p['id'] == provider_id), None)
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    
+    result = await fetch_available_models(
+        api_key=provider['api_key'],
+        base_url=provider['base_url']
+    )
+    
+    if result['success']:
+        # Mark which models are already added locally
+        existing_names = {m['model_name'] for m in provider.get('models', [])}
+        for model in result['models']:
+            model['already_added'] = model['id'] in existing_names
+    
+    return result
+
+
+@router.post("/llm/providers/{provider_id}/models/batch")
+async def batch_add_provider_models(provider_id: int, body: dict = Body(...)):
+    """Batch add multiple models to a provider, skipping duplicates"""
+    model_names = body.get('model_names', [])
+    if not model_names:
+        raise HTTPException(status_code=400, detail="model_names is required")
+    
+    added = batch_add_models(provider_id, model_names)
+    return {"status": "success", "added": len(added), "models": added}
+
+
 # ============ ASR Models ============
 
 @router.get("/asr/models")
@@ -102,6 +158,7 @@ async def create_asr_model(model: ASRModelCreate):
         raise HTTPException(status_code=400, detail=f"Invalid JSON config: {e}")
     
     new_id = add_asr_model(model.name, model.engine, model.config)
+    asr_client.refresh_cloud_engines()
     return {"id": new_id, "status": "success"}
 
 
@@ -121,6 +178,7 @@ async def update_asr_model_endpoint(model_id: int, model: ASRModelCreate):
 async def delete_asr_model_endpoint(model_id: int):
     """Delete an ASR model configuration"""
     delete_asr_model(model_id)
+    asr_client.refresh_cloud_engines()
     return {"status": "success"}
 
 

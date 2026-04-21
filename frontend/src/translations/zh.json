@@ -64,6 +64,11 @@
             "perPage": "{{count}} / 页",
             "empty": "暂无视频记录"
         },
+        "notesView": {
+            "placeholder": "选择视频查看 AI 笔记",
+            "placeholderDesc": "点击左侧视频列表中的条目，在此查看 AI 生成的笔记",
+            "segments": "条转录"
+        },
         "batch": {
             "select": "选择",
             "selectAll": "全选",
@@ -88,6 +93,8 @@
             "noSegments": "无转录",
             "hasAI": "有AI摘要",
             "noAI": "无AI摘要",
+            "hasNotes": "有笔记",
+            "noNotes": "无笔记",
             "hasCached": "已缓存",
             "noCached": "未缓存",
             "isSubtitle": "有字幕",
@@ -107,7 +114,8 @@
         },
         "view": {
             "grid": "卡片",
-            "list": "列表"
+            "list": "列表",
+            "notes": "笔记浏览"
         },
         "sourceBadge": {
             "bilibili": "Bilibili",
@@ -164,7 +172,31 @@
             "updateSuccess": "服务商更新成功",
             "updateFailed": "更新失败",
             "deleteSuccess": "服务商已删除",
-            "deleteFailed": "删除失败"
+            "deleteFailed": "删除失败",
+            "apiType": "API 协议",
+            "apiTypeChatCompletions": "Chat Completions (标准)",
+            "apiTypeResponses": "Responses (新版)",
+            "testConnection": "测试连接",
+            "testSuccess": "连接成功 ({{ms}}ms)",
+            "testFailed": "连接失败",
+            "fetchModels": "获取模型",
+            "fetchingModels": "正在获取...",
+            "fetchModelsSuccess": "成功添加 {{count}} 个模型",
+            "fetchModelsFailed": "获取模型失败",
+            "noModelsFound": "未发现可用模型",
+            "addSelected": "添加所选",
+            "alreadyAdded": "已添加",
+            "baseUrlHint": "大多数 OpenAI 兼容 API 需要以 /v1 结尾",
+            "endpointPreview": "请求地址预览",
+            "selectAll": "全选",
+            "deselectAll": "取消全选",
+            "searchModelsPlaceholder": "搜索模型...",
+            "discoverModels": "发现模型",
+            "selectedCount": "已选 {{selected}} / {{total}} 个",
+            "testAll": "全部测试",
+            "batchTestResult": "测试完成: {{passed}}/{{total}} 通过",
+            "selectProvider": "选择左侧服务商查看详情",
+            "noProviders": "暂无服务商，点击上方添加"
         },
         "asr": {
             "title": "ASR 模型配置",
@@ -175,7 +207,7 @@
             "enableTooltip": "点击启用",
             "disableTooltip": "点击禁用",
             "setPrimaryTooltip": "设为严格模式下的首选引擎",
-            "cloudModels": "Cloud Models (Bailian/DashScope)",
+            "cloudModels": "云端模型配置",
             "addConfig": "添加模型配置",
             "noCloudModels": "暂无云端模型配置",
             "unknownModel": "未知模型",
@@ -185,10 +217,17 @@
             "addConfigTitle": "添加模型配置",
             "configName": "配置名称",
             "configNamePlaceholder": "例如: My Bailian Key",
+            "openaiConfigNamePlaceholder": "例如: Groq Whisper / 硅基流动",
             "engineType": "引擎类型",
+            "badge": "标签",
+            "badgePlaceholder": "例如: Groq、硅基流动",
+            "badgeHint": "在引擎优先级列表中显示的自定义标签，留空则使用配置名称。",
             "dashscopeKey": "DashScope API Key",
             "leaveBlank": "留空则不修改",
             "model": "ASR 模型",
+            "openaiBaseUrl": "API 地址 (Base URL)",
+            "openaiBaseUrlHint": "OpenAI 兼容接口地址，如 https://api.groq.com/openai/v1、https://api.siliconflow.cn/v1",
+            "openaiModelHint": "模型 ID 因服务商而异，如 whisper-large-v3、whisper-1",
             "customModel": "✨ 自定义模型 ID (Custom)...",
             "customModelPlaceholder": "请输入模型 ID (如: qwen-audio-turbo)",
             "customModelHint": "请确保输入的模型 ID 在 DashScope/百炼平台上有效。",
@@ -215,7 +254,38 @@
             "confirmDelete": "确定要删除此配置吗?",
             "configUpdated": "ASR 配置已更新",
             "configUpdateFailed": "配置更新失败",
-            "statusRefreshed": "状态已刷新"
+            "statusRefreshed": "状态已刷新",
+            "workerEndpoints": "本地 Worker 端点",
+            "workerEndpointsHint": "本地运行的 ASR Worker 进程地址。修改后立即生效，无需重启。",
+            "addWorker": "添加 Worker",
+            "editWorker": "编辑 Worker URL",
+            "deleteWorker": "移除",
+            "confirmDeleteWorker": "确定移除 Worker \"{{worker}}\" ?",
+            "workerEngine": "引擎名称",
+            "workerEnginePlaceholder": "如 sensevoice、whisper、qwen3asr",
+            "workerUrl": "Worker 地址 (URL)",
+            "workerUrlPlaceholder": "http://localhost:8001",
+            "workerUrlHint": "Server 访问该 Worker 的 HTTP 地址。本机运行填 localhost，远程 GPU 服务器填对应 IP 或主机名。",
+            "workerSaved": "Worker 地址已添加",
+            "workerSaveFailed": "添加 Worker 失败",
+            "workerRemoved": "Worker 已移除",
+            "workerRemoveFailed": "移除失败",
+            "noWorkers": "暂无本地 Worker 配置",
+            "enginePresets": "SenseVoice (8001)",
+            "enginePresetsList": [
+                "sensevoice",
+                "whisper",
+                "qwen3asr"
+            ],
+            "registered": "已注册",
+            "manual": "手动添加",
+            "pathMode": "路径模式",
+            "uploadMode": "上传模式",
+            "idle": "空闲",
+            "manage": "管理",
+            "workerUrlLabel": "Worker URL",
+            "addWorkerUrl": "添加 Worker URL",
+            "addWorkerUrlPlaceholder": "http://localhost:8001"
         },
         "prompt": {
             "title": "提示词管理",
@@ -265,9 +335,12 @@
             "biliCookieHint": "用于获取B站AI生成字幕以及会员/高清画质（1080P+）。从浏览器 Cookie 中复制 SESSDATA 值。留空则仅获取UP主上传的CC字幕。",
             "biliCookieSaved": "B站 Cookie 已保存",
             "biliCookieSaveFailed": "保存失败",
-            "featureToggleTitle": "功能开关",
-            "showUvr5": "显示 UVR5 人声分离选项",
-            "showUvr5Hint": "UVR5消耗较多资源，启用后会在添加视频、重新转写等界面中显示该选项"
+            "ytCookieTitle": "YouTube Cookie",
+            "ytCookiePlaceholder": "粘贴 Netscape 格式的 cookies.txt 内容...",
+            "ytCookieHint": "用于访问年龄限制、地区限制或会员视频。使用浏览器插件（如 Get cookies.txt LOCALLY）导出 youtube.com 的 Cookie，粘贴完整内容到此处。留空则不使用 Cookie。",
+            "ytCookieSaved": "YouTube Cookie 已保存",
+            "ytCookieSaveFailed": "保存失败",
+            "featureToggleTitle": "功能开关"
         },
         "about": {
             "title": "关于",
@@ -324,7 +397,6 @@
             "srt": "标准字幕 (SRT)",
             "srt_char": "逐字字幕 (Character)"
         },
-        "enableUVR": "启用人声分离 (UVR)",
         "startTranscribe": "开始转录",
         "cacheOnly": "仅缓存",
         "cacheOnlyTooltip": "仅下载媒体文件，不进行转录",
@@ -338,7 +410,7 @@
         "startCache": "开始缓存",
         "addToLibrary": "添加到库",
         "advancedOptions": "高级转录选项",
-        "douyinHint": "请注意：由于获取机制变动，网页端已暂时屏蔽对抖音的直接转录与缓存。请使用首页提供的油猴插件在抖音网页版中进行操作。",
+        "douyinHint": "抖音视频支持直接粘贴链接进行转录，也可通过油猴插件操作。",
         "subtitlePriorityHint": "B站、YouTube 优先尝试获取现有字幕，而非下载转录。",
         "forceASRHint": "提示：可在高级转录选项中选择只获取字幕或强制转录",
         "clipboardAutoFilled": "已从剪切板自动填入",
@@ -395,6 +467,7 @@
         "select": "选择",
         "selected": "已选择",
         "summary": "总结",
+        "aiNotes": "AI笔记",
         "subtitle": "字幕",
         "moreActions": "更多操作",
         "retranscribe": "重新转录",
@@ -412,7 +485,6 @@
         "supportHint": "支持音频/视频文件，拖拽或点击选择",
         "dropHint": "点击或拖拽文件到这里",
         "languageLabel": "语言",
-        "enableUVR": "🔮 UVR5 人声分离",
         "promptLabel": "Initial Prompt (可选, Whisper)",
         "promptPlaceholder": "例如: 这是一个技术会议...",
         "generateSubtitle": "📝 生成字幕",
@@ -475,7 +547,9 @@
             "overview": "概览",
             "entries": "缓存文件",
             "batch": "批量缓存",
-            "cleanup": "清理中心"
+            "cleanup": "清理中心",
+            "logs": "日志",
+            "workers": "Workers"
         },
         "overview": {
             "totalSize": "总缓存大小",
@@ -615,6 +689,24 @@
             "confirmMessage": "确定要删除选中的 {{count}} 张封面图片吗？",
             "cleanDone": "清理完成: 删除 {{count}} 个文件, 释放 {{mb}} MB",
             "cleanFailed": "清理失败"
+        },
+        "logs": {
+            "fileInfo": "信息日志",
+            "fileError": "错误日志",
+            "fileAccess": "访问日志",
+            "allLevels": "所有级别",
+            "lines": "行",
+            "entries": "条记录",
+            "empty": "暂无日志记录",
+            "live": "实时",
+            "paused": "已暂停",
+            "pauseRefresh": "暂停自动刷新",
+            "resumeRefresh": "恢复自动刷新",
+            "clearHighlight": "清除高亮",
+            "refreshingEvery": "每 {{seconds}} 秒自动刷新",
+            "refreshPaused": "自动刷新已暂停",
+            "autoScrollOn": "自动滚动: 开",
+            "autoScrollOff": "自动滚动: 关 (手动滚动中)"
         }
     },
     "detailPanel": {
@@ -668,7 +760,7 @@
             "fileNotFound": "文件不存在"
         },
         "policy": {
-            "label": "缓存策略:",
+            "label": "缓存策略",
             "notCached": "未缓存",
             "keepForever": "永久保留",
             "custom": "保留至 {{date}}",
@@ -699,7 +791,7 @@
             }
         },
         "notes": {
-            "title": "📝 笔记",
+            "title": "AI笔记",
             "edit": "编辑",
             "cancel": "取消",
             "save": "保存",
@@ -710,13 +802,19 @@
         },
         "transcription": {
             "title": "转写内容",
-            "listMode": "列表模式",
+            "listMode": "转录总结",
             "immersiveMode": "沉浸模式",
+            "noteMode": "AI 笔记",
             "empty": "暂无转写片段"
+        },
+        "refPanel": {
+            "title": "转录参照"
         },
         "layout": {
             "split": "分屏模式",
-            "scroll": "滚动模式"
+            "scroll": "滚动模式",
+            "expandLeft": "展开播放器面板",
+            "expandRight": "展开转写面板"
         },
         "confirm": {
             "deleteCacheTitle": "删除缓存文件",
@@ -730,6 +828,87 @@
             "noUrl": "无法追加缓存：缺少原始URL",
             "success": "已添加到后台下载队列",
             "failed": "添加失败"
+        },
+        "aiNotes": {
+            "generate": "生成 AI 笔记",
+            "generating": "生成中...",
+            "regenerate": "重新生成",
+            "edit": "编辑",
+            "save": "保存",
+            "cancel": "取消",
+            "resetToOriginal": "重置为 AI 原版",
+            "resetConfirm": "将笔记重置为 AI 生成的原始内容？您的编辑将会丢失。",
+            "emptyTitle": "暂无 AI 笔记",
+            "emptyDesc": "使用 AI 从视频转写中生成结构化笔记。",
+            "style": "笔记风格",
+            "styleConcise": "简洁 (关键要点)",
+            "styleDetailed": "详细 (完整内容)",
+            "styleOutline": "大纲 (仅标题)",
+            "version": "版本",
+            "versionLabel": "历史版本",
+            "deleteVersion": "删除本版本",
+            "deleteConfirm": "确定删除本版笔记？",
+            "editedBadge": "已编辑",
+            "generatedSuccess": "AI 笔记生成任务已启动",
+            "generateFailed": "笔记生成启动失败",
+            "saveFailed": "笔记保存失败",
+            "deleteFailed": "笔记删除失败",
+            "exportMd": "导出 Markdown",
+            "model": "模型",
+            "defaultModel": "（默认模型）",
+            "startGenerate": "开始生成",
+            "cancelGenerate": "取消生成",
+            "genStageProcessing": "正在处理...",
+            "toc": "目录",
+            "screenshots": "关键帧截图",
+            "screenshotsDesc": "在关键时刻自动截取画面",
+            "densityOff": "关闭",
+            "densityFew": "少量",
+            "densityModerate": "适中",
+            "densityDense": "密集",
+            "exportFailed": "导出失败",
+            "transVersion": "转录版本",
+            "transVersionAuto": "自动 (默认)",
+            "transSource": "转录来源",
+            "transSourcePinned": "置顶",
+            "transSourceAllConcat": "全部拼接 ({{count}}个片段)",
+            "transSourceSegments": "所有片段",
+            "noTranscription": "暂无转录内容",
+            "noTranscriptionDesc": "需要先转录视频才能生成 AI 笔记",
+            "autoTranscribe": "自动转录",
+            "autoTranscribeHint": "优先获取字幕，无字幕则使用常规 ASR 转录",
+            "onlyGetSubtitles": "仅获取字幕",
+            "onlyGetSubtitlesHint": "仅从平台获取已有字幕",
+            "transcribeUnsupported": "当前视频源不支持从此处发起转录",
+            "transcribeStarted": "转录任务已启动",
+            "customPrompt": "附加指令",
+            "customPromptPlaceholder": "可选：临时补充要求，如所有小节都需要时间跳转、重点分析价格对比等",
+            "captureScreenshot": "截图当前画面",
+            "captureUploading": "截图上传中...",
+            "captureSuccess": "截图已插入笔记",
+            "captureFailed": "截图失败",
+            "captureVideoOnly": "截图仅支持视频模式",
+            "mindmap": "思维导图",
+            "mindmapFit": "适应视图",
+            "mindmapExport": "导出 SVG",
+            "mindmapAiOptimize": "AI 优化导图",
+            "mindmapAiComingSoon": "AI 优化导图（即将推出）",
+            "mindmapEmpty": "笔记中暂无标题层级，无法生成思维导图",
+            "mindmapTsHint": "点击时间戳跳转",
+            "mindmapDepthHint": "显示到第 {{level}} 级"
+        },
+        "qa": {
+            "tab": "问答",
+            "title": "AI 问答",
+            "newConversation": "新对话",
+            "conversations": "会话列表",
+            "emptyHint": "针对视频内容提出你的问题",
+            "inputPlaceholder": "输入问题...",
+            "selectModel": "选择模型",
+            "copyMessage": "复制",
+            "copied": "已复制",
+            "deleteMessage": "删除",
+            "deleteMessageConfirm": "确定要删除这条消息吗？"
         }
     },
     "aiSummaryModal": {
@@ -738,6 +917,7 @@
         "desc": "选择提示词模板或输入自定义指令进行分析",
         "descRefine": "基于已有总结内容进行追问，生成的结果将作为子版本",
         "analysisSent": "分析请求已发送",
+        "analysisStarted": "AI 分析已开始",
         "analysisFailed": "分析失败: ",
         "all": "全部",
         "uncategorized": "未分类",
@@ -770,6 +950,364 @@
         "deleteCategory": "删除分类",
         "deleteCategoryConfirm": "确定要删除分类 \"{{name}}\" 吗？",
         "deleteCategoryAndClean": "删除分类并清理",
-        "selectWarning": "请选择要覆盖的版本"
+        "selectWarning": "请选择要覆盖的版本",
+        "streamGenerating": "正在使用 {{model}} 生成...",
+        "streamComplete": "生成完成 · {{model}} · {{duration}}s",
+        "streamError": "生成失败",
+        "streamDone": "完成",
+        "streamCancel": "取消生成",
+        "streamCancelAnalysis": "取消分析",
+        "streamContinueBackground": "AI 分析将在后台继续，可在任务中心查看进度"
+    },
+    "workerManager": {
+        "title": "DiTing Worker Manager",
+        "subtitle": "用于本地 ASR 引擎的混合式安装与管理界面",
+        "language": {
+            "zh": "中文",
+            "en": "EN"
+        },
+        "common": {
+            "yes": "是",
+            "no": "否",
+            "na": "n/a",
+            "notSet": "未设置"
+        },
+        "actions": {
+            "refresh": "刷新",
+            "start": "启动",
+            "starting": "启动中…",
+            "stop": "停止",
+            "stopping": "停止中…",
+            "check": "检查",
+            "checking": "检查中…",
+            "unloadModel": "卸载模型",
+            "unloading": "卸载中…",
+            "uninstall": "卸载引擎",
+            "confirmUninstall": "确认卸载？",
+            "uninstalling": "卸载中…",
+            "addEngine": "新增引擎",
+            "addAnotherEngine": "继续新增引擎",
+            "openDashboard": "打开管理面板",
+            "next": "下一步",
+            "back": "上一步",
+            "cancel": "取消"
+        },
+        "theme": {
+            "toggle": "切换主题（当前：{{theme}}）",
+            "options": {
+                "auto": "跟随系统",
+                "light": "浅色",
+                "dark": "深色"
+            }
+        },
+        "hardware": {
+            "title": "硬件信息",
+            "summaryDescription": "当前设备检测结果会影响推荐的引擎、设备和初始模型默认值。",
+            "detecting": "检测中…",
+            "cpu": "CPU",
+            "ram": "内存",
+            "cuda": "CUDA",
+            "mps": "MPS",
+            "recommended": "推荐设备",
+            "computeKey": "计算类型",
+            "cores": "核",
+            "cpuOnly": "仅 CPU",
+            "appleSilicon": "Apple Silicon"
+        },
+        "engine": {
+            "installStatus": "安装状态",
+            "installedState": "已安装",
+            "notInstalledState": "未安装",
+            "installDir": "安装目录",
+            "noStatus": "暂无状态。"
+        },
+        "catalog": {
+            "engines": {
+                "whisper-openai": {
+                    "description": "OpenAI Whisper 本地 worker，提供灵活的模型选择。"
+                },
+                "sensevoice": {
+                    "description": "FunASR SenseVoice，内置 VAD，并提供快速的多语言语音识别。"
+                },
+                "qwen3asr": {
+                    "description": "Qwen3-ASR 语音识别，支持强制对齐器，可生成高质量时间戳。"
+                }
+            },
+            "models": {
+                "whisper_tiny": {
+                    "label": "Tiny",
+                    "description": "Whisper 中体量最小、速度最快的选项，适合轻量级或以 CPU 为主的环境。"
+                },
+                "whisper_small": {
+                    "label": "Small",
+                    "description": "更适合轻量硬件的 Whisper 平衡模型，可提供更快的本地转录速度。"
+                },
+                "whisper_medium": {
+                    "label": "Medium",
+                    "description": "中等体量的 Whisper 模型，在准确度与速度之间提供更稳健的平衡。"
+                },
+                "whisper_large_v3": {
+                    "label": "Large V3",
+                    "description": "标准版 Whisper Large V3，适合更看重最高准确度而非 turbo 变体的场景。"
+                },
+                "whisper_large_v3_turbo": {
+                    "label": "Large V3 Turbo",
+                    "description": "推荐的 Whisper Large V3 Turbo，在保持较强准确度的同时提供更快的本地推理速度。"
+                },
+                "sensevoice_small": {
+                    "label": "SenseVoice Small",
+                    "description": "紧凑的多语言 SenseVoice 模型，内置 VAD，并具备快速识别能力。"
+                },
+                "qwen3_asr": {
+                    "label": "Qwen3-ASR 1.7B",
+                    "description": "Qwen3-ASR 1.7B 模型，搭配强制对齐器，适合需要精确时间戳的场景。"
+                },
+                "__none__": {
+                    "label": "跳过下载（稍后手动放置）"
+                }
+            }
+        },
+        "tags": {
+            "recommended": "推荐",
+            "multilingual": "多语言",
+            "fast": "快速",
+            "balanced": "均衡",
+            "accurate": "高准确度",
+            "lightweight": "轻量"
+        },
+        "dashboard": {
+            "title": "管理面板",
+            "description": "查看和管理已安装的语音识别引擎。",
+            "installedEngines": "已安装引擎",
+            "listDescription": "已安装 {{count}} 个引擎。",
+            "selected": "当前查看",
+            "overviewTitle": "概览",
+            "summaryTitle": "引擎摘要",
+            "summaryDescription": "当前引擎的运行状态一览。",
+            "engineDescription": "查看引擎状态、管理模型与设置。",
+            "sidebarHint": "点击切换不同引擎。",
+            "commandCenterTitle": "命令栏",
+            "commandCenterDescription": "引擎的配置与状态信息。",
+            "recentActivityTitle": "最近活动",
+            "installRuntimeTitle": "安装与运行信息",
+            "installRuntimeDescription": "引擎的安装位置、运行设备和服务配置。",
+            "engineId": "引擎 ID",
+            "workerStatusTitle": "Worker 状态",
+            "workerStatusDescription": "Worker 当前的运行状态。",
+            "workerUrl": "Worker URL",
+            "loadedModel": "已加载模型",
+            "loadedDevice": "实际运行设备",
+            "installedModelsLabel": "已安装模型",
+            "configuredPortLabel": "配置端口",
+            "quickFactsTitle": "快速信息",
+            "lastStartedLabel": "上次启动",
+            "neverStarted": "从未启动",
+            "tabs": {
+                "overview": "概览",
+                "models": "模型",
+                "network": "网络",
+                "advanced": "高级"
+            },
+            "advancedTitle": "高级信息",
+            "advancedDescription": "查看引擎详细信息或执行卸载操作。",
+            "networkSettingsTitle": "网络设置",
+            "networkSettingsDescription": "配置 Worker 的端口和网络地址。",
+            "networkSaving": "保存中…",
+            "networkSaved": "网络设置已保存。",
+            "networkSaveFailed": "保存网络设置失败：{{error}}",
+            "modelManagementDescription": "查看和管理可用的语音识别模型。",
+            "inventoryHint": "以紧凑列表形式管理所有模型。",
+            "inventoryReady": "当前运行中的托管 worker 已可执行模型操作。",
+            "inventoryColumns": {
+                "model": "模型",
+                "footprint": "体量",
+                "status": "状态",
+                "actions": "操作"
+            },
+            "modelMeta": {
+                "size": "大小",
+                "vram": "显存"
+            },
+            "modelState": {
+                "compatibility": "兼容性",
+                "mps": "MPS",
+                "dependencies": "依赖"
+            },
+            "dangerZoneTitle": "危险操作",
+            "uninstallHint": "卸载会移除当前引擎的本地安装目录与管理记录。",
+            "badges": {
+                "running": "运行中",
+                "healthy": "健康",
+                "loaded": "已加载",
+                "management": "可管理"
+            },
+            "emptySelection": "请选择一个已安装的引擎。"
+        },
+        "wizard": {
+            "title": "新增引擎向导",
+            "steps": {
+                "hardware": "硬件",
+                "engine": "引擎",
+                "install": "安装",
+                "complete": "完成"
+            },
+            "stepStates": {
+                "current": "当前步骤",
+                "done": "已完成",
+                "upcoming": "待进行"
+            },
+            "stepRailTitle": "安装流程",
+            "summaryTitle": "上下文摘要",
+            "summaryDescription": "安装过程中的配置信息一览。",
+            "summary": {
+                "currentEngine": "引擎",
+                "model": "初始模型",
+                "device": "设备",
+                "port": "端口",
+                "workerUrl": "Worker URL",
+                "serverUrl": "Server URL",
+                "target": "目标目录",
+                "installedEngines": "已装引擎数",
+                "stage": "阶段监控",
+                "logCount": "最近 {{count}} 条更新"
+            },
+            "hardwareDescription": "先确认已检测到的硬件信息，随后可按推荐设备继续，也可以在下一步自行调整。",
+            "hardwareSummaryTitle": "硬件摘要",
+            "hardwareSummaryDescription": "已检测到的 CPU、内存和 GPU 信息。",
+            "hardwareLead": "请确认硬件信息，下一步将根据检测结果推荐合适的引擎和设备。",
+            "hardwareRecommendationTitle": "建议起点",
+            "hardwareRecommendationDescription": "基于硬件检测推荐的配置。如需自定义，可在下一步调整。",
+            "engineDescription": "选择要安装的引擎、设备、安装目录和初始模型。",
+            "engineFitTitle": "引擎与硬件匹配",
+            "engineFitDescription": "选择引擎后，系统将推荐匹配的设备和模型。",
+            "enginePrimaryTitle": "1. 选择引擎",
+            "enginePrimaryDescription": "选择要安装的引擎，并设置首次启动的模型和设备。",
+            "engineSecondaryTitle": "2. 配置运行与下载",
+            "engineSecondaryDescription": "配置端口、网络地址、安装目录和下载选项。",
+            "runtimeConfigTitle": "运行时配置",
+            "runtimeConfigDescription": "配置 worker 对外端口与回连主服务的 Server URL。",
+            "downloadInstallTitle": "下载与安装",
+            "downloadInstallDescription": "设置安装目录、镜像与代理，决定依赖和模型从哪里下载。",
+            "installDescription": "正在安装 {{engine}}。Python 依赖与模型下载可能需要一些时间。",
+            "installLead": "安装进度和最近日志显示在下方。",
+            "installRecentLogsTitle": "最近安装日志",
+            "completeTitle": "引擎安装完成",
+            "completeDescription": "{{engine}} 已可使用。你可以返回管理面板，或继续新增下一个引擎。",
+            "completeNextTitle": "下一步",
+            "completeNextDescription": "返回管理面板查看引擎，或继续安装下一个。",
+            "completePrimaryAction": "打开管理面板",
+            "completeSecondaryAction": "继续安装下一个引擎",
+            "selected": "已选择",
+            "noAvailableEngines": "当前支持的本地引擎均已安装。"
+        },
+        "status": {
+            "details": "URL：{{url}} | model={{model}} | device={{device}}"
+        },
+        "install": {
+            "locationTitle": "安装根目录",
+            "browse": "选择目录…",
+            "browseDialogTitle": "选择运行时根目录",
+            "locationHint": "这里表示整个 Worker runtime 的根目录。若手动指定，uv、引擎、模型下载与 manager_state.json 都会放在这个目录下；应用安装位置与运行时目录彼此独立。",
+            "protectedLocationWarning": "该目录位于 Windows 常见受保护位置下。安装时可能需要管理员权限；如果当前应用无法在此创建文件，写入可能会失败。",
+            "protectedLocationExamples": "常见受保护目录包括 Program Files 和 Windows 目录。",
+            "defaultBase": "默认运行时根目录：{{path}}",
+            "appInstallDir": "应用安装位置：{{path}}",
+            "currentTarget": "当前运行时根目录",
+            "runtimeRoot": "运行时根目录",
+            "engineInstallDir": "引擎目录",
+            "uvPath": "uv 路径",
+            "managerStatePath": "管理状态文件",
+            "latestStage": "当前阶段",
+            "phaseLabel": "阶段",
+            "progressLabel": "进度",
+            "targetLabel": "目标目录",
+            "logTitle": "安装日志",
+            "logHint": "原始日志保留在次级详情区，便于排查失败原因。",
+            "logEntries": "条日志",
+            "port": "端口",
+            "initialModel": "初始模型",
+            "device": "设备",
+            "serverUrl": "Server URL",
+            "serverUrlPlaceholder": "http://127.0.0.1:5023",
+            "workerUrl": "Worker URL",
+            "workerUrlPlaceholder": "http://localhost:8001",
+            "workerUrlHint": "Server 访问该 Worker 的 HTTP 地址。本机运行填 localhost，远程 GPU 服务器填对应 IP 或主机名。",
+            "effectiveWorkerUrl": "实际 Worker URL",
+            "useMirror": "使用国内镜像",
+            "mirrorDetailsTitle": "镜像明细",
+            "mirrorDetailsHint": "勾选后会在安装与模型下载阶段使用以下镜像地址。",
+            "mirrorPython": "Python / uv 镜像",
+            "mirrorPyPI": "PyPI 镜像",
+            "mirrorHuggingFace": "Hugging Face 镜像",
+            "mirrorPyTorch": "PyTorch wheel 索引",
+            "mirrorPyTorchDefault": "默认官方源",
+            "useProxy": "使用代理（可选）",
+            "proxy": "代理地址",
+            "proxyPlaceholder": "http://127.0.0.1:7890",
+            "sharedPaths": "共享路径映射",
+            "sharedPathsHint": "当 Worker 与 Server 不在同一台机器上时，可以配置共享路径映射以使用 path 模式传输音频文件，而不是通过网络上传。每条映射将 Server 上的路径对应到 Worker 上的等效路径。",
+            "sharedPathServer": "Server 路径",
+            "sharedPathWorker": "Worker 路径",
+            "sharedPathAdd": "添加路径映射",
+            "sharedPathRemove": "删除",
+            "sharedPathServerPlaceholder": "/app/data/media_cache",
+            "sharedPathWorkerPlaceholder": "D:\\shared\\media_cache",
+            "install": "安装",
+            "installing": "安装中…",
+            "preparing": "正在准备安装…",
+            "failed": "安装失败",
+            "complete": "安装完成",
+            "step": "步骤 {{current}} / {{total}}",
+            "targetDirectory": "目标目录：{{path}}",
+            "steps": {
+                "uv": "准备 uv",
+                "python": "安装 Python",
+                "venv": "创建虚拟环境",
+                "deps": "安装依赖",
+                "model": "下载模型",
+                "worker": "复制 worker 文件",
+                "config": "写入配置",
+                "state": "保存管理状态",
+                "failed": "安装失败"
+            }
+        },
+        "modelManagement": {
+            "title": "模型管理",
+            "summary": "已安装 {{installed}} / {{total}} 个模型",
+            "refresh": "刷新模型",
+            "refreshing": "刷新中…",
+            "collapse": "折叠",
+            "expand": "展开",
+            "startWorkerHint": "请先启动 worker，再管理模型。",
+            "noManagementHint": "当前 worker 还未报告管理 API 支持。",
+            "operation": "操作：{{type}}（{{status}}）",
+            "idMeta": "id={{id}}",
+            "sizeMeta": "大小≈{{size}}MB",
+            "accuracy": "准确度",
+            "accuracyAriaLabel": "准确度 {{value}} 星（满分 5 星）",
+            "speed": "速度",
+            "speedAriaLabel": "速度 {{value}} 级（满分 5 级）",
+            "installed": "已安装",
+            "active": "当前激活",
+            "notCompatible": "不兼容",
+            "download": "下载",
+            "downloading": "下载中…",
+            "activate": "激活",
+            "activating": "激活中…",
+            "delete": "删除",
+            "deleting": "删除中…",
+            "empty": "暂无可用模型。",
+            "messages": {
+                "pollingFailed": "轮询操作状态失败：{{error}}",
+                "downloading": "正在下载 {{modelId}}...",
+                "downloadFailed": "下载失败：{{error}}",
+                "activating": "正在激活 {{modelId}}...",
+                "activateFailed": "激活失败：{{error}}",
+                "deleted": "已删除 {{modelId}}。",
+                "deleteFailed": "删除失败：{{error}}",
+                "unloaded": "模型已卸载。",
+                "unloadFailed": "卸载失败：{{error}}"
+            }
+        }
     }
 }

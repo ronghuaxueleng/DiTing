@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { retranscribe } from '../api'
+import { retranscribe, getPrompts } from '../api'
 import { useEscapeKey } from '../hooks/useEscapeKey'
+import { useTranscriptionPrefs } from '../hooks/useTranscriptionPrefs'
 import Icons from './ui/Icons'
-import type { Video } from '../api/types'
+import type { Video, Prompt } from '../api/types'
 
 interface RetranscribeModalProps {
     video: Video
@@ -15,13 +16,24 @@ interface RetranscribeModalProps {
 export default function RetranscribeModal({ video, onClose, onSuccess }: RetranscribeModalProps) {
     useEscapeKey(onClose)
     const { t } = useTranslation()
-    const [language, setLanguage] = useState('zh')
-    const [useUvr, setUseUvr] = useState(false)
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [prompt, setPrompt] = useState('')
-    const [outputFormat, setOutputFormat] = useState('text')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const [prompts, setPrompts] = useState<Prompt[]>([])
+    const { language, setLanguage, subtitleMode, setSubtitleMode, outputFormat, setOutputFormat, autoAnalyze, setAutoAnalyze, selectedPromptId, setSelectedPromptId, stripSubtitle, setStripSubtitle, saveAll } = useTranscriptionPrefs()
+
+    // Load prompts
+    useEffect(() => {
+        getPrompts().then(data => {
+            setPrompts(data)
+            if (data && data.length > 0 && data[0]?.id) {
+                if (selectedPromptId === '') {
+                    setSelectedPromptId(data[0].id)
+                }
+            }
+        }).catch(err => console.error("Failed to load prompts:", err))
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSubmit = async () => {
         setLoading(true)
@@ -30,10 +42,15 @@ export default function RetranscribeModal({ video, onClose, onSuccess }: Retrans
             await retranscribe({
                 source_id: video.source_id,
                 language,
-                use_uvr: useUvr,
                 prompt: prompt.trim() || undefined,
                 output_format: outputFormat,
+                only_get_subtitles: subtitleMode === 'only_sub',
+                force_transcription: subtitleMode === 'force_asr',
+                auto_analyze_prompt: autoAnalyze && selectedPromptId ? prompts.find(p => p.id === selectedPromptId)?.content : undefined,
+                auto_analyze_prompt_id: autoAnalyze && typeof selectedPromptId === 'number' ? selectedPromptId : undefined,
+                auto_analyze_strip_subtitle: autoAnalyze ? stripSubtitle : undefined,
             })
+            saveAll()
             onSuccess()
         } catch (e) {
             setError((e as Error).message)
@@ -117,49 +134,109 @@ export default function RetranscribeModal({ video, onClose, onSuccess }: Retrans
 
                         {showAdvanced && (
                             <div className="p-4 space-y-4 bg-[var(--color-bg)]/30 border-t border-[var(--color-border)]">
-                                {/* UVR */}
-                                {localStorage.getItem('diting_show_uvr5') === 'true' && (
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={useUvr}
-                                            onChange={(e) => setUseUvr(e.target.checked)}
-                                            className="w-4 h-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                                        />
-                                        <span className="text-sm">{t('addVideo.enableUVR')}</span>
-                                    </label>
-                                )}
-
-                                {/* Output Format */}
+                                {/* Subtitle Mode */}
                                 <div className="space-y-1">
-                                    <label className="text-xs text-[var(--color-text-muted)] flex justify-between">
-                                        <span>{t('addVideo.formatLabel')}</span>
-                                    </label>
+                                    <label className="text-xs text-[var(--color-text-muted)]">{t('addVideo.subtitleModeLabel')}</label>
                                     <div className="relative">
                                         <select
-                                            value={outputFormat}
-                                            onChange={(e) => setOutputFormat(e.target.value)}
-                                            className="w-full pl-3 pr-8 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm appearance-none focus:ring-1 focus:ring-[var(--color-primary)] focus:outline-none"
+                                            value={subtitleMode}
+                                            onChange={(e) => setSubtitleMode(e.target.value as any)}
+                                            className="w-full pl-3 pr-8 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm appearance-none focus:ring-1 focus:ring-[var(--color-primary)]"
                                         >
-                                            <option value="text">{t('addVideo.format.text')}</option>
-                                            <option value="srt">{t('addVideo.format.srt')}</option>
-                                            <option value="srt_char">{t('addVideo.format.srt_char')}</option>
+                                            <option value="auto">{t('addVideo.subtitleMode.auto')}</option>
+                                            <option value="only_sub">{t('addVideo.subtitleMode.only_sub')}</option>
+                                            <option value="force_asr">{t('addVideo.subtitleMode.force_asr')}</option>
                                         </select>
                                         <Icons.ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)] pointer-events-none" />
                                     </div>
+                                    <p className="text-[10px] text-[var(--color-text-muted)] leading-tight mt-1">
+                                        {subtitleMode === 'auto' && t('addVideo.subtitleModeHint.auto')}
+                                        {subtitleMode === 'only_sub' && t('addVideo.subtitleModeHint.only_sub')}
+                                        {subtitleMode === 'force_asr' && t('addVideo.subtitleModeHint.force_asr')}
+                                    </p>
                                 </div>
 
+                                {/* Output Format */}
+                                {subtitleMode !== 'only_sub' && (
+                                    <div className="space-y-1">
+                                        <label className="text-xs text-[var(--color-text-muted)] flex justify-between">
+                                            <span>{t('addVideo.formatLabel')}</span>
+                                        </label>
+                                        <div className="flex bg-[var(--color-bg)] p-1 rounded-lg border border-[var(--color-border)]">
+                                            {[
+                                                { id: 'text', label: t('addVideo.format.text') },
+                                                { id: 'srt', label: t('addVideo.format.srt') },
+                                                { id: 'srt_char', label: t('addVideo.format.srt_char') }
+                                            ].map((opt) => (
+                                                <button
+                                                    key={opt.id}
+                                                    onClick={() => setOutputFormat(opt.id)}
+                                                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${outputFormat === opt.id
+                                                        ? 'bg-[var(--color-primary)] text-white shadow-sm'
+                                                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                                                        }`}
+                                                >
+                                                    {opt.label.split(' ')[0]}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Prompt */}
-                                <div className="space-y-1">
-                                    <label className="text-xs text-[var(--color-text-muted)]">{t('retranscribeModal.promptLabel')}</label>
-                                    <textarea
-                                        value={prompt}
-                                        onChange={(e) => setPrompt(e.target.value)}
-                                        placeholder={t('retranscribeModal.promptPlaceholder')}
-                                        rows={2}
-                                        className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm resize-none focus:ring-1 focus:ring-[var(--color-primary)] focus:outline-none"
+                                {subtitleMode !== 'only_sub' && (
+                                    <div className="space-y-1">
+                                        <label className="text-xs text-[var(--color-text-muted)]">{t('retranscribeModal.promptLabel')}</label>
+                                        <textarea
+                                            value={prompt}
+                                            onChange={(e) => setPrompt(e.target.value)}
+                                            placeholder={t('retranscribeModal.promptPlaceholder')}
+                                            rows={2}
+                                            className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm resize-none focus:ring-1 focus:ring-[var(--color-primary)] focus:outline-none"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Auto Analyze */}
+                    <div className="space-y-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={autoAnalyze}
+                                onChange={(e) => setAutoAnalyze(e.target.checked)}
+                                className="w-4 h-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                            />
+                            <span className="text-sm font-medium">{t('addVideo.autoAnalyze')}</span>
+                        </label>
+
+                        {autoAnalyze && (
+                            <div className="space-y-2 pl-6">
+                                {/* Prompt dropdown */}
+                                <select
+                                    value={selectedPromptId}
+                                    onChange={(e) => setSelectedPromptId(e.target.value ? Number(e.target.value) : '')}
+                                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm focus:ring-1 focus:ring-[var(--color-primary)] focus:outline-none"
+                                >
+                                    <option value="">{t('addVideo.selectPrompt')}</option>
+                                    {prompts.map(p => (
+                                        <option key={p.id} value={p.id} title={p.content}>
+                                            {p.name}{p.use_count > 0 ? ` (${p.use_count})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                {/* Strip subtitle preprocessing */}
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={stripSubtitle}
+                                        onChange={(e) => setStripSubtitle(e.target.checked)}
+                                        className="w-4 h-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                                     />
-                                </div>
+                                    <span className="text-xs text-[var(--color-text-muted)]">{t('addVideo.stripSubtitle')}</span>
+                                </label>
                             </div>
                         )}
                     </div>

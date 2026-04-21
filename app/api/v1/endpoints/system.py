@@ -14,6 +14,9 @@ router = APIRouter(prefix="/system", tags=["System"])
 from app.api.v1.endpoints.system_cache import router as cache_router
 router.include_router(cache_router)
 
+from app.api.v1.endpoints.logs import router as logs_router
+router.include_router(logs_router)
+
 
 class LauncherConfig(BaseModel):
     asr_engine: str = "sensevoice"
@@ -27,7 +30,12 @@ async def get_system_settings():
     """Get system configurations"""
     proxy_url = get_system_config('proxy_url')
     bilibili_sessdata = get_system_config('bilibili_sessdata')
-    return {"proxy_url": proxy_url, "bilibili_sessdata": bilibili_sessdata}
+    youtube_cookies = get_system_config('youtube_cookies')
+    return {
+        "proxy_url": proxy_url, 
+        "bilibili_sessdata": bilibili_sessdata,
+        "youtube_cookies": youtube_cookies
+    }
 
 
 @router.post("/settings")
@@ -76,6 +84,29 @@ async def update_launcher_config(config: LauncherConfig):
         json.dump(current, f, indent=4)
         
     return {"status": "ok", "config": current}
+
+
+# --- FFmpeg Check ---
+
+@router.get("/ffmpeg-check")
+async def check_ffmpeg():
+    """Check if FFmpeg is available in PATH"""
+    import shutil
+    import subprocess
+
+    ffmpeg_path = shutil.which("ffmpeg")
+    if not ffmpeg_path:
+        return {"available": False, "version": None, "path": None}
+
+    try:
+        result = subprocess.run(
+            [ffmpeg_path, "-version"],
+            capture_output=True, text=True, timeout=5,
+        )
+        first_line = result.stdout.split("\n")[0] if result.stdout else ""
+        return {"available": True, "version": first_line, "path": ffmpeg_path}
+    except Exception:
+        return {"available": False, "version": None, "path": ffmpeg_path}
 
 
 # --- Version & Update ---
@@ -143,7 +174,7 @@ async def check_system_update():
             "update_available": update_available,
             "current_version": APP_VERSION,
             "latest_version": tag,
-            "release_notes": notes[:500],
+            "release_notes": notes[:2000],
             "download_url": html_url,
         }
 

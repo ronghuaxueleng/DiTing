@@ -116,17 +116,6 @@ export default function VideoCard({ video, onRefresh, onOpenPanel, selectionMode
 
     // Status overlay for processing/analyzing
     const renderStatusOverlay = () => {
-        if ((video.count === 0 || video.count === undefined) && !video.media_available) {
-            return (
-                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-10 transition-opacity opacity-0 group-hover:opacity-100 backdrop-blur-sm">
-                    <span className="px-4 py-2 bg-zinc-700/80 text-zinc-300 rounded-full font-medium text-sm flex items-center gap-2 border border-zinc-600">
-                        <Icons.FileText className="w-4 h-4" />
-                        {t('videoCard.noTranscription')}
-                    </span>
-                    <span className="text-zinc-400 text-xs mt-2">{t('videoCard.noTranscriptionDesc')}</span>
-                </div>
-            )
-        }
 
         if (video.latest_status === 'processing' || video.latest_status === 'pending') {
             return (
@@ -279,6 +268,16 @@ export default function VideoCard({ video, onRefresh, onOpenPanel, selectionMode
                         >
                             <Icons.Sparkles className="w-2.5 h-2.5" />
                             {video.ai_count > 1 && <span>{video.ai_count}</span>}
+                        </span>
+                    )}
+
+                    {(video.notes_count ?? 0) > 0 && (
+                        <span
+                            className="h-5 px-1.5 rounded flex items-center gap-0.5 bg-violet-500/15 text-violet-400 border border-violet-500/25"
+                            title={t('videoCard.aiNotes')}
+                        >
+                            <Icons.BookOpen className="w-2.5 h-2.5" />
+                            {(video.notes_count ?? 0) > 1 && <span>{video.notes_count}</span>}
                         </span>
                     )}
 

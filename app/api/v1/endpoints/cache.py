@@ -4,7 +4,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 import requests
 
-from app.db import save_transcription, upsert_video_meta, get_transcription_by_source
+import time
+from app.db import upsert_video_meta
 from app.utils.source_utils import normalize_source_id, infer_source_type
 from app.services.cache_task import process_cache_task
 from app.core.logger import logger
@@ -19,7 +20,7 @@ class BatchCacheRequest(BaseModel):
 async def batch_cache_videos(payload: BatchCacheRequest, background_tasks: BackgroundTasks):
     """
     Batch cache multiple videos from URLs.
-    Creates transcription records with 'pending' status and queues background download tasks.
+    Uses ephemeral IDs for in-memory progress tracking and queues background download tasks.
     """
     urls = payload.urls
     quality = payload.quality
@@ -63,21 +64,10 @@ async def batch_cache_videos(payload: BatchCacheRequest, background_tasks: Backg
             # Let's leave it to global/default for now.
         )
         
-        # Create or reuse Transcription Record
-        # If source already has records, reuse the latest one to avoid creating orphan segments
-        existing = get_transcription_by_source(normalized_source)
-        if existing:
-            tid = existing['id']
-            logger.info(f"♻️ Reusing existing record ID {tid} for cache task on {normalized_source}")
-        else:
-            tid = save_transcription(
-                 source=normalized_source,
-                 raw_text="",
-                 source_type=source_type,
-                 asr_model="Cache-Only",
-                 status="pending"
-            )
-        
+        # Use ephemeral ID (negative timestamp) for in-memory task tracking only.
+        # Cache-only tasks should NOT create DB transcription records.
+        tid = -int(time.time() * 1000)
+
         # Queue Task
         background_tasks.add_task(
              process_cache_task,
